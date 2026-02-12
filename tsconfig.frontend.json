@@ -6,5 +6,5 @@
 		"types": ["vite/client"],
 		"lib": ["ESNext", "DOM", "DOM.Iterable"]
 	},
-	"include": ["frontend/**/*.ts", "frontend/**/*.d.ts", "frontend/**/*.vue"]
+	"include": ["frontend/**/*.ts", "frontend/**/*.d.ts", "frontend/**/*.vue", "shared/**/*.ts"]
 }

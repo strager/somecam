@@ -1,4 +1,12 @@
-<script setup lang="ts"></script>
+<script setup lang="ts">
+import { useRouter } from "vue-router";
+
+const router = useRouter();
+
+function startFindingMeaning(): void {
+	void router.push("/cards");
+}
+</script>
 
 <template>
 	<main>
@@ -18,7 +26,7 @@
 		</section>
 
 		<div class="cta">
-			<button type="button">Start Finding Meaning</button>
+			<button type="button" @click="startFindingMeaning">Start Finding Meaning</button>
 		</div>
 
 		<footer>
