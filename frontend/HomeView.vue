@@ -1,49 +1,111 @@
-<script setup lang="ts">
-import { onMounted, ref } from "vue";
-
-const loading = ref(true);
-const apiStatus = ref<string | null>(null);
-const errorMessage = ref<string | null>(null);
-
-onMounted(async () => {
-	try {
-		const response = await fetch("/api/health");
-		if (!response.ok) {
-			throw new Error(`Request failed with status ${response.status}`);
-		}
-
-		const payload = (await response.json()) as { status?: unknown };
-		if (payload.status !== "ok") {
-			throw new Error("Unexpected API response.");
-		}
-
-		apiStatus.value = payload.status;
-	} catch (error) {
-		errorMessage.value = error instanceof Error ? error.message : "Unknown error";
-	} finally {
-		loading.value = false;
-	}
-});
-</script>
+<script setup lang="ts"></script>
 
 <template>
 	<main>
-		<h1>SoMeCaM</h1>
-		<p v-if="loading">Checking API health...</p>
-		<p v-else-if="errorMessage">API Health Error: {{ errorMessage }}</p>
-		<p v-else>API Health: {{ apiStatus }}</p>
+		<header>
+			<h1>SoMeCaM</h1>
+			<p class="subtitle">Sources of Meaning Card Method</p>
+		</header>
+
+		<section class="purpose">
+			<h2>Explore What Makes Life Meaningful</h2>
+			<p>SoMeCaM is a method for mapping and exploring your personal sources of meaning. Based on 26 identified sources of meaning across five dimensions — self-transcendence, self-actualization, order, well-being, and relatedness — the method helps you reflect on what matters most in your life.</p>
+		</section>
+
+		<section class="privacy">
+			<h2>Your Privacy</h2>
+			<p>Your data is never stored on our servers. Your responses are saved locally in your browser so you can return to them later.</p>
+		</section>
+
+		<div class="cta">
+			<button type="button">Start Finding Meaning</button>
+		</div>
+
+		<footer>
+			<p class="citation">
+				Based on: la Cour, P. &amp; Schnell, T. (2020). Presentation of the Sources of Meaning Card Method: The SoMeCaM.
+				<cite>Journal of Humanistic Psychology, 60</cite>(1), 20–42.
+				<a href="https://doi.org/10.1177/0022167816669620" target="_blank" rel="noopener">doi:10.1177/0022167816669620</a>
+			</p>
+		</footer>
 	</main>
 </template>
 
 <style scoped>
 main {
-	margin: 2rem auto;
-	max-width: 34rem;
-	padding: 0 1rem;
-	font-family: "Segoe UI", sans-serif;
+	margin: 3rem auto;
+	max-width: 36rem;
+	padding: 0 1.5rem;
+	font-family: "Segoe UI", system-ui, sans-serif;
+	color: #1a1a1a;
+}
+
+header {
+	text-align: center;
+	margin-bottom: 2.5rem;
 }
 
 h1 {
-	margin-bottom: 1rem;
+	font-size: 2.5rem;
+	margin: 0 0 0.25rem;
+	letter-spacing: 0.02em;
+}
+
+.subtitle {
+	font-size: 1.1rem;
+	color: #555;
+	margin: 0;
+}
+
+h2 {
+	font-size: 1.25rem;
+	margin: 0 0 0.5rem;
+}
+
+section {
+	margin-bottom: 2rem;
+}
+
+section p {
+	line-height: 1.6;
+	margin: 0;
+}
+
+.cta {
+	text-align: center;
+	margin: 2.5rem 0;
+}
+
+.cta button {
+	font-size: 1.1rem;
+	padding: 0.75rem 2rem;
+	border: none;
+	border-radius: 6px;
+	background: #2a6e4e;
+	color: #fff;
+	cursor: pointer;
+	font-family: inherit;
+	transition: background 0.15s ease;
+}
+
+.cta button:hover {
+	background: #1f5a3e;
+}
+
+footer {
+	margin-top: 3rem;
+	padding-top: 1.5rem;
+	border-top: 1px solid #ddd;
+}
+
+.citation {
+	font-size: 0.85rem;
+	color: #666;
+	line-height: 1.5;
+	margin: 0;
+}
+
+.citation a {
+	color: #2a6e4e;
 }
 </style>
