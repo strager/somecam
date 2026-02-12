@@ -1,0 +1,10 @@
+{
+	"extends": "./tsconfig.json",
+	"compilerOptions": {
+		"erasableSyntaxOnly": true,
+		"rewriteRelativeImportExtensions": true,
+		"types": ["node"],
+		"lib": ["ESNext"]
+	},
+	"include": ["backend/**/*.ts", "vite.config.ts", "vitest.config.ts"]
+}

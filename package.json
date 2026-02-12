@@ -1,0 +1,28 @@
+{
+	"name": "somecam",
+	"version": "0.1.0",
+	"private": true,
+	"type": "module",
+	"scripts": {
+		"dev": "node --watch-path=backend --watch-path=openapi.yaml --watch-path=vite.config.ts backend/main.ts",
+		"typecheck": "tsc -p tsconfig.backend.json && vue-tsc --noEmit -p tsconfig.frontend.json",
+		"test": "vitest run",
+		"format": "prettier --write ."
+	},
+	"dependencies": {
+		"express": "^5.1.0",
+		"openapi-backend": "^5.15.0",
+		"vue": "^3.5.13",
+		"vue-router": "^4.5.1"
+	},
+	"devDependencies": {
+		"@types/express": "^5.0.3",
+		"@types/node": "^24.0.0",
+		"@vitejs/plugin-vue": "^6.0.1",
+		"prettier": "3.8.1",
+		"typescript": "^5.8.2",
+		"vite": "^7.1.2",
+		"vitest": "^3.2.4",
+		"vue-tsc": "^2.2.8"
+	}
+}
