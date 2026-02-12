@@ -21,6 +21,8 @@ Vite runs in middleware mode and is attached by `backend/main.ts`.
 - Dev server: `npm run dev`
 - Tests: `npm test`
 - Type checks: `npm run typecheck`
+- Lint: `npm run lint`
+- Lint (auto-fix): `npm run fix`
 - Format: `npm run format`
 
 ## Backend Rules

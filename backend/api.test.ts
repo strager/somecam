@@ -1,5 +1,4 @@
 import type { Server } from "node:http";
-import type { AddressInfo } from "node:net";
 
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
@@ -29,8 +28,7 @@ describe("API", () => {
 			throw new Error("Expected server to listen on a TCP port.");
 		}
 
-		const port = (address as AddressInfo).port;
-		baseUrl = `http://127.0.0.1:${port}`;
+		baseUrl = `http://127.0.0.1:${address.port.toString()}`;
 	});
 
 	afterAll(async () => {
@@ -41,7 +39,7 @@ describe("API", () => {
 
 		await new Promise<void>((resolve, reject) => {
 			runningServer.close((error) => {
-				if (error !== undefined && error !== null) {
+				if (error !== undefined) {
 					reject(error);
 					return;
 				}
@@ -72,9 +70,9 @@ describe("API", () => {
 		expect(body).toEqual(
 			expect.objectContaining({
 				type: "about:blank",
-				title: expect.any(String),
+				title: expect.any(String) as unknown,
 				status: 400,
-				detail: expect.any(String),
+				detail: expect.any(String) as unknown,
 			}),
 		);
 		expect(Array.isArray(body.errors)).toBe(true);

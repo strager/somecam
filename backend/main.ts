@@ -15,11 +15,11 @@ async function main(): Promise<void> {
 	app.use(vite.middlewares);
 
 	app.listen(port, () => {
-		console.log(`SoMeCaM dev server listening at http://localhost:${port}`);
+		console.log(`SoMeCaM dev server listening at http://localhost:${port.toString()}`);
 	});
 }
 
-main().catch((error) => {
+main().catch((error: unknown) => {
 	console.error("Failed to start SoMeCaM:", error);
 	process.exitCode = 1;
 });

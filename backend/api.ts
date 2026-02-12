@@ -3,19 +3,19 @@ import { OpenAPIBackend, type Context, type Request as OpenApiRequest, type Vali
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-type ApiProblemDetails = {
+interface ApiProblemDetails {
 	type: string;
 	title: string;
 	status: number;
 	detail: string;
 	errors?: unknown[];
-};
+}
 
-type ApiResponse = {
+interface ApiResponse {
 	statusCode: number;
 	body?: unknown;
 	headers?: Record<string, string>;
-};
+}
 
 const OPENAPI_PATH = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "openapi.yaml");
 
@@ -77,16 +77,10 @@ function normalizeApiResponse(value: unknown): ApiResponse {
 }
 
 function extractValidationErrors(context: Context): unknown[] {
-	const validationContext = context as Context & {
-		validation?: { errors?: unknown[] };
-	};
-	if (validationContext.validation === undefined) {
+	if (!Array.isArray(context.validation.errors)) {
 		return [];
 	}
-	if (!Array.isArray(validationContext.validation.errors)) {
-		return [];
-	}
-	return validationContext.validation.errors;
+	return context.validation.errors;
 }
 
 function collectResponseValidationErrors(validationResult: ValidationResult): unknown[] {
@@ -97,13 +91,12 @@ function collectResponseValidationErrors(validationResult: ValidationResult): un
 }
 
 function validateOperationResponse(context: Context, response: ApiResponse): ApiResponse {
-	const maybeOperation = (context as Context & { operation?: Context["operation"] }).operation;
-	if (maybeOperation === undefined || response.body === undefined) {
+	if (response.body === undefined) {
 		return response;
 	}
 
 	try {
-		const validationResult = api.validateResponse(response.body, maybeOperation, response.statusCode);
+		const validationResult = api.validateResponse(response.body, context.operation, response.statusCode);
 		const errors = collectResponseValidationErrors(validationResult);
 		if (errors.length === 0) {
 			return response;
@@ -162,7 +155,7 @@ function toOpenApiRequest(req: ExpressRequest): OpenApiRequest {
 		method: req.method,
 		path: req.url,
 		headers,
-		body: req.body,
+		body: req.body as unknown,
 	};
 }
 
@@ -197,9 +190,7 @@ api.register({
 });
 
 async function ensureApiInitialized(): Promise<void> {
-	if (initializePromise === undefined) {
-		initializePromise = api.init();
-	}
+	initializePromise ??= api.init();
 	await initializePromise;
 }
 
@@ -208,7 +199,7 @@ export async function createApiMiddleware(): Promise<RequestHandler> {
 
 	return async (req: ExpressRequest, res: Response, next): Promise<void> => {
 		try {
-			const result = await api.handleRequest(toOpenApiRequest(req), req, res);
+			const result: unknown = await api.handleRequest(toOpenApiRequest(req), req, res);
 			if (res.headersSent) {
 				return;
 			}

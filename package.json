@@ -7,6 +7,8 @@
 		"dev": "node --watch-path=backend --watch-path=openapi.yaml --watch-path=vite.config.ts backend/main.ts",
 		"typecheck": "tsc -p tsconfig.backend.json && vue-tsc --noEmit -p tsconfig.frontend.json",
 		"test": "vitest run",
+		"lint": "eslint .",
+		"fix": "eslint --fix .",
 		"format": "prettier --write ."
 	},
 	"dependencies": {
@@ -16,11 +18,16 @@
 		"vue-router": "^4.5.1"
 	},
 	"devDependencies": {
+		"@eslint/js": "^9.39.2",
 		"@types/express": "^5.0.3",
 		"@types/node": "^24.0.0",
 		"@vitejs/plugin-vue": "^6.0.1",
+		"eslint": "^9.39.2",
+		"eslint-config-prettier": "^10.1.8",
+		"eslint-plugin-vue": "^10.7.0",
 		"prettier": "3.8.1",
 		"typescript": "^5.8.2",
+		"typescript-eslint": "^8.55.0",
 		"vite": "^7.1.2",
 		"vitest": "^3.2.4",
 		"vue-tsc": "^2.2.8"
