@@ -3,6 +3,9 @@ import { OpenAPIBackend, type Context, type Request as OpenApiRequest, type Vali
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
+import type { AppConfig } from "./config.ts";
+import { createChatCompletion } from "./xai-client.ts";
+
 interface ApiProblemDetails {
 	type: string;
 	title: string;
@@ -26,6 +29,7 @@ const api = new OpenAPIBackend({
 });
 
 let initializePromise: Promise<unknown> | undefined;
+let appConfig: AppConfig | undefined;
 
 const problemJsonHeader = {
 	"content-type": "application/problem+json",
@@ -165,6 +169,50 @@ api.register({
 		body: { status: "ok" },
 		headers: { "content-type": "application/json" },
 	}),
+	postSummarize: async (context: Context): Promise<ApiResponse> => {
+		if (appConfig === undefined) {
+			return {
+				statusCode: 500,
+				headers: problemJsonHeader,
+				body: createProblemDetails(500, "Internal Server Error", "AI summarization is not configured."),
+			};
+		}
+
+		const { cardSource, cardDescription, questionText, answer } = context.request.requestBody as {
+			cardSource: string;
+			cardDescription: string;
+			questionText: string;
+			answer: string;
+		};
+
+		try {
+			const content = await createChatCompletion({
+				apiKey: appConfig.xaiApiKey,
+				model: "grok-4-1-fast-reasoning",
+				messages: [
+					{
+						role: "system",
+						content: "You are a reflective coach helping someone explore their sources of meaning. Summarize their answer in a short phrase of 3–8 words. No full sentences. Do not ask questions.",
+					},
+					{
+						role: "user",
+						content: `Card: ${cardSource} — ${cardDescription}\nQuestion: ${questionText}\nAnswer: ${answer}`,
+					},
+				],
+				maxTokens: 30,
+				temperature: 0.7,
+			});
+
+			return { statusCode: 200, body: { summary: content } };
+		} catch (error) {
+			const detail = error instanceof Error ? error.message : "Upstream AI service error.";
+			return {
+				statusCode: 502,
+				headers: problemJsonHeader,
+				body: createProblemDetails(502, "Bad Gateway", detail),
+			};
+		}
+	},
 	validationFail: (context: Context): ApiResponse => {
 		const errors = extractValidationErrors(context);
 		return {
@@ -194,7 +242,8 @@ async function ensureApiInitialized(): Promise<void> {
 	await initializePromise;
 }
 
-export async function createApiMiddleware(): Promise<RequestHandler> {
+export async function createApiMiddleware(config?: AppConfig): Promise<RequestHandler> {
+	appConfig = config;
 	await ensureApiInitialized();
 
 	return async (req: ExpressRequest, res: Response, next): Promise<void> => {

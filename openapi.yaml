@@ -45,6 +45,53 @@ paths:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/ProblemDetails"
+  /summarize:
+    post:
+      operationId: postSummarize
+      summary: Generate an AI summary of a card exploration answer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SummarizeRequest"
+      responses:
+        "200":
+          description: Summary generated successfully.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SummarizeResponse"
+        "400":
+          description: Request failed validation.
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+        "404":
+          description: Route not found.
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+        "405":
+          description: Method not allowed.
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+        "500":
+          description: Internal API error.
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+        "502":
+          description: Upstream AI service error.
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
 components:
   schemas:
     HealthResponse:
@@ -57,6 +104,35 @@ components:
           type: string
           enum:
             - ok
+    SummarizeRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - cardSource
+        - cardDescription
+        - questionText
+        - answer
+      properties:
+        cardSource:
+          type: string
+          minLength: 1
+        cardDescription:
+          type: string
+          minLength: 1
+        questionText:
+          type: string
+          minLength: 1
+        answer:
+          type: string
+          minLength: 1
+    SummarizeResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - summary
+      properties:
+        summary:
+          type: string
     ProblemDetails:
       type: object
       additionalProperties: true

@@ -21,10 +21,20 @@ Peter la Cour and Tatjana Schnell, 2016
   - openapi-backend <https://www.npmjs.com/package/openapi-backend> with request
     and response validation
 
-## Runbook
+## Setup
 
 ```bash
 npm ci
+cp .env.example .env
+```
+
+Edit `.env` and set `XAI_API_KEY` to your key from <https://console.x.ai/>.
+This enables AI-generated summaries on the /chosen page. The app runs without it,
+but summaries will be unavailable.
+
+## Runbook
+
+```bash
 npm run typecheck
 npm test
 npm run dev

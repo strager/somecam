@@ -1,6 +1,8 @@
 import express, { type Express, type NextFunction, type Request, type Response } from "express";
 
 import { createApiMiddleware } from "./api.ts";
+import type { AppConfig } from "./config.ts";
+import { loadConfig } from "./config.ts";
 
 function internalErrorBody(): string {
 	return JSON.stringify({
@@ -14,9 +16,16 @@ function internalErrorBody(): string {
 export async function createApp(): Promise<Express> {
 	const app = express();
 
+	let config: AppConfig | undefined;
+	try {
+		config = loadConfig();
+	} catch {
+		console.warn("XAI_API_KEY is not set; AI summarization will be disabled.");
+	}
+
 	app.use(express.json());
 	app.use(express.urlencoded({ extended: true }));
-	app.use("/api", await createApiMiddleware());
+	app.use("/api", await createApiMiddleware(config));
 
 	app.use((error: unknown, _req: Request, res: Response, _next: NextFunction): void => {
 		const message = error instanceof Error ? error.message : String(error);

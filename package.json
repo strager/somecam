@@ -4,7 +4,7 @@
 	"private": true,
 	"type": "module",
 	"scripts": {
-		"dev": "node --watch-path=backend --watch-path=openapi.yaml --watch-path=vite.config.ts backend/main.ts",
+		"dev": "node --env-file-if-exists=.env --watch-path=backend --watch-path=openapi.yaml --watch-path=vite.config.ts backend/main.ts",
 		"typecheck": "tsc -p tsconfig.backend.json && vue-tsc --noEmit -p tsconfig.frontend.json",
 		"test": "vitest run",
 		"lint": "eslint .",

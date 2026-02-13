@@ -1,0 +1,54 @@
+interface ChatMessage {
+	role: "system" | "user" | "assistant";
+	content: string;
+}
+
+interface ChatCompletionOptions {
+	apiKey: string;
+	model: string;
+	messages: ChatMessage[];
+	maxTokens?: number;
+	temperature?: number;
+}
+
+interface ChatCompletionResponse {
+	choices: {
+		message: {
+			content: string;
+		};
+	}[];
+}
+
+export async function createChatCompletion(options: ChatCompletionOptions): Promise<string> {
+	const body: Record<string, unknown> = {
+		model: options.model,
+		messages: options.messages,
+	};
+	if (options.maxTokens !== undefined) {
+		body.max_tokens = options.maxTokens;
+	}
+	if (options.temperature !== undefined) {
+		body.temperature = options.temperature;
+	}
+
+	const response = await fetch("https://api.x.ai/v1/chat/completions", {
+		method: "POST",
+		headers: {
+			"Content-Type": "application/json",
+			Authorization: `Bearer ${options.apiKey}`,
+		},
+		body: JSON.stringify(body),
+	});
+
+	if (!response.ok) {
+		const text = await response.text();
+		throw new Error(`X AI API error (${response.status.toString()}): ${text}`);
+	}
+
+	const data = (await response.json()) as ChatCompletionResponse;
+	if (data.choices.length === 0 || !data.choices[0].message.content) {
+		throw new Error("X AI API returned no choices.");
+	}
+
+	return data.choices[0].message.content;
+}
