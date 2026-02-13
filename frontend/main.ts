@@ -3,7 +3,9 @@ import { createRouter, createWebHistory } from "vue-router";
 
 import App from "./App.vue";
 import CardSwipeView from "./CardSwipeView.vue";
+import ChosenCardsView from "./ChosenCardsView.vue";
 import HomeView from "./HomeView.vue";
+import NarrowDownView from "./NarrowDownView.vue";
 
 const router = createRouter({
 	history: createWebHistory(),
@@ -15,6 +17,14 @@ const router = createRouter({
 		{
 			path: "/cards",
 			component: CardSwipeView,
+		},
+		{
+			path: "/narrow-down",
+			component: NarrowDownView,
+		},
+		{
+			path: "/chosen",
+			component: ChosenCardsView,
 		},
 	],
 });

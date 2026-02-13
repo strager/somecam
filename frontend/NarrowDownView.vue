@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
 import { useRouter } from "vue-router";
 
 import type { MeaningCard, SwipeDirection } from "../shared/meaning-cards";
@@ -11,54 +11,44 @@ interface SwipeRecord {
 	direction: SwipeDirection;
 }
 
-interface SavedProgress {
-	shuffledCardIds: string[];
+interface NarrowDownProgress {
+	cardIds: string[];
 	swipeHistory: SwipeRecord[];
 }
 
-const STORAGE_KEY = "somecam-progress";
 const NARROWDOWN_KEY = "somecam-narrowdown";
 const CHOSEN_KEY = "somecam-chosen";
 
 const router = useRouter();
+const cardsById = new Map(MEANING_CARDS.map((c) => [c.id, c]));
 
-const shuffledCards = ref<MeaningCard[]>([]);
+const cards = ref<MeaningCard[]>([]);
 const currentIndex = ref(0);
 const swipeHistory = ref<SwipeRecord[]>([]);
 const swipeCardRef = ref<InstanceType<typeof SwipeCard> | null>(null);
 
-const currentCard = computed(() => shuffledCards.value[currentIndex.value] ?? null);
-const totalCards = computed(() => shuffledCards.value.length);
+const currentCard = computed(() => cards.value[currentIndex.value] ?? null);
+const totalCards = computed(() => cards.value.length);
 const progressPercent = computed(() => (totalCards.value > 0 ? Math.round((currentIndex.value / totalCards.value) * 100) : 0));
 const isComplete = computed(() => currentIndex.value >= totalCards.value);
 const isLastCard = computed(() => currentIndex.value >= totalCards.value - 1);
 const canUndo = computed(() => swipeHistory.value.length > 0);
-
-function shuffle<T>(array: readonly T[]): T[] {
-	const result = [...array];
-	for (let i = result.length - 1; i > 0; i--) {
-		const j = Math.floor(Math.random() * (i + 1));
-		[result[i], result[j]] = [result[j], result[i]];
-	}
-	return result;
-}
-
-const cardsById = new Map(MEANING_CARDS.map((c) => [c.id, c]));
+const keptCount = computed(() => swipeHistory.value.filter((r) => r.direction === "agree").length);
 
 function saveProgress(): void {
-	const data: SavedProgress = {
-		shuffledCardIds: shuffledCards.value.map((c) => c.id),
+	const data: NarrowDownProgress = {
+		cardIds: cards.value.map((c) => c.id),
 		swipeHistory: swipeHistory.value,
 	};
-	localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+	localStorage.setItem(NARROWDOWN_KEY, JSON.stringify(data));
 }
 
-function loadProgress(): SavedProgress | null {
+function loadProgress(): NarrowDownProgress | null {
 	try {
-		const raw = localStorage.getItem(STORAGE_KEY);
+		const raw = localStorage.getItem(NARROWDOWN_KEY);
 		if (raw === null) return null;
-		const data = JSON.parse(raw) as SavedProgress;
-		if (!Array.isArray(data.shuffledCardIds) || data.shuffledCardIds.length === 0) return null;
+		const data = JSON.parse(raw) as NarrowDownProgress;
+		if (!Array.isArray(data.cardIds) || data.cardIds.length === 0) return null;
 		if (!Array.isArray(data.swipeHistory)) return null;
 		return data;
 	} catch {
@@ -68,16 +58,18 @@ function loadProgress(): SavedProgress | null {
 
 onMounted(() => {
 	const saved = loadProgress();
-	if (saved) {
-		const cards = saved.shuffledCardIds.map((id) => cardsById.get(id)).filter((c): c is MeaningCard => c !== undefined);
-		if (cards.length > 0) {
-			shuffledCards.value = cards;
-			swipeHistory.value = saved.swipeHistory;
-			currentIndex.value = saved.swipeHistory.length;
-			return;
-		}
+	if (!saved) {
+		void router.replace("/cards");
+		return;
 	}
-	shuffledCards.value = shuffle(MEANING_CARDS);
+	const resolved = saved.cardIds.map((id) => cardsById.get(id)).filter((c): c is MeaningCard => c !== undefined);
+	if (resolved.length === 0) {
+		void router.replace("/cards");
+		return;
+	}
+	cards.value = resolved;
+	swipeHistory.value = saved.swipeHistory;
+	currentIndex.value = saved.swipeHistory.length;
 });
 
 function handleSwipe(direction: SwipeDirection): void {
@@ -105,48 +97,39 @@ function handleUndo(): void {
 	saveProgress();
 }
 
-function continueToNextPhase(): void {
-	const agreeCardIds = swipeHistory.value.filter((r) => r.direction === "agree").map((r) => r.cardId);
-	const unsureCardIds = swipeHistory.value.filter((r) => r.direction === "unsure").map((r) => r.cardId);
-	const cardIdsToConsider = agreeCardIds.length < 3 ? agreeCardIds.concat(unsureCardIds) : agreeCardIds;
-
-	if (cardIdsToConsider.length > 5) {
-		localStorage.setItem(NARROWDOWN_KEY, JSON.stringify({ cardIds: cardIdsToConsider, swipeHistory: [] }));
-		void router.push("/narrow-down");
-	} else {
-		localStorage.setItem(CHOSEN_KEY, JSON.stringify(cardIdsToConsider));
-		void router.push("/chosen");
-	}
-}
+watch(isComplete, (done) => {
+	if (!done) return;
+	const keptCardIds = swipeHistory.value.filter((r) => r.direction === "agree").map((r) => r.cardId);
+	localStorage.setItem(CHOSEN_KEY, JSON.stringify(keptCardIds));
+	localStorage.removeItem(NARROWDOWN_KEY);
+	void router.push("/chosen");
+});
 </script>
 
 <template>
 	<main>
 		<header>
-			<h1>SoMeCaM</h1>
+			<h1>Narrow Down</h1>
+			<p class="instruction">Keep your top sources of meaning (aim for 3–5)</p>
 			<div class="progress">
 				<div class="progress-bar">
 					<div class="progress-fill" :style="{ width: `${String(progressPercent)}%` }" />
 				</div>
-				<span class="progress-text"> {{ progressPercent }}% ({{ currentIndex }}/{{ totalCards }}) </span>
+				<span class="progress-text">
+					{{ keptCount }} kept · {{ currentIndex }}/{{ totalCards }}
+					reviewed
+				</span>
 			</div>
 		</header>
 
 		<div v-if="!isComplete" class="card-area">
 			<div v-if="!isLastCard" class="card-surface blank-card" />
-			<SwipeCard ref="swipeCardRef" :key="currentIndex" :card="currentCard!" @swiped="handleSwipe" />
-		</div>
-
-		<div v-else class="end-state">
-			<h2>All cards reviewed!</h2>
-			<p>You have reviewed all {{ totalCards }} sources of meaning.</p>
-			<button type="button" class="btn primary" @click="continueToNextPhase">Continue to Next Phase</button>
+			<SwipeCard ref="swipeCardRef" :key="currentIndex" :card="currentCard!" :allow-unsure="false" @swiped="handleSwipe" />
 		</div>
 
 		<div class="controls">
-			<button type="button" class="btn disagree" :disabled="isComplete" @click="handleButtonSwipe('disagree')">Disagree</button>
-			<button type="button" class="btn unsure" :disabled="isComplete" @click="handleButtonSwipe('unsure')">Unsure</button>
-			<button type="button" class="btn agree" :disabled="isComplete" @click="handleButtonSwipe('agree')">Agree</button>
+			<button type="button" class="btn disagree" :disabled="isComplete" @click="handleButtonSwipe('disagree')">Remove</button>
+			<button type="button" class="btn agree" :disabled="isComplete" @click="handleButtonSwipe('agree')">Keep</button>
 		</div>
 
 		<div class="undo-area">
@@ -171,8 +154,14 @@ header {
 
 h1 {
 	font-size: 2rem;
-	margin: 0 0 1rem;
+	margin: 0 0 0.5rem;
 	letter-spacing: 0.02em;
+}
+
+.instruction {
+	color: #555;
+	margin: 0 0 1rem;
+	font-size: 1rem;
 }
 
 .progress {
@@ -211,22 +200,6 @@ h1 {
 	align-items: center;
 	min-height: 16rem;
 	margin-bottom: 1.5rem;
-}
-
-.end-state {
-	text-align: center;
-	padding: 2rem 0;
-}
-
-.end-state h2 {
-	font-size: 1.4rem;
-	margin: 0 0 0.5rem;
-}
-
-.end-state p {
-	color: #555;
-	margin: 0 0 1.5rem;
-	line-height: 1.5;
 }
 
 .controls {
@@ -274,26 +247,6 @@ h1 {
 
 .btn.disagree:hover:not(:disabled) {
 	background: #a83232;
-}
-
-.btn.unsure {
-	background: #6b7280;
-	color: #fff;
-}
-
-.btn.unsure:hover:not(:disabled) {
-	background: #565c66;
-}
-
-.btn.primary {
-	font-size: 1.1rem;
-	padding: 0.75rem 2rem;
-	background: #2a6e4e;
-	color: #fff;
-}
-
-.btn.primary:hover {
-	background: #1f5a3e;
 }
 
 .btn.undo {

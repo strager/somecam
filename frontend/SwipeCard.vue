@@ -4,9 +4,13 @@ import { computed, ref } from "vue";
 import type { MeaningCard } from "../shared/meaning-cards";
 import type { SwipeDirection } from "../shared/meaning-cards";
 
-defineProps<{
-	card: MeaningCard;
-}>();
+const props = withDefaults(
+	defineProps<{
+		card: MeaningCard;
+		allowUnsure?: boolean;
+	}>(),
+	{ allowUnsure: true },
+);
 
 const emit = defineEmits<{
 	swiped: [direction: SwipeDirection];
@@ -33,6 +37,7 @@ const dominantDirection = computed<SwipeDirection | null>(() => {
 	if (ax >= ay) {
 		return offsetX.value > 0 ? "agree" : "disagree";
 	}
+	if (!props.allowUnsure) return null;
 	return "unsure";
 });
 
@@ -134,6 +139,7 @@ function onPointerUp(): void {
 }
 
 function flyAway(direction: SwipeDirection, durationMs = FLY_AWAY_DURATION_MS): void {
+	if (!props.allowUnsure && direction === "unsure") return;
 	flyingAway.value = true;
 	flyDirection.value = direction;
 	flyDurationMs.value = durationMs;
