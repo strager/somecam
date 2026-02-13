@@ -125,7 +125,7 @@ watch(isComplete, (done) => {
 
 		<div v-if="!isComplete" class="card-area">
 			<div v-if="!isLastCard" class="card-surface blank-card" />
-			<SwipeCard ref="swipeCardRef" :key="currentIndex" :card="currentCard!" :allow-unsure="false" @swiped="handleSwipe" />
+			<SwipeCard ref="swipeCardRef" :key="currentIndex" :card="currentCard!" :allow-unsure="false" :show-source="true" @swiped="handleSwipe" />
 		</div>
 
 		<div class="controls">

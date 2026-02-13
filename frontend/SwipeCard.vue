@@ -8,8 +8,9 @@ const props = withDefaults(
 	defineProps<{
 		card: MeaningCard;
 		allowUnsure?: boolean;
+		showSource?: boolean;
 	}>(),
-	{ allowUnsure: true },
+	{ allowUnsure: true, showSource: false },
 );
 
 const emit = defineEmits<{
@@ -160,6 +161,7 @@ defineExpose({ flyAway });
 		<span v-if="dominantDirection === 'agree' || flyDirection === 'agree'" class="direction-label agree" :style="{ opacity: labelOpacity }"> Agree </span>
 		<span v-if="dominantDirection === 'disagree' || flyDirection === 'disagree'" class="direction-label disagree" :style="{ opacity: labelOpacity }"> Disagree </span>
 		<span v-if="dominantDirection === 'unsure' || flyDirection === 'unsure'" class="direction-label unsure" :style="{ opacity: labelOpacity }"> Unsure </span>
+		<p v-if="showSource" class="card-source">{{ card.source }}</p>
 		<p class="card-text">{{ card.description }}</p>
 	</div>
 </template>
@@ -181,6 +183,7 @@ defineExpose({ flyAway });
 	position: relative;
 	margin: 0 auto;
 	display: flex;
+	flex-direction: column;
 	align-items: center;
 	justify-content: center;
 	text-align: center;
@@ -235,6 +238,17 @@ defineExpose({ flyAway });
 	to {
 		opacity: 1;
 	}
+}
+
+.card-source {
+	font-size: 0.75rem;
+	font-weight: 600;
+	text-transform: uppercase;
+	letter-spacing: 0.05em;
+	color: #888;
+	margin: 0 0 0.5rem;
+	position: relative;
+	z-index: 1;
 }
 
 .card-text {
