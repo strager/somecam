@@ -129,24 +129,17 @@ async function submitAnswer(): Promise<void> {
 	entries.value[idx].submitted = true;
 	persistEntries();
 
-	if (allAnswered.value) {
-		void router.push("/chosen");
-		return;
-	}
-
 	const remaining = remainingQuestionIds();
-	if (remaining.length === 0) {
-		void router.push("/chosen");
-		return;
-	}
 
 	const questions = [...entries.value.filter((e) => e.submitted).map((e) => ({ questionId: e.questionId, answer: e.userAnswer })), ...remaining.map((qId) => ({ questionId: qId, answer: "" }))];
 
-	inferring.value = true;
+	const inferPromise = remaining.length > 0
+		? fetchInferredAnswers({ cardId, questions })
+			.then((r) => new Map(r.inferredAnswers.map((ia) => [ia.questionId, ia.answer])))
+			.catch(() => new Map<string, string>())
+		: Promise.resolve(new Map<string, string>());
 
-	const inferPromise = fetchInferredAnswers({ cardId, questions })
-		.then((r) => new Map(r.inferredAnswers.map((ia) => [ia.questionId, ia.answer])))
-		.catch(() => new Map<string, string>());
+	inferring.value = remaining.length > 0;
 
 	const depthResult = await fetchAnswerDepthCheck({
 		cardId,
@@ -177,7 +170,6 @@ async function submitAnswer(): Promise<void> {
 
 function applyInferAndAdvance(inferredMap: Map<string, string>, remaining: string[]): void {
 	if (remaining.length === 0) {
-		void router.push("/chosen");
 		return;
 	}
 
@@ -212,14 +204,8 @@ function applyInferAndAdvance(inferredMap: Map<string, string>, remaining: strin
 }
 
 async function inferAndAdvance(): Promise<void> {
-	if (allAnswered.value) {
-		void router.push("/chosen");
-		return;
-	}
-
 	const remaining = remainingQuestionIds();
 	if (remaining.length === 0) {
-		void router.push("/chosen");
 		return;
 	}
 
@@ -239,7 +225,7 @@ async function inferAndAdvance(): Promise<void> {
 	applyInferAndAdvance(inferredMap, remaining);
 }
 
-function stopExploring(): void {
+function finishExploring(): void {
 	const idx = activeIndex.value;
 	if (idx < entries.value.length && currentAnswer.value.trim() !== "") {
 		entries.value[idx].userAnswer = currentAnswer.value.trim();
@@ -297,8 +283,6 @@ onMounted(() => {
 			if (entries.value.length < EXPLORE_QUESTIONS.length) {
 				// Refreshed during inference — re-run it
 				void inferAndAdvance();
-			} else {
-				void router.push("/chosen");
 			}
 		} else {
 			// Initialize currentAnswer from the active entry's prefill (or existing user answer)
@@ -335,7 +319,7 @@ onMounted(() => {
 					<span>Thinking about your next question...</span>
 				</div>
 
-				<div v-else-if="displayedQuestion && !allAnswered">
+				<div v-else-if="displayedQuestion && (!allAnswered || depthCheckShown)">
 					<p class="question">{{ displayedQuestion.topic }}: {{ displayedQuestion.text }}</p>
 					<p v-if="activeEntryPrefilled" class="prefill-hint"><em>This answer was pre-filled based on your previous responses. Feel free to edit it.</em></p>
 					<ExploreTextarea v-model="currentAnswer" :rows="5" placeholder="Type your reflection here..." @update:model-value="debouncedPersist" @blur="persistEntries()" @keydown="onKeydown" />
@@ -347,7 +331,7 @@ onMounted(() => {
 					<p v-else class="hint">Shift + Enter to submit</p>
 				</div>
 
-				<button class="stop-btn" @click="stopExploring">Stop Exploring</button>
+				<button class="finish-btn" @click="finishExploring">Finish exploring</button>
 			</div>
 		</div>
 	</main>
@@ -479,21 +463,21 @@ h2 {
 	margin: 0 0 0.5rem;
 }
 
-.stop-btn {
+.finish-btn {
 	display: block;
 	width: 100%;
 	margin-top: 1.5rem;
 	padding: 0.75rem 1.5rem;
 	font-size: 1rem;
 	font-weight: 600;
-	color: #c0392b;
+	color: #2a6e4e;
 	background: transparent;
-	border: 1.5px solid #c0392b;
+	border: 1.5px solid #2a6e4e;
 	border-radius: 8px;
 	cursor: pointer;
 }
 
-.stop-btn:hover {
-	background: #fdf0ef;
+.finish-btn:hover {
+	background: #eaf5ef;
 }
 </style>
