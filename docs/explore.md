@@ -51,9 +51,9 @@ sources-of-meaning overview.
 
 After the user submits an answer, the app fires two requests in parallel: the
 existing infer-answers call and a new **check-answer-depth** call. The depth
-check asks an LLM whether the answer shows genuine reflection (specific personal
-details, self-awareness, explores "why"). If the answer looks too brief or
-generic, a follow-up question is displayed inline — styled in amber to
+check asks an LLM whether the answer shows personal engagement rather than a
+dismissive or throwaway response. If the answer is clearly low-effort, a
+follow-up question is displayed inline — styled in amber to
 distinguish it from the regular green questions — nudging the user toward deeper
 reflection.
 
