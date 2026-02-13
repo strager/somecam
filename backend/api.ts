@@ -210,15 +210,15 @@ api.register({
 		try {
 			const content = await createChatCompletion({
 				apiKey: appConfig.xaiApiKey,
-				model: "grok-4-fast-non-reasoning",
+				model: "grok-4-1-fast-reasoning",
 				messages: [
 					{
 						role: "system",
-						content: "You are a reflective coach helping someone explore their sources of meaning. Summarize their answer in a short phrase of 3–8 words. No full sentences. Do not ask questions.",
+						content: `You are a reflective coach helping someone explore their sources of meaning. Summarize their answer.\n\n- 4 to 10 words\n- Do not ask questions\n- Match the vocabulary of the user's answer\n- Do not use the word '${question.topic}' in any form\n\nTopic: ${card.source} — ${card.description}\n\nQuestion given to user: ${question.text}`,
 					},
 					{
 						role: "user",
-						content: `Card: ${card.source} — ${card.description}\nQuestion: ${question.text}\nAnswer: ${answer}`,
+						content: answer,
 					},
 				],
 				maxTokens: 30,
