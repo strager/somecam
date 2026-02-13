@@ -3,6 +3,7 @@ import { onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
 
 import { fetchSummary } from "./api";
+import StartOverButton from "./StartOverButton.vue";
 import { EXPLORE_QUESTIONS } from "../shared/explore-questions";
 import type { MeaningCard } from "../shared/meaning-cards";
 import { MEANING_CARDS } from "../shared/meaning-cards";
@@ -178,6 +179,8 @@ onMounted(() => {
 		</div>
 
 		<button class="report-btn" @click="router.push('/report')">Download Report</button>
+
+		<StartOverButton />
 	</main>
 </template>
 

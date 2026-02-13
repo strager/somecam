@@ -4,6 +4,7 @@ import { useRouter } from "vue-router";
 
 import type { MeaningCard, SwipeDirection } from "../shared/meaning-cards";
 import { MEANING_CARDS } from "../shared/meaning-cards";
+import StartOverButton from "./StartOverButton.vue";
 import SwipeCard from "./SwipeCard.vue";
 
 interface SwipeRecord {
@@ -152,6 +153,8 @@ function continueToNextPhase(): void {
 		<div class="undo-area">
 			<button type="button" class="btn undo" :disabled="!canUndo" @click="handleUndo">Undo</button>
 		</div>
+
+		<StartOverButton />
 	</main>
 </template>
 

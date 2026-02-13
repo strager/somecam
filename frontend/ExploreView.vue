@@ -4,6 +4,7 @@ import { useRoute, useRouter } from "vue-router";
 
 import { fetchAnswerDepthCheck, fetchInferredAnswers } from "./api";
 import ExploreTextarea from "./ExploreTextarea.vue";
+import StartOverButton from "./StartOverButton.vue";
 import type { ExploreQuestion } from "../shared/explore-questions";
 import { EXPLORE_QUESTIONS } from "../shared/explore-questions";
 import type { MeaningCard } from "../shared/meaning-cards";
@@ -336,6 +337,8 @@ onMounted(() => {
 				<button class="finish-btn" @click="finishExploring">Finish exploring</button>
 			</div>
 		</div>
+
+		<StartOverButton />
 	</main>
 </template>
 
