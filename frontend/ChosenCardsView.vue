@@ -131,9 +131,7 @@ onMounted(() => {
 			const card = cardsById.get(cardId);
 			if (card === undefined) continue;
 
-			const validEntries = answered
-				.map((e) => ({ entry: e, question: questionsById.get(e.questionId) }))
-				.filter((v): v is { entry: ExploreEntry; question: (typeof EXPLORE_QUESTIONS)[number] } => v.question !== undefined);
+			const validEntries = answered.map((e) => ({ entry: e, question: questionsById.get(e.questionId) })).filter((v): v is { entry: ExploreEntry; question: (typeof EXPLORE_QUESTIONS)[number] } => v.question !== undefined);
 			cardSummaryEntries.value[cardId] = validEntries.map((v) => ({
 				questionId: v.entry.questionId,
 				topic: v.question.topic,
@@ -172,7 +170,9 @@ onMounted(() => {
 				<div v-else-if="cardSummaryEntries[card.id]" class="summary-block">
 					<div v-for="entry in cardSummaryEntries[card.id]" :key="entry.questionId" class="summary-item">
 						<div v-if="entry.error" class="summary-error">Could not load summary.</div>
-						<p v-else-if="entry.summary"><strong>{{ entry.topic }}:</strong> {{ entry.summary }}</p>
+						<p v-else-if="entry.summary">
+							<strong>{{ entry.topic }}:</strong> {{ entry.summary }}
+						</p>
 					</div>
 				</div>
 			</div>

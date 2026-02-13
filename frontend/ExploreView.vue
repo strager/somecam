@@ -135,11 +135,12 @@ async function submitAnswer(): Promise<void> {
 
 	const questions = [...entries.value.filter((e) => e.submitted).map((e) => ({ questionId: e.questionId, answer: e.userAnswer })), ...remaining.map((qId) => ({ questionId: qId, answer: "" }))];
 
-	const inferPromise = remaining.length > 0
-		? fetchInferredAnswers({ cardId, questions })
-			.then((r) => new Map(r.inferredAnswers.map((ia) => [ia.questionId, ia.answer])))
-			.catch(() => new Map<string, string>())
-		: Promise.resolve(new Map<string, string>());
+	const inferPromise =
+		remaining.length > 0
+			? fetchInferredAnswers({ cardId, questions })
+					.then((r) => new Map(r.inferredAnswers.map((ia) => [ia.questionId, ia.answer])))
+					.catch(() => new Map<string, string>())
+			: Promise.resolve(new Map<string, string>());
 
 	inferring.value = remaining.length > 0;
 

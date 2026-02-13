@@ -121,13 +121,15 @@ onMounted(() => {
 		<section class="detail-section">
 			<h2>Self reflections</h2>
 			<div v-for="report in reports" :key="report.card.id" class="report-card">
-				<h3>{{ report.card.description }} <span class="source-label">({{ report.card.source }})</span></h3>
+				<h3>
+					{{ report.card.description }} <span class="source-label">({{ report.card.source }})</span>
+				</h3>
 				<div v-for="q in report.questions" :key="q.topic" class="qa-block">
 					<p class="qa-topic">{{ q.question }}</p>
 					<p v-if="q.answer" class="qa-answer">{{ q.answer }}</p>
 					<p v-else class="qa-unanswered">Not yet answered.</p>
 				</div>
-				</div>
+			</div>
 		</section>
 	</main>
 </template>
@@ -265,7 +267,7 @@ h2 + .report-card {
 	line-height: 1.5;
 	color: #555;
 	white-space: pre-wrap;
-	padding-left: .5rem;
+	padding-left: 0.5rem;
 	border-left: 3px solid #2a6e4e;
 }
 
