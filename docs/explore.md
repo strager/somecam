@@ -46,6 +46,25 @@ full history of their reflections. After the fifth and final answer is submitted
 the app automatically navigates to `/chosen`, returning the user to the
 sources-of-meaning overview.
 
+## Answer depth check
+
+After the user submits an answer, the app fires two requests in parallel: the
+existing infer-answers call and a new **check-answer-depth** call. The depth
+check asks an LLM whether the answer shows genuine reflection (specific personal
+details, self-awareness, explores "why"). If the answer looks too brief or
+generic, a follow-up question is displayed inline — styled in amber to
+distinguish it from the regular green questions — nudging the user toward deeper
+reflection.
+
+The user can edit their answer in response to the follow-up, or simply press
+**Next** again to skip the guardrail and continue to the next question. The
+guardrail never blocks progress.
+
+If the depth-check request fails (network error, API error, unparseable
+response), the app fails open: it treats the answer as sufficient and advances
+normally. This ensures the depth check is purely additive and never degrades the
+core explore experience.
+
 ## Using "Stop Exploring" for early exit
 
 At any point during the exploration, a **Stop Exploring** button is visible below

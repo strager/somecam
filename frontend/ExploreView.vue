@@ -2,7 +2,7 @@
 import { computed, onMounted, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
 
-import { fetchInferredAnswers } from "./api";
+import { fetchAnswerDepthCheck, fetchInferredAnswers } from "./api";
 import type { ExploreQuestion } from "../shared/explore-questions";
 import { EXPLORE_QUESTIONS } from "../shared/explore-questions";
 import type { MeaningCard } from "../shared/meaning-cards";
@@ -15,6 +15,8 @@ interface ExploreEntry {
 	userAnswer: string;
 	prefilledAnswer: string;
 	submitted: boolean;
+	guardrailText: string;
+	submittedAfterGuardrail: boolean;
 }
 
 type ExploreData = Record<string, ExploreEntry[]>;
@@ -31,6 +33,9 @@ const card = ref<MeaningCard | undefined>(undefined);
 const entries = ref<ExploreEntry[]>([]);
 const currentAnswer = ref("");
 const inferring = ref(false);
+const depthCheckFollowUp = ref("");
+const depthCheckShown = ref(false);
+const pendingInferResult = ref<Map<string, string> | null>(null);
 
 const activeIndex = computed(() => {
 	const idx = entries.value.findIndex((e) => !e.submitted);
@@ -43,8 +48,20 @@ const activeQuestion = computed<ExploreQuestion | undefined>(() => {
 	return questionsById.get(entries.value[idx].questionId);
 });
 
+const displayedQuestion = computed<ExploreQuestion | undefined>(() => {
+	if (activeQuestion.value !== undefined) return activeQuestion.value;
+	if (!depthCheckShown.value) return undefined;
+	const last = entries.value.at(-1);
+	if (last === undefined) return undefined;
+	return questionsById.get(last.questionId);
+});
+
 const answeredEntries = computed(() => {
-	return entries.value.filter((e) => e.submitted);
+	const submitted = entries.value.filter((e) => e.submitted);
+	if (depthCheckShown.value && submitted.length > 0) {
+		return submitted.slice(0, -1);
+	}
+	return submitted;
 });
 
 const allAnswered = computed(() => {
@@ -70,6 +87,21 @@ function remainingQuestionIds(): string[] {
 }
 
 async function submitAnswer(): Promise<void> {
+	if (depthCheckShown.value) {
+		// User pressing Next to skip the guardrail
+		const idx = entries.value.length - 1;
+		if (idx >= 0 && entries.value[idx].submitted) {
+			entries.value[idx].userAnswer = currentAnswer.value.trim();
+			entries.value[idx].submittedAfterGuardrail = true;
+			persistEntries();
+		}
+		depthCheckShown.value = false;
+		depthCheckFollowUp.value = "";
+		applyInferAndAdvance(pendingInferResult.value ?? new Map<string, string>(), remainingQuestionIds());
+		pendingInferResult.value = null;
+		return;
+	}
+
 	const idx = activeIndex.value;
 	if (idx >= entries.value.length) return;
 
@@ -80,7 +112,86 @@ async function submitAnswer(): Promise<void> {
 	entries.value[idx].submitted = true;
 	persistEntries();
 
-	await inferAndAdvance();
+	if (allAnswered.value) {
+		void router.push("/chosen");
+		return;
+	}
+
+	const remaining = remainingQuestionIds();
+	if (remaining.length === 0) {
+		void router.push("/chosen");
+		return;
+	}
+
+	const questions = [...entries.value.filter((e) => e.submitted).map((e) => ({ questionId: e.questionId, answer: e.userAnswer })), ...remaining.map((qId) => ({ questionId: qId, answer: "" }))];
+
+	inferring.value = true;
+
+	const inferPromise = fetchInferredAnswers({ cardId, questions })
+		.then((r) => new Map(r.inferredAnswers.map((ia) => [ia.questionId, ia.answer])))
+		.catch(() => new Map<string, string>());
+
+	const depthResult = await fetchAnswerDepthCheck({
+		cardId,
+		questionId: entries.value[idx].questionId,
+		answer: answerText,
+	}).catch(() => ({ sufficient: true, followUpQuestion: "" }));
+
+	if (!depthResult.sufficient && depthResult.followUpQuestion) {
+		// Depth check failed fast — cache the still-pending infer promise
+		inferring.value = false;
+		pendingInferResult.value = null;
+		entries.value[idx].guardrailText = depthResult.followUpQuestion;
+		persistEntries();
+		depthCheckFollowUp.value = depthResult.followUpQuestion;
+		depthCheckShown.value = true;
+		// Resolve infer in background so it's ready when user skips
+		void inferPromise.then((result) => {
+			pendingInferResult.value = result;
+		});
+		return;
+	}
+
+	const inferResult = await inferPromise;
+	inferring.value = false;
+
+	applyInferAndAdvance(inferResult, remaining);
+}
+
+function applyInferAndAdvance(inferredMap: Map<string, string>, remaining: string[]): void {
+	if (remaining.length === 0) {
+		void router.push("/chosen");
+		return;
+	}
+
+	// Pick next question: prefer one with a pre-fill
+	let nextQuestionId: string | undefined;
+	let nextPrefill = "";
+
+	for (const qId of remaining) {
+		const inferred = inferredMap.get(qId);
+		if (inferred !== undefined) {
+			nextQuestionId = qId;
+			nextPrefill = inferred;
+			break;
+		}
+	}
+
+	if (nextQuestionId === undefined) {
+		const randomIndex = Math.floor(Math.random() * remaining.length);
+		nextQuestionId = remaining[randomIndex];
+	}
+
+	entries.value.push({
+		questionId: nextQuestionId,
+		userAnswer: "",
+		prefilledAnswer: nextPrefill,
+		submitted: false,
+		guardrailText: "",
+		submittedAfterGuardrail: false,
+	});
+	persistEntries();
+	currentAnswer.value = nextPrefill;
 }
 
 async function inferAndAdvance(): Promise<void> {
@@ -108,32 +219,7 @@ async function inferAndAdvance(): Promise<void> {
 		inferring.value = false;
 	}
 
-	// Pick next question: prefer one with a pre-fill
-	let nextQuestionId: string | undefined;
-	let nextPrefill = "";
-
-	for (const qId of remaining) {
-		const inferred = inferredMap.get(qId);
-		if (inferred !== undefined) {
-			nextQuestionId = qId;
-			nextPrefill = inferred;
-			break;
-		}
-	}
-
-	if (nextQuestionId === undefined) {
-		const randomIndex = Math.floor(Math.random() * remaining.length);
-		nextQuestionId = remaining[randomIndex];
-	}
-
-	entries.value.push({
-		questionId: nextQuestionId,
-		userAnswer: "",
-		prefilledAnswer: nextPrefill,
-		submitted: false,
-	});
-	persistEntries();
-	currentAnswer.value = nextPrefill;
+	applyInferAndAdvance(inferredMap, remaining);
 }
 
 function stopExploring(): void {
@@ -173,10 +259,24 @@ onMounted(() => {
 		}
 
 		card.value = foundCard;
-		entries.value = cardEntries;
+		entries.value = (cardEntries as (Omit<ExploreEntry, "guardrailText" | "submittedAfterGuardrail"> & { guardrailText?: string; submittedAfterGuardrail?: boolean })[]).map((e) => ({
+			questionId: e.questionId,
+			userAnswer: e.userAnswer,
+			prefilledAnswer: e.prefilledAnswer,
+			submitted: e.submitted,
+			guardrailText: e.guardrailText ?? "",
+			submittedAfterGuardrail: e.submittedAfterGuardrail ?? false,
+		}));
 
 		const lastEntry = entries.value[entries.value.length - 1];
 		if (lastEntry.submitted) {
+			if (lastEntry.guardrailText && !lastEntry.submittedAfterGuardrail) {
+				// Refreshed during guardrail — restore it
+				depthCheckFollowUp.value = lastEntry.guardrailText;
+				depthCheckShown.value = true;
+				currentAnswer.value = lastEntry.userAnswer;
+				return;
+			}
 			if (entries.value.length < EXPLORE_QUESTIONS.length) {
 				// Refreshed during inference — re-run it
 				void inferAndAdvance();
@@ -218,11 +318,15 @@ onMounted(() => {
 					<span>Thinking about your next question...</span>
 				</div>
 
-				<div v-else-if="activeQuestion && !allAnswered">
-					<p class="question">{{ activeQuestion.topic }}: {{ activeQuestion.text }}</p>
+				<div v-else-if="displayedQuestion && !allAnswered">
+					<p class="question">{{ displayedQuestion.topic }}: {{ displayedQuestion.text }}</p>
 					<textarea v-model="currentAnswer" rows="5" placeholder="Type your reflection here..." @keydown="onKeydown"></textarea>
-					<button class="submit-btn" :disabled="currentAnswer.trim() === ''" @click="submitAnswer">Next</button>
-					<p class="hint">Shift + Enter to submit</p>
+					<p v-if="depthCheckShown" class="depth-follow-up">
+						<em>{{ depthCheckFollowUp }}</em>
+					</p>
+					<button class="submit-btn" :disabled="!depthCheckShown && currentAnswer.trim() === ''" @click="submitAnswer">Next</button>
+					<p v-if="depthCheckShown" class="hint">Press Next to continue as-is, or edit your answer above</p>
+					<p v-else class="hint">Shift + Enter to submit</p>
 				</div>
 
 				<button class="stop-btn" @click="stopExploring">Stop Exploring</button>
@@ -367,6 +471,13 @@ textarea:focus {
 	font-size: 0.85rem;
 	color: #888;
 	margin: 0.5rem 0 0;
+}
+
+.depth-follow-up {
+	font-size: 1.1rem;
+	font-weight: 600;
+	color: #b8860b;
+	margin: 0 0 0.5rem;
 }
 
 .stop-btn {

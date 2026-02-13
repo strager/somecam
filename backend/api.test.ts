@@ -167,6 +167,60 @@ describe("API", () => {
 		);
 	});
 
+	it("returns 400 for POST /api/check-answer-depth with missing fields", async () => {
+		const response = await fetch(`${baseUrl}/api/check-answer-depth`, {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({ cardId: "self-knowledge" }),
+		});
+		expect(response.status).toBe(400);
+		expect(response.headers.get("content-type")).toContain("application/problem+json");
+
+		const body = (await response.json()) as {
+			type?: unknown;
+			title?: unknown;
+			status?: unknown;
+			detail?: unknown;
+		};
+		expect(body).toEqual(
+			expect.objectContaining({
+				type: "about:blank",
+				title: expect.any(String) as unknown,
+				status: 400,
+				detail: expect.any(String) as unknown,
+			}),
+		);
+	});
+
+	it("returns 500 for POST /api/check-answer-depth when config is not set", async () => {
+		const response = await fetch(`${baseUrl}/api/check-answer-depth`, {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({
+				cardId: "self-knowledge",
+				questionId: "interpretation",
+				answer: "It means a lot to me.",
+			}),
+		});
+		expect(response.status).toBe(500);
+		expect(response.headers.get("content-type")).toContain("application/problem+json");
+
+		const body = (await response.json()) as {
+			type?: unknown;
+			title?: unknown;
+			status?: unknown;
+			detail?: unknown;
+		};
+		expect(body).toEqual(
+			expect.objectContaining({
+				type: "about:blank",
+				title: "Internal Server Error",
+				status: 500,
+				detail: "AI depth check is not configured.",
+			}),
+		);
+	});
+
 	it("returns RFC 9457 problem details for validation failures", async () => {
 		const response = await fetch(`${baseUrl}/api/health?timeoutSeconds=invalid`);
 		expect(response.status).toBe(400);

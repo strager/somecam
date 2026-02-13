@@ -139,6 +139,53 @@ paths:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/ProblemDetails"
+  /check-answer-depth:
+    post:
+      operationId: postCheckAnswerDepth
+      summary: Check whether an exploration answer shows sufficient depth
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CheckAnswerDepthRequest"
+      responses:
+        "200":
+          description: Depth check completed successfully.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CheckAnswerDepthResponse"
+        "400":
+          description: Request failed validation.
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+        "404":
+          description: Route not found.
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+        "405":
+          description: Method not allowed.
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+        "500":
+          description: Internal API error.
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+        "502":
+          description: Upstream AI service error.
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
 components:
   schemas:
     HealthResponse:
@@ -224,6 +271,34 @@ components:
                 type: string
               answer:
                 type: string
+    CheckAnswerDepthRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - cardId
+        - questionId
+        - answer
+      properties:
+        cardId:
+          type: string
+          minLength: 1
+        questionId:
+          type: string
+          minLength: 1
+        answer:
+          type: string
+          minLength: 1
+    CheckAnswerDepthResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - sufficient
+        - followUpQuestion
+      properties:
+        sufficient:
+          type: boolean
+        followUpQuestion:
+          type: string
     ProblemDetails:
       type: object
       additionalProperties: true

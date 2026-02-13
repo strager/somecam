@@ -312,6 +312,86 @@ api.register({
 			};
 		}
 	},
+	postCheckAnswerDepth: async (context: Context): Promise<ApiResponse> => {
+		if (appConfig === undefined) {
+			return {
+				statusCode: 500,
+				headers: problemJsonHeader,
+				body: createProblemDetails(500, "Internal Server Error", "AI depth check is not configured."),
+			};
+		}
+
+		const {
+			cardId: depthCardId,
+			questionId,
+			answer,
+		} = context.request.requestBody as {
+			cardId: string;
+			questionId: string;
+			answer: string;
+		};
+
+		const cardsById = new Map(MEANING_CARDS.map((c) => [c.id, c]));
+		const questionsById = new Map(EXPLORE_QUESTIONS.map((q) => [q.id, q]));
+
+		const card = cardsById.get(depthCardId);
+		if (card === undefined) {
+			return {
+				statusCode: 400,
+				headers: problemJsonHeader,
+				body: createProblemDetails(400, "Bad Request", `Unknown card ID: ${depthCardId}`),
+			};
+		}
+
+		const question = questionsById.get(questionId);
+		if (question === undefined) {
+			return {
+				statusCode: 400,
+				headers: problemJsonHeader,
+				body: createProblemDetails(400, "Bad Request", `Unknown question ID: ${questionId}`),
+			};
+		}
+
+		try {
+			const content = await createChatCompletion({
+				apiKey: appConfig.xaiApiKey,
+				model: "grok-4-1-fast-reasoning",
+				messages: [
+					{
+						role: "system",
+						content: "You are evaluating whether someone's answer to a reflective question shows genuine thought — roughly one minute of reflection. " + 'A SUFFICIENT answer includes specific personal details, self-awareness, or explores "why" behind the surface response. ' + "An INSUFFICIENT answer is vague, generic, very short, or could apply to anyone. " + 'Return a JSON object with two fields: "sufficient" (boolean) and "followUpQuestion" (string). ' + "If sufficient is true, set followUpQuestion to an empty string. " + "If sufficient is false, write a brief follow-up question that references the user's answer and nudges deeper reflection. " + "Return ONLY the JSON object, no other text.",
+					},
+					{
+						role: "user",
+						content: `Card: ${card.source} — ${card.description}\nQuestion topic: ${question.topic}\nQuestion: ${question.text}\nAnswer: ${answer}`,
+					},
+				],
+				maxTokens: 150,
+				temperature: 0.7,
+				debugPrompt: appConfig.debugPrompt,
+			});
+
+			try {
+				const parsed = JSON.parse(content) as unknown;
+				if (typeof parsed !== "object" || parsed === null) {
+					return { statusCode: 200, body: { sufficient: true, followUpQuestion: "" } };
+				}
+				const obj = parsed as Record<string, unknown>;
+				const sufficient = typeof obj.sufficient === "boolean" ? obj.sufficient : true;
+				const followUpQuestion = typeof obj.followUpQuestion === "string" ? obj.followUpQuestion : "";
+				return { statusCode: 200, body: { sufficient, followUpQuestion } };
+			} catch {
+				return { statusCode: 200, body: { sufficient: true, followUpQuestion: "" } };
+			}
+		} catch (error) {
+			const detail = error instanceof Error ? error.message : "Upstream AI service error.";
+			return {
+				statusCode: 502,
+				headers: problemJsonHeader,
+				body: createProblemDetails(502, "Bad Gateway", detail),
+			};
+		}
+	},
 	validationFail: (context: Context): ApiResponse => {
 		const errors = extractValidationErrors(context);
 		return {
