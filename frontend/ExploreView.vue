@@ -312,7 +312,7 @@ onMounted(() => {
 				<p class="description">{{ card.description }}</p>
 
 				<div v-for="entry in answeredEntries" :key="entry.questionId" class="answered-question">
-					<p class="question">{{ questionsById.get(entry.questionId)?.topic }}: {{ questionsById.get(entry.questionId)?.text }}</p>
+					<p class="question">{{ questionsById.get(entry.questionId)?.text }}</p>
 					<ExploreTextarea v-model="entry.userAnswer" variant="answered" :rows="3" @update:model-value="debouncedPersist" @blur="persistEntries()" />
 				</div>
 
@@ -322,7 +322,7 @@ onMounted(() => {
 				</div>
 
 				<div v-else-if="displayedQuestion && (!allAnswered || depthCheckShown)">
-					<p class="question">{{ displayedQuestion.topic }}: {{ displayedQuestion.text }}</p>
+					<p class="question">{{ displayedQuestion.text }}</p>
 					<p v-if="activeEntryPrefilled" class="prefill-hint"><em>This answer was pre-filled based on your previous responses. Feel free to edit it.</em></p>
 					<ExploreTextarea ref="activeTextarea" v-model="currentAnswer" :rows="5" placeholder="Type your reflection here..." @update:model-value="debouncedPersist" @blur="persistEntries()" @keydown="onKeydown" />
 					<p v-if="depthCheckShown" class="depth-follow-up">
