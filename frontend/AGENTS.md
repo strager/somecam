@@ -1,0 +1,22 @@
+## Coding style
+
+- Do NOT use `.ts` extensions in frontend imports (Vite's Bundler resolution doesn't support them).
+
+## localStorage
+
+- All localStorage access goes through `frontend/store.ts`. Do not use `localStorage` directly in components.
+- `clearAllProgress()` intentionally preserves `somecam-llm-test` (the debug page's data).
+- Debounce text input saves (300ms). Save immediately on discrete actions (button clicks, dropdown changes).
+
+## Design Tokens
+
+- Primary green: `#2a6e4e` — used for buttons, accents, checkboxes, focus rings.
+- Use green for positive/primary actions. Reserve red for destructive actions only.
+
+## UI/UX
+
+- On page navigation, scroll to the top of the page.
+- When validation fails, focus the relevant input field.
+- Don't rely on color alone to indicate state — pair with icons or other visual cues.
+- Batch async UI updates: if loading multiple items, wait until all are ready before showing them (avoid items popping in one by one).
+- When displaying lists of cards, use `MEANING_CARDS` order. When displaying question-related data, use `EXPLORE_QUESTIONS` order.

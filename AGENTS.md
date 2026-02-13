@@ -41,11 +41,19 @@ Vite runs in middleware mode and is attached by `backend/main.ts`.
 
 - Backend uses native Node TypeScript execution (`node` directly).
 - Keep backend code compatible with `erasableSyntaxOnly: true` (no `enum`, no parameter properties).
-- Use explicit `.ts` extensions for local backend imports.
 
 ## Testing Guidance
 
 - `backend/api.test.ts` is an integration-style test that starts the app on a random local port.
+
+## Workflow
+
+- After making changes, run `npm run lint`, `npm run typecheck`, and `npm test`. Fix all errors — including pre-existing ones — before finishing.
+
+## Shared Data
+
+- Both frontend and backend import from `shared/`.
+- `shared/meaning-cards.ts` and `shared/explore-questions.ts` are the source of truth for cards and questions.
 
 ## Notes for Future Changes
 
