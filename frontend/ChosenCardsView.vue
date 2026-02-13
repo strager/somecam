@@ -86,7 +86,8 @@ onMounted(() => {
 			void router.replace("/cards");
 			return;
 		}
-		chosenCards.value = cardIds.map((id) => cardsById.get(id)).filter((c): c is MeaningCard => c !== undefined);
+		const chosenSet = new Set(cardIds);
+		chosenCards.value = MEANING_CARDS.filter((c) => chosenSet.has(c.id));
 
 		if (localStorage.getItem(EXPLORE_KEY) === null) {
 			const data = assignQuestions(cardIds);
