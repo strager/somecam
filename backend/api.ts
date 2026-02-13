@@ -190,7 +190,7 @@ api.register({
 		try {
 			const content = await createChatCompletion({
 				apiKey: appConfig.xaiApiKey,
-				model: "grok-4-1-fast-reasoning",
+				model: "grok-4-fast-non-reasoning",
 				messages: [
 					{
 						role: "system",
@@ -266,7 +266,7 @@ api.register({
 		try {
 			const content = await createChatCompletion({
 				apiKey: appConfig.xaiApiKey,
-				model: "grok-4-1-fast-reasoning",
+				model: "grok-4-fast-non-reasoning",
 				messages: [
 					{
 						role: "system",
@@ -352,7 +352,7 @@ api.register({
 		try {
 			const content = await createChatCompletion({
 				apiKey: appConfig.xaiApiKey,
-				model: "grok-4-1-fast-reasoning",
+				model: "grok-4-fast-non-reasoning",
 				messages: [
 					{
 						role: "system",
