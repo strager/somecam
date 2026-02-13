@@ -58,20 +58,27 @@ const questionsById = new Map(EXPLORE_QUESTIONS.map((q) => [q.id, q]));
 const chosenCards = ref<MeaningCard[]>([]);
 const answeredCards = ref<Set<string>>(new Set());
 
-const summaries = ref<Record<string, string>>({});
-const summaryTopics = ref<Record<string, string>>({});
-const summaryLoading = ref<Record<string, boolean>>({});
-const summaryErrors = ref<Record<string, string>>({});
+interface SummaryEntry {
+	questionId: string;
+	topic: string;
+	summary: string;
+	loading: boolean;
+	error: string;
+}
 
-async function loadSummary(cardId: string, card: MeaningCard, topic: string, questionText: string, answer: string, cache: SummaryCache): Promise<void> {
-	summaryTopics.value[cardId] = topic;
+const cardSummaryEntries = ref<Partial<Record<string, SummaryEntry[]>>>({});
 
-	if (cardId in cache && cache[cardId].answer === answer) {
-		summaries.value[cardId] = cache[cardId].summary;
+async function loadSummary(cardId: string, questionId: string, card: MeaningCard, questionText: string, answer: string, cache: SummaryCache): Promise<void> {
+	const cacheKey = `${cardId}:${questionId}`;
+	const entry = cardSummaryEntries.value[cardId]?.find((e) => e.questionId === questionId);
+	if (entry === undefined) return;
+
+	if (cacheKey in cache && cache[cacheKey].answer === answer) {
+		entry.summary = cache[cacheKey].summary;
 		return;
 	}
 
-	summaryLoading.value[cardId] = true;
+	entry.loading = true;
 	try {
 		const result = await fetchSummary({
 			cardSource: card.source,
@@ -79,13 +86,13 @@ async function loadSummary(cardId: string, card: MeaningCard, topic: string, que
 			questionText,
 			answer,
 		});
-		summaries.value[cardId] = result.summary;
-		cache[cardId] = { answer, summary: result.summary };
+		entry.summary = result.summary;
+		cache[cacheKey] = { answer, summary: result.summary };
 		saveSummaryCache(cache);
 	} catch (error) {
-		summaryErrors.value[cardId] = error instanceof Error ? error.message : "Failed to load summary.";
+		entry.error = error instanceof Error ? error.message : "Failed to load summary.";
 	} finally {
-		summaryLoading.value[cardId] = false;
+		entry.loading = false;
 	}
 }
 
@@ -116,14 +123,26 @@ onMounted(() => {
 		const promises: Promise<void>[] = [];
 
 		for (const [cardId, entries] of Object.entries(exploreData)) {
-			const firstAnswered = entries.find((e) => e.userAnswer !== "");
-			if (firstAnswered !== undefined) {
-				answeredCards.value.add(cardId);
-				const card = cardsById.get(cardId);
-				const question = questionsById.get(firstAnswered.questionId);
-				if (card !== undefined && question !== undefined) {
-					promises.push(loadSummary(cardId, card, question.topic, question.text, firstAnswered.userAnswer, cache));
-				}
+			const answered = entries.filter((e) => e.userAnswer !== "");
+			if (answered.length === 0) continue;
+
+			answeredCards.value.add(cardId);
+			const card = cardsById.get(cardId);
+			if (card === undefined) continue;
+
+			const validEntries = answered
+				.map((e) => ({ entry: e, question: questionsById.get(e.questionId) }))
+				.filter((v): v is { entry: ExploreEntry; question: (typeof EXPLORE_QUESTIONS)[number] } => v.question !== undefined);
+			cardSummaryEntries.value[cardId] = validEntries.map((v) => ({
+				questionId: v.entry.questionId,
+				topic: v.question.topic,
+				summary: "",
+				loading: false,
+				error: "",
+			}));
+
+			for (const v of validEntries) {
+				promises.push(loadSummary(cardId, v.entry.questionId, card, v.question.text, v.entry.userAnswer, cache));
 			}
 		}
 
@@ -148,10 +167,12 @@ onMounted(() => {
 				<h3>{{ card.source }}</h3>
 				<p>{{ card.description }}</p>
 				<button :class="['explore-btn', { answered: answeredCards.has(card.id) }]" @click="router.push(`/explore/${card.id}`)">Explore</button>
-				<div v-if="summaryLoading[card.id]" class="summary-loading">Generating summary...</div>
-				<div v-else-if="summaryErrors[card.id]" class="summary-error">Could not load summary.</div>
-				<div v-else-if="summaries[card.id]" class="summary-block">
-					<strong>{{ summaryTopics[card.id] }}:</strong> {{ summaries[card.id] }}
+				<div v-if="cardSummaryEntries[card.id]?.some((e) => e.loading)" class="summary-loading">Generating summary...</div>
+				<div v-else-if="cardSummaryEntries[card.id]" class="summary-block">
+					<div v-for="entry in cardSummaryEntries[card.id]" :key="entry.questionId" class="summary-item">
+						<div v-if="entry.error" class="summary-error">Could not load summary.</div>
+						<p v-else-if="entry.summary"><strong>{{ entry.topic }}:</strong> {{ entry.summary }}</p>
+					</div>
 				</div>
 			</div>
 		</div>
@@ -257,5 +278,12 @@ h2 {
 	background: #f0faf4;
 	border-left: 3px solid #2a6e4e;
 	border-radius: 4px;
+	display: flex;
+	flex-direction: column;
+	gap: 0.5rem;
+}
+
+.summary-item p {
+	margin: 0;
 }
 </style>
