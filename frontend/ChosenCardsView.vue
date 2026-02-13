@@ -130,7 +130,11 @@ onMounted(() => {
 			const card = cardsById.get(cardId);
 			if (card === undefined) continue;
 
-			const validEntries = answered.map((e) => ({ entry: e, question: questionsById.get(e.questionId) })).filter((v): v is { entry: ExploreEntry; question: (typeof EXPLORE_QUESTIONS)[number] } => v.question !== undefined);
+			const questionOrder = new Map(EXPLORE_QUESTIONS.map((q, i) => [q.id, i]));
+			const validEntries = answered
+				.map((e) => ({ entry: e, question: questionsById.get(e.questionId) }))
+				.filter((v): v is { entry: ExploreEntry; question: (typeof EXPLORE_QUESTIONS)[number] } => v.question !== undefined)
+				.sort((a, b) => (questionOrder.get(a.entry.questionId) ?? 0) - (questionOrder.get(b.entry.questionId) ?? 0));
 			cardSummaryEntries.value[cardId] = validEntries.map((v) => ({
 				questionId: v.entry.questionId,
 				topic: v.question.topic,
