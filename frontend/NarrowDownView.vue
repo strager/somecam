@@ -5,20 +5,9 @@ import { useRouter } from "vue-router";
 import type { MeaningCard, SwipeDirection } from "../shared/meaning-cards";
 import { MEANING_CARDS } from "../shared/meaning-cards";
 import StartOverButton from "./StartOverButton.vue";
+import type { SwipeRecord } from "./store";
+import { loadNarrowDown, removeNarrowDown, saveChosenCardIds, saveNarrowDown } from "./store";
 import SwipeCard from "./SwipeCard.vue";
-
-interface SwipeRecord {
-	cardId: string;
-	direction: SwipeDirection;
-}
-
-interface NarrowDownProgress {
-	cardIds: string[];
-	swipeHistory: SwipeRecord[];
-}
-
-const NARROWDOWN_KEY = "somecam-narrowdown";
-const CHOSEN_KEY = "somecam-chosen";
 
 const router = useRouter();
 const cardsById = new Map(MEANING_CARDS.map((c) => [c.id, c]));
@@ -36,29 +25,8 @@ const isLastCard = computed(() => currentIndex.value >= totalCards.value - 1);
 const canUndo = computed(() => swipeHistory.value.length > 0);
 const keptCount = computed(() => swipeHistory.value.filter((r) => r.direction === "agree").length);
 
-function saveProgress(): void {
-	const data: NarrowDownProgress = {
-		cardIds: cards.value.map((c) => c.id),
-		swipeHistory: swipeHistory.value,
-	};
-	localStorage.setItem(NARROWDOWN_KEY, JSON.stringify(data));
-}
-
-function loadProgress(): NarrowDownProgress | null {
-	try {
-		const raw = localStorage.getItem(NARROWDOWN_KEY);
-		if (raw === null) return null;
-		const data = JSON.parse(raw) as NarrowDownProgress;
-		if (!Array.isArray(data.cardIds) || data.cardIds.length === 0) return null;
-		if (!Array.isArray(data.swipeHistory)) return null;
-		return data;
-	} catch {
-		return null;
-	}
-}
-
 onMounted(() => {
-	const saved = loadProgress();
+	const saved = loadNarrowDown();
 	if (!saved) {
 		void router.replace("/cards");
 		return;
@@ -79,7 +47,10 @@ function handleSwipe(direction: SwipeDirection): void {
 		direction,
 	});
 	currentIndex.value++;
-	saveProgress();
+	saveNarrowDown({
+		cardIds: cards.value.map((c) => c.id),
+		swipeHistory: swipeHistory.value,
+	});
 }
 
 function handleButtonSwipe(direction: SwipeDirection): void {
@@ -95,14 +66,17 @@ function handleUndo(): void {
 	if (swipeHistory.value.length === 0) return;
 	swipeHistory.value.pop();
 	currentIndex.value = swipeHistory.value.length;
-	saveProgress();
+	saveNarrowDown({
+		cardIds: cards.value.map((c) => c.id),
+		swipeHistory: swipeHistory.value,
+	});
 }
 
 watch(isComplete, (done) => {
 	if (!done) return;
 	const keptCardIds = swipeHistory.value.filter((r) => r.direction === "agree").map((r) => r.cardId);
-	localStorage.setItem(CHOSEN_KEY, JSON.stringify(keptCardIds));
-	localStorage.removeItem(NARROWDOWN_KEY);
+	saveChosenCardIds(keptCardIds);
+	removeNarrowDown();
 	void router.push("/chosen");
 });
 </script>

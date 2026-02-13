@@ -1,15 +1,12 @@
 <script setup lang="ts">
 import { useRouter } from "vue-router";
-
-const KEYS_TO_CLEAR = ["somecam-progress", "somecam-narrowdown", "somecam-chosen", "somecam-explore", "somecam-summaries"];
+import { clearAllProgress } from "./store";
 
 const router = useRouter();
 
 function startOver(): void {
 	if (!window.confirm("Start over? This will clear all your progress.")) return;
-	for (const key of KEYS_TO_CLEAR) {
-		localStorage.removeItem(key);
-	}
+	clearAllProgress();
 	void router.push("/");
 }
 </script>

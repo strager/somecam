@@ -5,23 +5,12 @@ import { useRoute, useRouter } from "vue-router";
 import { fetchAnswerDepthCheck, fetchInferredAnswers } from "./api";
 import ExploreTextarea from "./ExploreTextarea.vue";
 import StartOverButton from "./StartOverButton.vue";
+import type { ExploreEntryFull } from "./store";
+import { loadExploreDataFull, saveExploreData } from "./store";
 import type { ExploreQuestion } from "../shared/explore-questions";
 import { EXPLORE_QUESTIONS } from "../shared/explore-questions";
 import type { MeaningCard } from "../shared/meaning-cards";
 import { MEANING_CARDS } from "../shared/meaning-cards";
-
-const EXPLORE_KEY = "somecam-explore";
-
-interface ExploreEntry {
-	questionId: string;
-	userAnswer: string;
-	prefilledAnswer: string;
-	submitted: boolean;
-	guardrailText: string;
-	submittedAfterGuardrail: boolean;
-}
-
-type ExploreData = Record<string, ExploreEntry[]>;
 
 const route = useRoute();
 const router = useRouter();
@@ -32,7 +21,7 @@ const questionsById = new Map(EXPLORE_QUESTIONS.map((q) => [q.id, q]));
 const cardId = route.params.cardId as string;
 
 const card = ref<MeaningCard | undefined>(undefined);
-const entries = ref<ExploreEntry[]>([]);
+const entries = ref<ExploreEntryFull[]>([]);
 const currentAnswer = ref("");
 const inferring = ref(false);
 const depthCheckFollowUp = ref("");
@@ -78,11 +67,10 @@ const allAnswered = computed(() => {
 });
 
 function persistEntries(): void {
-	const raw = localStorage.getItem(EXPLORE_KEY);
-	if (raw === null) return;
-	const data = JSON.parse(raw) as ExploreData;
+	const data = loadExploreDataFull();
+	if (data === null) return;
 	data[cardId] = entries.value;
-	localStorage.setItem(EXPLORE_KEY, JSON.stringify(data));
+	saveExploreData(data);
 }
 
 let persistTimer: ReturnType<typeof setTimeout> | undefined;
@@ -255,12 +243,11 @@ onMounted(() => {
 	}
 
 	try {
-		const raw = localStorage.getItem(EXPLORE_KEY);
-		if (raw === null) {
+		const data = loadExploreDataFull();
+		if (data === null) {
 			void router.replace("/chosen");
 			return;
 		}
-		const data = JSON.parse(raw) as ExploreData;
 		const cardEntries = data[cardId];
 		if (!Array.isArray(cardEntries) || cardEntries.length === 0) {
 			void router.replace("/chosen");
@@ -268,14 +255,7 @@ onMounted(() => {
 		}
 
 		card.value = foundCard;
-		entries.value = (cardEntries as (Omit<ExploreEntry, "guardrailText" | "submittedAfterGuardrail"> & { guardrailText?: string; submittedAfterGuardrail?: boolean })[]).map((e) => ({
-			questionId: e.questionId,
-			userAnswer: e.userAnswer,
-			prefilledAnswer: e.prefilledAnswer,
-			submitted: e.submitted,
-			guardrailText: e.guardrailText ?? "",
-			submittedAfterGuardrail: e.submittedAfterGuardrail ?? false,
-		}));
+		entries.value = cardEntries;
 
 		const lastEntry = entries.value[entries.value.length - 1];
 		if (lastEntry.submitted) {

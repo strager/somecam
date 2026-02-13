@@ -3,33 +3,13 @@ import { onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
 
 import { fetchSummary } from "./api";
-import { assignQuestions, EXPLORE_KEY } from "./explore-data";
-import type { ExploreData, ExploreEntry } from "./explore-data";
+import { assignQuestions } from "./explore-data";
 import StartOverButton from "./StartOverButton.vue";
+import type { ExploreEntry, SummaryCache } from "./store";
+import { loadChosenCardIds, loadExploreData, loadSummaryCache, saveExploreData, saveSummaryCache } from "./store";
 import { EXPLORE_QUESTIONS } from "../shared/explore-questions";
 import type { MeaningCard } from "../shared/meaning-cards";
 import { MEANING_CARDS } from "../shared/meaning-cards";
-
-const CHOSEN_KEY = "somecam-chosen";
-const SUMMARIES_KEY = "somecam-summaries";
-
-type SummaryCache = Record<string, { answer: string; summary: string }>;
-
-function loadSummaryCache(): SummaryCache {
-	try {
-		const raw = localStorage.getItem(SUMMARIES_KEY);
-		if (raw !== null) {
-			return JSON.parse(raw) as SummaryCache;
-		}
-	} catch {
-		// ignore corrupt cache
-	}
-	return {};
-}
-
-function saveSummaryCache(cache: SummaryCache): void {
-	localStorage.setItem(SUMMARIES_KEY, JSON.stringify(cache));
-}
 
 const router = useRouter();
 const cardsById = new Map(MEANING_CARDS.map((c) => [c.id, c]));
@@ -76,28 +56,19 @@ async function loadSummary(cardId: string, questionId: string, answer: string, c
 
 onMounted(() => {
 	try {
-		const raw = localStorage.getItem(CHOSEN_KEY);
-		if (raw === null) {
-			void router.replace("/cards");
-			return;
-		}
-		const cardIds = JSON.parse(raw) as string[];
-		if (!Array.isArray(cardIds) || cardIds.length === 0) {
+		const cardIds = loadChosenCardIds();
+		if (cardIds === null) {
 			void router.replace("/cards");
 			return;
 		}
 		const chosenSet = new Set(cardIds);
 		chosenCards.value = MEANING_CARDS.filter((c) => chosenSet.has(c.id));
 
-		if (localStorage.getItem(EXPLORE_KEY) === null) {
-			const data = assignQuestions(cardIds);
-			localStorage.setItem(EXPLORE_KEY, JSON.stringify(data));
+		let exploreData = loadExploreData();
+		if (exploreData === null) {
+			exploreData = assignQuestions(cardIds);
+			saveExploreData(exploreData);
 		}
-
-		const exploreRaw = localStorage.getItem(EXPLORE_KEY);
-		if (exploreRaw === null) return;
-
-		const exploreData = JSON.parse(exploreRaw) as ExploreData;
 		const cache = loadSummaryCache();
 		const promises: Promise<void>[] = [];
 

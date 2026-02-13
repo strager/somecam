@@ -2,23 +2,10 @@
 import { onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
 
+import { loadChosenCardIds, loadExploreData, loadSummaryCache } from "./store";
 import { EXPLORE_QUESTIONS } from "../shared/explore-questions";
 import type { MeaningCard } from "../shared/meaning-cards";
 import { MEANING_CARDS } from "../shared/meaning-cards";
-
-const CHOSEN_KEY = "somecam-chosen";
-const EXPLORE_KEY = "somecam-explore";
-const SUMMARIES_KEY = "somecam-summaries";
-
-interface ExploreEntry {
-	questionId: string;
-	userAnswer: string;
-	prefilledAnswer: string;
-	submitted: boolean;
-}
-
-type ExploreData = Record<string, ExploreEntry[]>;
-type SummaryCache = Record<string, { answer: string; summary: string }>;
 
 interface QuestionReport {
 	topic: string;
@@ -43,29 +30,14 @@ function downloadPdf(): void {
 
 onMounted(() => {
 	try {
-		const raw = localStorage.getItem(CHOSEN_KEY);
-		if (raw === null) {
-			void router.replace("/cards");
-			return;
-		}
-		const cardIds = JSON.parse(raw) as string[];
-		if (!Array.isArray(cardIds) || cardIds.length === 0) {
+		const cardIds = loadChosenCardIds();
+		if (cardIds === null) {
 			void router.replace("/cards");
 			return;
 		}
 
-		const exploreRaw = localStorage.getItem(EXPLORE_KEY);
-		const exploreData: ExploreData = exploreRaw !== null ? (JSON.parse(exploreRaw) as ExploreData) : {};
-
-		let summaryCache: SummaryCache = {};
-		try {
-			const summaryRaw = localStorage.getItem(SUMMARIES_KEY);
-			if (summaryRaw !== null) {
-				summaryCache = JSON.parse(summaryRaw) as SummaryCache;
-			}
-		} catch {
-			// ignore corrupt cache
-		}
+		const exploreData = loadExploreData() ?? {};
+		const summaryCache = loadSummaryCache();
 
 		for (const cardId of cardIds) {
 			const card = cardsById.get(cardId);

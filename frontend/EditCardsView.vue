@@ -2,11 +2,9 @@
 import { computed, onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
 
-import { assignQuestions, EXPLORE_KEY } from "./explore-data";
-import type { ExploreData } from "./explore-data";
+import { assignQuestions } from "./explore-data";
+import { loadChosenCardIds, loadExploreData, saveChosenCardIds, saveExploreData } from "./store";
 import { MEANING_CARDS } from "../shared/meaning-cards";
-
-const CHOSEN_KEY = "somecam-chosen";
 
 const router = useRouter();
 const chosenIds = ref<Set<string>>(new Set());
@@ -15,19 +13,9 @@ const confirmingRemove = ref<string | null>(null);
 
 const selectedCount = computed(() => chosenIds.value.size);
 
-function loadExploreData(): ExploreData | null {
-	try {
-		const raw = localStorage.getItem(EXPLORE_KEY);
-		if (raw === null) return null;
-		return JSON.parse(raw) as ExploreData;
-	} catch {
-		return null;
-	}
-}
-
 function saveChosenIds(): void {
 	const ordered = MEANING_CARDS.filter((c) => chosenIds.value.has(c.id)).map((c) => c.id);
-	localStorage.setItem(CHOSEN_KEY, JSON.stringify(ordered));
+	saveChosenCardIds(ordered);
 }
 
 function isExplored(cardId: string): boolean {
@@ -55,7 +43,7 @@ function addCard(cardId: string): void {
 	if (exploreData !== null && !(cardId in exploreData)) {
 		const newEntry = assignQuestions([cardId]);
 		Object.assign(exploreData, newEntry);
-		localStorage.setItem(EXPLORE_KEY, JSON.stringify(exploreData));
+		saveExploreData(exploreData);
 	}
 }
 
@@ -72,13 +60,8 @@ function cancelRemove(): void {
 
 onMounted(() => {
 	try {
-		const raw = localStorage.getItem(CHOSEN_KEY);
-		if (raw === null) {
-			void router.replace("/cards");
-			return;
-		}
-		const cardIds = JSON.parse(raw) as string[];
-		if (!Array.isArray(cardIds) || cardIds.length === 0) {
+		const cardIds = loadChosenCardIds();
+		if (cardIds === null) {
 			void router.replace("/cards");
 			return;
 		}

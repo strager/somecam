@@ -5,21 +5,9 @@ import { useRouter } from "vue-router";
 import type { MeaningCard, SwipeDirection } from "../shared/meaning-cards";
 import { MEANING_CARDS } from "../shared/meaning-cards";
 import StartOverButton from "./StartOverButton.vue";
+import type { SwipeRecord } from "./store";
+import { loadSwipeProgress, saveChosenCardIds, saveNarrowDown, saveSwipeProgress } from "./store";
 import SwipeCard from "./SwipeCard.vue";
-
-interface SwipeRecord {
-	cardId: string;
-	direction: SwipeDirection;
-}
-
-interface SavedProgress {
-	shuffledCardIds: string[];
-	swipeHistory: SwipeRecord[];
-}
-
-const STORAGE_KEY = "somecam-progress";
-const NARROWDOWN_KEY = "somecam-narrowdown";
-const CHOSEN_KEY = "somecam-chosen";
 
 const router = useRouter();
 
@@ -46,29 +34,8 @@ function shuffle<T>(array: readonly T[]): T[] {
 
 const cardsById = new Map(MEANING_CARDS.map((c) => [c.id, c]));
 
-function saveProgress(): void {
-	const data: SavedProgress = {
-		shuffledCardIds: shuffledCards.value.map((c) => c.id),
-		swipeHistory: swipeHistory.value,
-	};
-	localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-}
-
-function loadProgress(): SavedProgress | null {
-	try {
-		const raw = localStorage.getItem(STORAGE_KEY);
-		if (raw === null) return null;
-		const data = JSON.parse(raw) as SavedProgress;
-		if (!Array.isArray(data.shuffledCardIds) || data.shuffledCardIds.length === 0) return null;
-		if (!Array.isArray(data.swipeHistory)) return null;
-		return data;
-	} catch {
-		return null;
-	}
-}
-
 onMounted(() => {
-	const saved = loadProgress();
+	const saved = loadSwipeProgress();
 	if (saved) {
 		const cards = saved.shuffledCardIds.map((id) => cardsById.get(id)).filter((c): c is MeaningCard => c !== undefined);
 		if (cards.length > 0) {
@@ -87,7 +54,10 @@ function handleSwipe(direction: SwipeDirection): void {
 		direction,
 	});
 	currentIndex.value++;
-	saveProgress();
+	saveSwipeProgress({
+		shuffledCardIds: shuffledCards.value.map((c) => c.id),
+		swipeHistory: swipeHistory.value,
+	});
 }
 
 function handleButtonSwipe(direction: SwipeDirection): void {
@@ -103,7 +73,10 @@ function handleUndo(): void {
 	if (swipeHistory.value.length === 0) return;
 	swipeHistory.value.pop();
 	currentIndex.value = swipeHistory.value.length;
-	saveProgress();
+	saveSwipeProgress({
+		shuffledCardIds: shuffledCards.value.map((c) => c.id),
+		swipeHistory: swipeHistory.value,
+	});
 }
 
 function continueToNextPhase(): void {
@@ -112,10 +85,10 @@ function continueToNextPhase(): void {
 	const cardIdsToConsider = agreeCardIds.length < 3 ? agreeCardIds.concat(unsureCardIds) : agreeCardIds;
 
 	if (cardIdsToConsider.length > 5) {
-		localStorage.setItem(NARROWDOWN_KEY, JSON.stringify({ cardIds: cardIdsToConsider, swipeHistory: [] }));
+		saveNarrowDown({ cardIds: cardIdsToConsider, swipeHistory: [] });
 		void router.push("/narrow-down");
 	} else {
-		localStorage.setItem(CHOSEN_KEY, JSON.stringify(cardIdsToConsider));
+		saveChosenCardIds(cardIdsToConsider);
 		void router.push("/chosen");
 	}
 }

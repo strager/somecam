@@ -2,15 +2,10 @@
 import { reactive, ref, watch } from "vue";
 
 import { fetchAnswerDepthCheck, fetchInferredAnswers, fetchSummary } from "./api";
+import type { LlmTestState } from "./store";
+import { loadLlmTestState, saveLlmTestState } from "./store";
 import { EXPLORE_QUESTIONS } from "../shared/explore-questions";
 import { MEANING_CARDS } from "../shared/meaning-cards";
-
-const STORAGE_KEY = "somecam-llm-test";
-
-interface StoredState {
-	cardId: string;
-	rows: { questionId: string; answer: string }[];
-}
 
 interface QuestionRow {
 	questionId: string;
@@ -36,51 +31,44 @@ function createRow(): QuestionRow {
 	};
 }
 
-function loadState(): { cardId: string; rows: QuestionRow[] } | null {
-	try {
-		const raw = localStorage.getItem(STORAGE_KEY);
-		if (raw === null) return null;
-		const data = JSON.parse(raw) as StoredState;
-		if (typeof data.cardId !== "string" || !Array.isArray(data.rows) || data.rows.length === 0) return null;
-		const restoredRows: QuestionRow[] = data.rows.map((r) => ({
-			questionId: typeof r.questionId === "string" ? r.questionId : EXPLORE_QUESTIONS[0].id,
-			answer: typeof r.answer === "string" ? r.answer : "",
-			depthLoading: false,
-			depthResult: null,
-			depthError: null,
-			summarizeLoading: false,
-			summarizeResult: null,
-			summarizeError: null,
-		}));
-		return { cardId: data.cardId, rows: restoredRows };
-	} catch {
-		return null;
-	}
-}
-
-function saveState(): void {
-	const data: StoredState = {
-		cardId: selectedCardId.value,
-		rows: rows.map((r) => ({ questionId: r.questionId, answer: r.answer })),
-	};
-	localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+function toQuestionRows(storedRows: LlmTestState["rows"]): QuestionRow[] {
+	return storedRows.map((row) => ({
+		questionId: row.questionId,
+		answer: row.answer,
+		depthLoading: false,
+		depthResult: null,
+		depthError: null,
+		summarizeLoading: false,
+		summarizeResult: null,
+		summarizeError: null,
+	}));
 }
 
 let saveTimer: ReturnType<typeof setTimeout> | undefined;
+
+function persistState(): void {
+	saveLlmTestState({
+		cardId: selectedCardId.value,
+		rows: rows.map((row) => ({
+			questionId: row.questionId,
+			answer: row.answer,
+		})),
+	});
+}
 
 function debouncedSave(): void {
 	if (saveTimer !== undefined) clearTimeout(saveTimer);
 	saveTimer = setTimeout(() => {
 		saveTimer = undefined;
-		saveState();
+		persistState();
 	}, 300);
 }
 
-const stored = loadState();
+const stored = loadLlmTestState();
 const selectedCardId = ref(stored ? stored.cardId : MEANING_CARDS[0].id);
-const rows = reactive<QuestionRow[]>(stored ? stored.rows : [createRow()]);
+const rows = reactive<QuestionRow[]>(stored ? toQuestionRows(stored.rows) : [createRow()]);
 
-watch(selectedCardId, saveState);
+watch(selectedCardId, persistState);
 
 const inferResult = ref<string | null>(null);
 const inferLoading = ref(false);
@@ -88,12 +76,12 @@ const inferError = ref<string | null>(null);
 
 function addRow() {
 	rows.push(createRow());
-	saveState();
+	persistState();
 }
 
 function removeRow(index: number) {
 	rows.splice(index, 1);
-	saveState();
+	persistState();
 }
 
 async function checkDepth(row: QuestionRow) {
@@ -165,7 +153,7 @@ async function inferAnswers() {
 			<div class="row-header">
 				<label>
 					Question
-					<select v-model="row.questionId" @change="saveState()">
+					<select v-model="row.questionId" @change="persistState()">
 						<option v-for="q in EXPLORE_QUESTIONS" :key="q.id" :value="q.id">{{ q.topic }}: {{ q.text }}</option>
 					</select>
 				</label>

@@ -1,15 +1,5 @@
 import { EXPLORE_QUESTIONS } from "../shared/explore-questions.js";
-
-export interface ExploreEntry {
-	questionId: string;
-	userAnswer: string;
-	prefilledAnswer: string;
-	submitted: boolean;
-}
-
-export type ExploreData = Record<string, ExploreEntry[]>;
-
-export const EXPLORE_KEY = "somecam-explore";
+import type { ExploreData } from "./store.js";
 
 export function assignQuestions(cardIds: string[]): ExploreData {
 	const data: ExploreData = {};
