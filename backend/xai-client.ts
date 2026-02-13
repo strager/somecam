@@ -9,6 +9,7 @@ interface ChatCompletionOptions {
 	messages: ChatMessage[];
 	maxTokens?: number;
 	temperature?: number;
+	debugPrompt?: boolean;
 }
 
 interface ChatCompletionResponse {
@@ -31,6 +32,10 @@ export async function createChatCompletion(options: ChatCompletionOptions): Prom
 		body.temperature = options.temperature;
 	}
 
+	if (options.debugPrompt) {
+		console.log("[DEBUG_PROMPT] Request:", JSON.stringify(body, null, 2));
+	}
+
 	const response = await fetch("https://api.x.ai/v1/chat/completions", {
 		method: "POST",
 		headers: {
@@ -45,7 +50,13 @@ export async function createChatCompletion(options: ChatCompletionOptions): Prom
 		throw new Error(`X AI API error (${response.status.toString()}): ${text}`);
 	}
 
-	const data = (await response.json()) as ChatCompletionResponse;
+	const text = await response.text();
+
+	if (options.debugPrompt) {
+		console.log("[DEBUG_PROMPT] Response:", text);
+	}
+
+	const data = JSON.parse(text) as ChatCompletionResponse;
 	if (data.choices.length === 0 || !data.choices[0].message.content) {
 		throw new Error("X AI API returned no choices.");
 	}

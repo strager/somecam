@@ -5,6 +5,8 @@ import { fileURLToPath } from "node:url";
 
 import type { AppConfig } from "./config.ts";
 import { createChatCompletion } from "./xai-client.ts";
+import { MEANING_CARDS } from "../shared/meaning-cards.ts";
+import { EXPLORE_QUESTIONS } from "../shared/explore-questions.ts";
 
 interface ApiProblemDetails {
 	type: string;
@@ -201,9 +203,106 @@ api.register({
 				],
 				maxTokens: 30,
 				temperature: 0.7,
+				debugPrompt: appConfig.debugPrompt,
 			});
 
 			return { statusCode: 200, body: { summary: content } };
+		} catch (error) {
+			const detail = error instanceof Error ? error.message : "Upstream AI service error.";
+			return {
+				statusCode: 502,
+				headers: problemJsonHeader,
+				body: createProblemDetails(502, "Bad Gateway", detail),
+			};
+		}
+	},
+	postInferAnswers: async (context: Context): Promise<ApiResponse> => {
+		if (appConfig === undefined) {
+			return {
+				statusCode: 500,
+				headers: problemJsonHeader,
+				body: createProblemDetails(500, "Internal Server Error", "AI inference is not configured."),
+			};
+		}
+
+		const { cardId, questions } = context.request.requestBody as {
+			cardId: string;
+			questions: { questionId: string; answer: string }[];
+		};
+
+		const cardsById = new Map(MEANING_CARDS.map((c) => [c.id, c]));
+		const questionsById = new Map(EXPLORE_QUESTIONS.map((q) => [q.id, q]));
+
+		const card = cardsById.get(cardId);
+		if (card === undefined) {
+			return {
+				statusCode: 400,
+				headers: problemJsonHeader,
+				body: createProblemDetails(400, "Bad Request", `Unknown card ID: ${cardId}`),
+			};
+		}
+
+		for (const q of questions) {
+			if (!questionsById.has(q.questionId)) {
+				return {
+					statusCode: 400,
+					headers: problemJsonHeader,
+					body: createProblemDetails(400, "Bad Request", `Unknown question ID: ${q.questionId}`),
+				};
+			}
+		}
+
+		const promptQuestions = questions.map((q) => {
+			const question = questionsById.get(q.questionId) as { topic: string; text: string };
+			return {
+				source: card.source,
+				description: card.description,
+				questionId: q.questionId,
+				topic: question.topic,
+				text: question.text,
+				answer: q.answer,
+			};
+		});
+
+		const userMessage = JSON.stringify(promptQuestions);
+
+		try {
+			const content = await createChatCompletion({
+				apiKey: appConfig.xaiApiKey,
+				model: "grok-4-1-fast-reasoning",
+				messages: [
+					{
+						role: "system",
+						content: "You are a reflective coach helping someone explore their sources of meaning. " + "The user will provide a JSON array of question objects about a meaning card. " + 'Questions with a non-empty "answer" have been answered by the user. ' + 'Questions with an empty "answer" are unanswered. ' + "Determine which unanswered questions are already addressed by the user's existing answers. " + "For each addressed question, write a short answer (1-3 sentences) mimicking the user's writing style. " + 'Return a JSON array of objects with "questionId" and "answer" fields. ' + "Only include questions that are clearly addressed. If none are addressed, return an empty array. " + "Return ONLY the JSON array, no other text.",
+					},
+					{
+						role: "user",
+						content: userMessage,
+					},
+				],
+				maxTokens: 500,
+				temperature: 0.7,
+				debugPrompt: appConfig.debugPrompt,
+			});
+
+			try {
+				const parsed = JSON.parse(content) as unknown;
+				if (!Array.isArray(parsed)) {
+					return { statusCode: 200, body: { inferredAnswers: [] } };
+				}
+				const inferredAnswers: { questionId: string; answer: string }[] = [];
+				for (const item of parsed) {
+					if (typeof item === "object" && item !== null && typeof (item as Record<string, unknown>).questionId === "string" && typeof (item as Record<string, unknown>).answer === "string") {
+						inferredAnswers.push({
+							questionId: (item as Record<string, unknown>).questionId as string,
+							answer: (item as Record<string, unknown>).answer as string,
+						});
+					}
+				}
+				return { statusCode: 200, body: { inferredAnswers } };
+			} catch {
+				return { statusCode: 200, body: { inferredAnswers: [] } };
+			}
 		} catch (error) {
 			const detail = error instanceof Error ? error.message : "Upstream AI service error.";
 			return {

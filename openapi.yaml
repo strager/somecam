@@ -92,6 +92,53 @@ paths:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/ProblemDetails"
+  /infer-answers:
+    post:
+      operationId: postInferAnswers
+      summary: Infer answers to unanswered exploration questions from existing answers
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/InferAnswersRequest"
+      responses:
+        "200":
+          description: Inferred answers generated successfully.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InferAnswersResponse"
+        "400":
+          description: Request failed validation.
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+        "404":
+          description: Route not found.
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+        "405":
+          description: Method not allowed.
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+        "500":
+          description: Internal API error.
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+        "502":
+          description: Upstream AI service error.
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
 components:
   schemas:
     HealthResponse:
@@ -133,6 +180,50 @@ components:
       properties:
         summary:
           type: string
+    InferAnswersRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - cardId
+        - questions
+      properties:
+        cardId:
+          type: string
+          minLength: 1
+        questions:
+          type: array
+          minItems: 1
+          items:
+            type: object
+            additionalProperties: false
+            required:
+              - questionId
+              - answer
+            properties:
+              questionId:
+                type: string
+                minLength: 1
+              answer:
+                type: string
+    InferAnswersResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - inferredAnswers
+      properties:
+        inferredAnswers:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required:
+              - questionId
+              - answer
+            properties:
+              questionId:
+                type: string
+              answer:
+                type: string
     ProblemDetails:
       type: object
       additionalProperties: true

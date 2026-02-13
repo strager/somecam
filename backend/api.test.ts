@@ -110,6 +110,63 @@ describe("API", () => {
 		);
 	});
 
+	it("returns 400 for POST /api/infer-answers with missing fields", async () => {
+		const response = await fetch(`${baseUrl}/api/infer-answers`, {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({ cardId: "self-knowledge" }),
+		});
+		expect(response.status).toBe(400);
+		expect(response.headers.get("content-type")).toContain("application/problem+json");
+
+		const body = (await response.json()) as {
+			type?: unknown;
+			title?: unknown;
+			status?: unknown;
+			detail?: unknown;
+		};
+		expect(body).toEqual(
+			expect.objectContaining({
+				type: "about:blank",
+				title: expect.any(String) as unknown,
+				status: 400,
+				detail: expect.any(String) as unknown,
+			}),
+		);
+	});
+
+	it("returns 500 for POST /api/infer-answers when config is not set", async () => {
+		const response = await fetch(`${baseUrl}/api/infer-answers`, {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({
+				cardId: "self-knowledge",
+				questions: [
+					{ questionId: "interpretation", answer: "I want to understand my motivations." },
+					{ questionId: "significance", answer: "" },
+					{ questionId: "importance", answer: "" },
+				],
+			}),
+		});
+		expect(response.status).toBe(500);
+		expect(response.headers.get("content-type")).toContain("application/problem+json");
+
+		const body = (await response.json()) as {
+			type?: unknown;
+			title?: unknown;
+			status?: unknown;
+			detail?: unknown;
+		};
+		expect(body).toEqual(
+			expect.objectContaining({
+				type: "about:blank",
+				title: "Internal Server Error",
+				status: 500,
+				detail: "AI inference is not configured.",
+			}),
+		);
+	});
+
 	it("returns RFC 9457 problem details for validation failures", async () => {
 		const response = await fetch(`${baseUrl}/api/health?timeoutSeconds=invalid`);
 		expect(response.status).toBe(400);

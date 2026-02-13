@@ -11,7 +11,14 @@ const CHOSEN_KEY = "somecam-chosen";
 const EXPLORE_KEY = "somecam-explore";
 const SUMMARIES_KEY = "somecam-summaries";
 
-type ExploreData = Record<string, { questionId: string; answer: string }>;
+interface ExploreEntry {
+	questionId: string;
+	userAnswer: string;
+	prefilledAnswer: string;
+	submitted: boolean;
+}
+
+type ExploreData = Record<string, ExploreEntry[]>;
 type SummaryCache = Record<string, { answer: string; summary: string }>;
 
 function assignQuestions(cardIds: string[]): ExploreData {
@@ -24,7 +31,7 @@ function assignQuestions(cardIds: string[]): ExploreData {
 		const index = Math.floor(Math.random() * pool.length);
 		const questionId = pool[index];
 		pool.splice(index, 1);
-		data[cardId] = { questionId, answer: "" };
+		data[cardId] = [{ questionId, userAnswer: "", prefilledAnswer: "", submitted: false }];
 	}
 	return data;
 }
@@ -108,13 +115,14 @@ onMounted(() => {
 		const cache = loadSummaryCache();
 		const promises: Promise<void>[] = [];
 
-		for (const [cardId, entry] of Object.entries(exploreData)) {
-			if (entry.answer) {
+		for (const [cardId, entries] of Object.entries(exploreData)) {
+			const firstAnswered = entries.find((e) => e.userAnswer !== "");
+			if (firstAnswered !== undefined) {
 				answeredCards.value.add(cardId);
 				const card = cardsById.get(cardId);
-				const question = questionsById.get(entry.questionId);
+				const question = questionsById.get(firstAnswered.questionId);
 				if (card !== undefined && question !== undefined) {
-					promises.push(loadSummary(cardId, card, question.topic, question.text, entry.answer, cache));
+					promises.push(loadSummary(cardId, card, question.topic, question.text, firstAnswered.userAnswer, cache));
 				}
 			}
 		}

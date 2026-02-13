@@ -1,12 +1,23 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted, ref, watch } from "vue";
+import { computed, onMounted, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
 
-import type { MeaningCard } from "../shared/meaning-cards";
+import { fetchInferredAnswers } from "./api";
+import type { ExploreQuestion } from "../shared/explore-questions";
 import { EXPLORE_QUESTIONS } from "../shared/explore-questions";
+import type { MeaningCard } from "../shared/meaning-cards";
 import { MEANING_CARDS } from "../shared/meaning-cards";
 
 const EXPLORE_KEY = "somecam-explore";
+
+interface ExploreEntry {
+	questionId: string;
+	userAnswer: string;
+	prefilledAnswer: string;
+	submitted: boolean;
+}
+
+type ExploreData = Record<string, ExploreEntry[]>;
 
 const route = useRoute();
 const router = useRouter();
@@ -17,40 +28,127 @@ const questionsById = new Map(EXPLORE_QUESTIONS.map((q) => [q.id, q]));
 const cardId = route.params.cardId as string;
 
 const card = ref<MeaningCard | undefined>(undefined);
-const questionText = ref("");
-const answer = ref("");
+const entries = ref<ExploreEntry[]>([]);
+const currentAnswer = ref("");
+const inferring = ref(false);
 
-function persistAnswer(): void {
+const activeIndex = computed(() => {
+	const idx = entries.value.findIndex((e) => !e.submitted);
+	return idx === -1 ? entries.value.length : idx;
+});
+
+const activeQuestion = computed<ExploreQuestion | undefined>(() => {
+	const idx = activeIndex.value;
+	if (idx >= entries.value.length) return undefined;
+	return questionsById.get(entries.value[idx].questionId);
+});
+
+const answeredEntries = computed(() => {
+	return entries.value.filter((e) => e.submitted);
+});
+
+const allAnswered = computed(() => {
+	return entries.value.length === EXPLORE_QUESTIONS.length && entries.value.every((e) => e.submitted);
+});
+
+function persistEntries(): void {
 	const raw = localStorage.getItem(EXPLORE_KEY);
 	if (raw === null) return;
-	const data = JSON.parse(raw) as Record<string, unknown>;
-	const entry = data[cardId] as { questionId: string; answer: string } | undefined;
-	if (entry === undefined) return;
-	entry.answer = answer.value;
+	const data = JSON.parse(raw) as ExploreData;
+	data[cardId] = entries.value;
 	localStorage.setItem(EXPLORE_KEY, JSON.stringify(data));
 }
 
-let autosaveTimer: ReturnType<typeof setTimeout> | undefined;
+function answeredQuestionIds(): Set<string> {
+	return new Set(entries.value.filter((e) => e.submitted).map((e) => e.questionId));
+}
 
-watch(answer, () => {
-	clearTimeout(autosaveTimer);
-	autosaveTimer = setTimeout(persistAnswer, 300);
-});
+function remainingQuestionIds(): string[] {
+	const answered = answeredQuestionIds();
+	const inEntries = new Set(entries.value.map((e) => e.questionId));
+	return EXPLORE_QUESTIONS.filter((q) => !answered.has(q.id) && !inEntries.has(q.id)).map((q) => q.id);
+}
 
-onUnmounted(() => {
-	clearTimeout(autosaveTimer);
-});
+async function submitAnswer(): Promise<void> {
+	const idx = activeIndex.value;
+	if (idx >= entries.value.length) return;
 
-function submit(): void {
-	clearTimeout(autosaveTimer);
-	persistAnswer();
+	const answerText = currentAnswer.value.trim();
+	if (answerText === "") return;
+
+	entries.value[idx].userAnswer = answerText;
+	entries.value[idx].submitted = true;
+	persistEntries();
+
+	await inferAndAdvance();
+}
+
+async function inferAndAdvance(): Promise<void> {
+	if (allAnswered.value) {
+		void router.push("/chosen");
+		return;
+	}
+
+	const remaining = remainingQuestionIds();
+	if (remaining.length === 0) {
+		void router.push("/chosen");
+		return;
+	}
+
+	const questions = [...entries.value.filter((e) => e.submitted).map((e) => ({ questionId: e.questionId, answer: e.userAnswer })), ...remaining.map((qId) => ({ questionId: qId, answer: "" }))];
+
+	inferring.value = true;
+	let inferredMap = new Map<string, string>();
+	try {
+		const result = await fetchInferredAnswers({ cardId, questions });
+		inferredMap = new Map(result.inferredAnswers.map((ia) => [ia.questionId, ia.answer]));
+	} catch {
+		// graceful degradation: no pre-fills
+	} finally {
+		inferring.value = false;
+	}
+
+	// Pick next question: prefer one with a pre-fill
+	let nextQuestionId: string | undefined;
+	let nextPrefill = "";
+
+	for (const qId of remaining) {
+		const inferred = inferredMap.get(qId);
+		if (inferred !== undefined) {
+			nextQuestionId = qId;
+			nextPrefill = inferred;
+			break;
+		}
+	}
+
+	if (nextQuestionId === undefined) {
+		const randomIndex = Math.floor(Math.random() * remaining.length);
+		nextQuestionId = remaining[randomIndex];
+	}
+
+	entries.value.push({
+		questionId: nextQuestionId,
+		userAnswer: "",
+		prefilledAnswer: nextPrefill,
+		submitted: false,
+	});
+	persistEntries();
+	currentAnswer.value = nextPrefill;
+}
+
+function stopExploring(): void {
+	const idx = activeIndex.value;
+	if (idx < entries.value.length && currentAnswer.value.trim() !== "") {
+		entries.value[idx].userAnswer = currentAnswer.value.trim();
+		persistEntries();
+	}
 	void router.push("/chosen");
 }
 
 function onKeydown(event: KeyboardEvent): void {
 	if (event.key === "Enter" && event.shiftKey) {
 		event.preventDefault();
-		submit();
+		void submitAnswer();
 	}
 }
 
@@ -67,20 +165,32 @@ onMounted(() => {
 			void router.replace("/chosen");
 			return;
 		}
-		const data = JSON.parse(raw) as Record<string, unknown>;
-		const entry = data[cardId] as { questionId: string; answer: string } | undefined;
-		if (entry === undefined) {
+		const data = JSON.parse(raw) as ExploreData;
+		const cardEntries = data[cardId];
+		if (!Array.isArray(cardEntries) || cardEntries.length === 0) {
 			void router.replace("/chosen");
 			return;
 		}
-		const question = questionsById.get(entry.questionId);
-		if (question === undefined) {
-			void router.replace("/chosen");
-			return;
-		}
+
 		card.value = foundCard;
-		questionText.value = question.text;
-		answer.value = entry.answer;
+		entries.value = cardEntries;
+
+		const lastEntry = entries.value[entries.value.length - 1];
+		if (lastEntry.submitted) {
+			if (entries.value.length < EXPLORE_QUESTIONS.length) {
+				// Refreshed during inference — re-run it
+				void inferAndAdvance();
+			} else {
+				void router.push("/chosen");
+			}
+		} else {
+			// Initialize currentAnswer from the active entry's prefill (or existing user answer)
+			const idx = activeIndex.value;
+			if (idx < entries.value.length) {
+				const entry = entries.value[idx];
+				currentAnswer.value = entry.userAnswer || entry.prefilledAnswer;
+			}
+		}
 	} catch {
 		void router.replace("/chosen");
 	}
@@ -97,10 +207,25 @@ onMounted(() => {
 		<div class="card-wrapper">
 			<div class="card-surface explore-card">
 				<p class="description">{{ card.description }}</p>
-				<p class="question">{{ questionText }}</p>
-				<textarea v-model="answer" rows="5" placeholder="Type your reflection here..." @keydown="onKeydown"></textarea>
-				<button class="submit-btn" @click="submit">Save &amp; Continue</button>
-				<p class="hint">Shift + Enter to submit</p>
+
+				<div v-for="entry in answeredEntries" :key="entry.questionId" class="answered-question">
+					<p class="question">{{ questionsById.get(entry.questionId)?.topic }}: {{ questionsById.get(entry.questionId)?.text }}</p>
+					<p class="answered-text">{{ entry.userAnswer }}</p>
+				</div>
+
+				<div v-if="inferring" class="inferring-indicator">
+					<span class="spinner"></span>
+					<span>Thinking about your next question...</span>
+				</div>
+
+				<div v-else-if="activeQuestion && !allAnswered">
+					<p class="question">{{ activeQuestion.topic }}: {{ activeQuestion.text }}</p>
+					<textarea v-model="currentAnswer" rows="5" placeholder="Type your reflection here..." @keydown="onKeydown"></textarea>
+					<button class="submit-btn" :disabled="currentAnswer.trim() === ''" @click="submitAnswer">Next</button>
+					<p class="hint">Shift + Enter to submit</p>
+				</div>
+
+				<button class="stop-btn" @click="stopExploring">Stop Exploring</button>
 			</div>
 		</div>
 	</main>
@@ -149,11 +274,52 @@ h2 {
 	margin: 0 0 1rem;
 }
 
+.answered-question {
+	margin-bottom: 1rem;
+	padding-bottom: 0.75rem;
+	border-bottom: 1px solid #e0e0e0;
+}
+
 .question {
 	font-size: 1.1rem;
 	font-weight: 600;
 	color: #2a6e4e;
-	margin: 0 0 0.75rem;
+	margin: 0 0 0.5rem;
+}
+
+.answered-text {
+	font-size: 1rem;
+	line-height: 1.5;
+	color: #555;
+	margin: 0;
+	white-space: pre-wrap;
+}
+
+.inferring-indicator {
+	display: flex;
+	align-items: center;
+	gap: 0.75rem;
+	padding: 1rem 0;
+	font-size: 1rem;
+	color: #888;
+	font-style: italic;
+}
+
+.spinner {
+	display: inline-block;
+	width: 1.25rem;
+	height: 1.25rem;
+	border: 2px solid #e0e0e0;
+	border-top-color: #2a6e4e;
+	border-radius: 50%;
+	animation: spin 0.8s linear infinite;
+	flex-shrink: 0;
+}
+
+@keyframes spin {
+	to {
+		transform: rotate(360deg);
+	}
 }
 
 textarea {
@@ -187,8 +353,13 @@ textarea:focus {
 	cursor: pointer;
 }
 
-.submit-btn:hover {
+.submit-btn:hover:not(:disabled) {
 	background: #225d40;
+}
+
+.submit-btn:disabled {
+	opacity: 0.6;
+	cursor: not-allowed;
 }
 
 .hint {
@@ -196,5 +367,23 @@ textarea:focus {
 	font-size: 0.85rem;
 	color: #888;
 	margin: 0.5rem 0 0;
+}
+
+.stop-btn {
+	display: block;
+	width: 100%;
+	margin-top: 1.5rem;
+	padding: 0.75rem 1.5rem;
+	font-size: 1rem;
+	font-weight: 600;
+	color: #c0392b;
+	background: transparent;
+	border: 1.5px solid #c0392b;
+	border-radius: 8px;
+	cursor: pointer;
+}
+
+.stop-btn:hover {
+	background: #fdf0ef;
 }
 </style>
