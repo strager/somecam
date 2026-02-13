@@ -6,6 +6,7 @@ const NARROWDOWN_KEY = "somecam-narrowdown";
 const CHOSEN_KEY = "somecam-chosen";
 const EXPLORE_KEY = "somecam-explore";
 const SUMMARIES_KEY = "somecam-summaries";
+const FREEFORM_KEY = "somecam-freeform";
 const LLM_TEST_KEY = "somecam-llm-test";
 
 const DEFAULT_QUESTION_ID = EXPLORE_QUESTIONS[0]?.id ?? "";
@@ -40,6 +41,7 @@ export interface ExploreEntryFull extends ExploreEntry {
 export type ExploreData = Record<string, ExploreEntry[]>;
 export type ExploreDataFull = Record<string, ExploreEntryFull[]>;
 export type SummaryCache = Record<string, { answer: string; summary: string }>;
+export type FreeformNotes = Record<string, string>;
 
 interface LlmTestRow {
 	questionId: string;
@@ -242,6 +244,23 @@ export function saveSummaryCache(cache: SummaryCache): void {
 	localStorage.setItem(SUMMARIES_KEY, JSON.stringify(cache));
 }
 
+export function loadFreeformNotes(): FreeformNotes {
+	const parsed = parseJsonFromStorage(FREEFORM_KEY);
+	if (!isObjectRecord(parsed)) {
+		return {};
+	}
+	for (const value of Object.values(parsed)) {
+		if (typeof value !== "string") {
+			return {};
+		}
+	}
+	return parsed as FreeformNotes;
+}
+
+export function saveFreeformNotes(notes: FreeformNotes): void {
+	localStorage.setItem(FREEFORM_KEY, JSON.stringify(notes));
+}
+
 export function loadLlmTestState(): LlmTestState | null {
 	const parsed = parseJsonFromStorage(LLM_TEST_KEY);
 	if (!isObjectRecord(parsed)) {
@@ -283,4 +302,5 @@ export function clearAllProgress(): void {
 	localStorage.removeItem(CHOSEN_KEY);
 	localStorage.removeItem(EXPLORE_KEY);
 	localStorage.removeItem(SUMMARIES_KEY);
+	localStorage.removeItem(FREEFORM_KEY);
 }

@@ -38,14 +38,24 @@ When a pre-filled answer appears, the user is free to accept it as-is by
 clicking **Next**, or they can modify the text to better capture their thoughts.
 The textarea behaves exactly the same whether the answer was pre-filled or blank.
 
-## Answering all five questions and auto-navigation
+## Answering all five questions
 
 The user works through questions one at a time. Previously answered questions are
 displayed as editable textareas above the active question. The user can click
 into any prior answer to revise it; changes are saved automatically when the
-textarea loses focus. After the fifth and final answer is submitted,
-the app automatically navigates to `/chosen`, returning the user to the
-sources-of-meaning overview.
+textarea loses focus. After the fifth and final answer is submitted, the
+free-form notes field appears.
+
+## Additional notes (free-form)
+
+Once all five questions have been answered, a free-form textarea labelled
+"Additional notes about this source of meaning" is displayed. This is not a
+structured question — there is no AI summary and no depth check. The user can
+type any extra thoughts they want to capture about the card. The note is saved to
+localStorage and included in the downloadable report above the five Q&A blocks.
+
+The user can leave the field empty and click **Finish exploring** to return to
+the sources-of-meaning overview.
 
 ## Answer depth check
 

@@ -3,7 +3,7 @@
 import { JSDOM } from "jsdom";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { clearAllProgress, loadChosenCardIds, loadExploreData, loadExploreDataFull, loadLlmTestState, loadNarrowDown, loadSummaryCache, loadSwipeProgress, removeNarrowDown, saveChosenCardIds, saveExploreData, saveLlmTestState, saveNarrowDown, saveSummaryCache, saveSwipeProgress } from "./store.ts";
+import { clearAllProgress, loadChosenCardIds, loadExploreData, loadExploreDataFull, loadFreeformNotes, loadLlmTestState, loadNarrowDown, loadSummaryCache, loadSwipeProgress, removeNarrowDown, saveChosenCardIds, saveExploreData, saveFreeformNotes, saveLlmTestState, saveNarrowDown, saveSummaryCache, saveSwipeProgress } from "./store.ts";
 import { EXPLORE_QUESTIONS } from "../shared/explore-questions.ts";
 
 const STORAGE_PREFIX = "somecam";
@@ -17,6 +17,7 @@ const PROGRESS_STORAGE_KEY = storageKey("progress");
 const NARROWDOWN_STORAGE_KEY = storageKey("narrowdown");
 const EXPLORE_STORAGE_KEY = storageKey("explore");
 const SUMMARIES_STORAGE_KEY = storageKey("summaries");
+const FREEFORM_STORAGE_KEY = storageKey("freeform");
 const LLM_TEST_STORAGE_KEY = storageKey("llm-test");
 const DEFAULT_QUESTION_ID = EXPLORE_QUESTIONS[0].id;
 
@@ -517,6 +518,37 @@ describe("loadLlmTestState/saveLlmTestState", () => {
 	});
 });
 
+describe("loadFreeformNotes/saveFreeformNotes", () => {
+	it("returns empty object when key is absent", () => {
+		expect(loadFreeformNotes()).toEqual({});
+	});
+
+	it("returns empty object for corrupt JSON", () => {
+		localStorage.setItem(FREEFORM_STORAGE_KEY, "{");
+		expect(loadFreeformNotes()).toEqual({});
+	});
+
+	it("returns empty object for non-object JSON", () => {
+		localStorage.setItem(FREEFORM_STORAGE_KEY, JSON.stringify("not-an-object"));
+		expect(loadFreeformNotes()).toEqual({});
+	});
+
+	it("returns empty object when values are not strings", () => {
+		localStorage.setItem(FREEFORM_STORAGE_KEY, JSON.stringify({ "self-knowledge": 123 }));
+		expect(loadFreeformNotes()).toEqual({});
+	});
+
+	it("round-trips saved notes", () => {
+		saveFreeformNotes({ "self-knowledge": "Some extra thoughts", community: "Community notes" });
+		expect(loadFreeformNotes()).toEqual({ "self-knowledge": "Some extra thoughts", community: "Community notes" });
+	});
+
+	it("round-trips empty object", () => {
+		saveFreeformNotes({});
+		expect(loadFreeformNotes()).toEqual({});
+	});
+});
+
 describe("clearAllProgress", () => {
 	it("removes all progress keys except llm-test", () => {
 		saveSwipeProgress({
@@ -544,6 +576,7 @@ describe("clearAllProgress", () => {
 				summary: "summary",
 			},
 		});
+		saveFreeformNotes({ "self-knowledge": "Some notes" });
 		const llmTestState = {
 			cardId: "self-knowledge",
 			rows: [{ questionId: "interpretation", answer: "answer" }],
@@ -557,6 +590,7 @@ describe("clearAllProgress", () => {
 		expect(loadChosenCardIds()).toBeNull();
 		expect(loadExploreData()).toBeNull();
 		expect(loadSummaryCache()).toEqual({});
+		expect(loadFreeformNotes()).toEqual({});
 		expect(loadLlmTestState()).toEqual(llmTestState);
 	});
 });

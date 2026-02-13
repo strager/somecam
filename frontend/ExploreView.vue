@@ -6,7 +6,7 @@ import { fetchAnswerDepthCheck, fetchInferredAnswers } from "./api.ts";
 import ExploreTextarea from "./ExploreTextarea.vue";
 import StartOverButton from "./StartOverButton.vue";
 import type { ExploreEntryFull } from "./store.ts";
-import { loadExploreDataFull, saveExploreData } from "./store.ts";
+import { loadExploreDataFull, loadFreeformNotes, saveExploreData, saveFreeformNotes } from "./store.ts";
 import type { ExploreQuestion } from "../shared/explore-questions.ts";
 import { EXPLORE_QUESTIONS } from "../shared/explore-questions.ts";
 import type { MeaningCard } from "../shared/meaning-cards.ts";
@@ -28,6 +28,7 @@ const depthCheckFollowUp = ref("");
 const depthCheckShown = ref(false);
 const pendingInferResult = ref<Map<string, string> | null>(null);
 const activeTextarea = ref<InstanceType<typeof ExploreTextarea> | null>(null);
+const freeformNote = ref("");
 
 const activeIndex = computed(() => {
 	const idx = entries.value.findIndex((e) => !e.submitted);
@@ -80,6 +81,22 @@ function debouncedPersist(): void {
 	persistTimer = setTimeout(() => {
 		persistTimer = undefined;
 		persistEntries();
+	}, 300);
+}
+
+function persistFreeform(): void {
+	const notes = loadFreeformNotes();
+	notes[cardId] = freeformNote.value;
+	saveFreeformNotes(notes);
+}
+
+let freeformPersistTimer: ReturnType<typeof setTimeout> | undefined;
+
+function debouncedFreeformPersist(): void {
+	if (freeformPersistTimer !== undefined) return;
+	freeformPersistTimer = setTimeout(() => {
+		freeformPersistTimer = undefined;
+		persistFreeform();
 	}, 300);
 }
 
@@ -225,6 +242,7 @@ function finishExploring(): void {
 		entries.value[idx].userAnswer = currentAnswer.value.trim();
 		persistEntries();
 	}
+	persistFreeform();
 	void router.push("/chosen");
 }
 
@@ -256,6 +274,7 @@ onMounted(() => {
 
 		card.value = foundCard;
 		entries.value = cardEntries;
+		freeformNote.value = loadFreeformNotes()[cardId] ?? "";
 
 		const lastEntry = entries.value[entries.value.length - 1];
 		if (lastEntry.submitted) {
@@ -315,6 +334,11 @@ onMounted(() => {
 					<button class="submit-btn" :disabled="!depthCheckShown && currentAnswer.trim() === ''" @click="submitAnswer">Next</button>
 					<p v-if="depthCheckShown" class="hint">Press Next to continue as-is, or edit your answer above</p>
 					<p v-else class="hint">Shift + Enter to submit</p>
+				</div>
+
+				<div v-if="allAnswered && !inferring && !depthCheckShown" class="freeform-section">
+					<p class="question">Additional notes about this source of meaning</p>
+					<ExploreTextarea v-model="freeformNote" :rows="5" placeholder="Any other thoughts you'd like to capture (optional)" @update:model-value="debouncedFreeformPersist" @blur="persistFreeform()" />
 				</div>
 
 				<button class="finish-btn" @click="finishExploring">Finish exploring</button>

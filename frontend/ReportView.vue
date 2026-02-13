@@ -2,7 +2,7 @@
 import { onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
 
-import { loadChosenCardIds, loadExploreData, loadSummaryCache } from "./store.ts";
+import { loadChosenCardIds, loadExploreData, loadFreeformNotes, loadSummaryCache } from "./store.ts";
 import { EXPLORE_QUESTIONS } from "../shared/explore-questions.ts";
 import type { MeaningCard } from "../shared/meaning-cards.ts";
 import { MEANING_CARDS } from "../shared/meaning-cards.ts";
@@ -17,6 +17,7 @@ interface QuestionReport {
 interface CardReport {
 	card: MeaningCard;
 	questions: QuestionReport[];
+	freeformNote: string;
 }
 
 const router = useRouter();
@@ -38,6 +39,7 @@ onMounted(() => {
 
 		const exploreData = loadExploreData() ?? {};
 		const summaryCache = loadSummaryCache();
+		const freeformNotes = loadFreeformNotes();
 
 		for (const cardId of cardIds) {
 			const card = cardsById.get(cardId);
@@ -59,7 +61,7 @@ onMounted(() => {
 				});
 			}
 
-			reports.value.push({ card, questions });
+			reports.value.push({ card, questions, freeformNote: freeformNotes[cardId] ?? "" });
 		}
 	} catch {
 		void router.replace("/cards");
@@ -96,6 +98,9 @@ onMounted(() => {
 				<h3>
 					{{ report.card.description }} <span class="source-label">({{ report.card.source }})</span>
 				</h3>
+				<div v-if="report.freeformNote" class="qa-block">
+					<p class="qa-freeform-answer">{{ report.freeformNote }}</p>
+				</div>
 				<div v-for="q in report.questions" :key="q.topic" class="qa-block">
 					<p class="qa-topic">{{ q.question }}</p>
 					<p v-if="q.answer" class="qa-answer">{{ q.answer }}</p>
@@ -233,12 +238,16 @@ h2 + .report-card {
 	color: #333;
 }
 
-.qa-answer {
+.qa-answer,
+.qa-freeform-answer {
 	margin: 0.25rem 0 0;
 	font-size: 0.95rem;
 	line-height: 1.5;
-	color: #555;
 	white-space: pre-wrap;
+}
+
+.qa-answer {
+	color: #555;
 	padding-left: 0.5rem;
 	border-left: 3px solid #2a6e4e;
 }
