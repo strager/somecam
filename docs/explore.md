@@ -41,8 +41,9 @@ The textarea behaves exactly the same whether the answer was pre-filled or blank
 ## Answering all five questions and auto-navigation
 
 The user works through questions one at a time. Previously answered questions are
-displayed as read-only text above the active question, so the user can see the
-full history of their reflections. After the fifth and final answer is submitted,
+displayed as editable textareas above the active question. The user can click
+into any prior answer to revise it; changes are saved automatically when the
+textarea loses focus. After the fifth and final answer is submitted,
 the app automatically navigates to `/chosen`, returning the user to the
 sources-of-meaning overview.
 

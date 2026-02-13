@@ -3,6 +3,7 @@ import { computed, onMounted, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
 
 import { fetchAnswerDepthCheck, fetchInferredAnswers } from "./api";
+import ExploreTextarea from "./ExploreTextarea.vue";
 import type { ExploreQuestion } from "../shared/explore-questions";
 import { EXPLORE_QUESTIONS } from "../shared/explore-questions";
 import type { MeaningCard } from "../shared/meaning-cards";
@@ -310,7 +311,7 @@ onMounted(() => {
 
 				<div v-for="entry in answeredEntries" :key="entry.questionId" class="answered-question">
 					<p class="question">{{ questionsById.get(entry.questionId)?.topic }}: {{ questionsById.get(entry.questionId)?.text }}</p>
-					<p class="answered-text">{{ entry.userAnswer }}</p>
+					<ExploreTextarea v-model="entry.userAnswer" variant="answered" :rows="3" @blur="persistEntries()" />
 				</div>
 
 				<div v-if="inferring" class="inferring-indicator">
@@ -320,7 +321,7 @@ onMounted(() => {
 
 				<div v-else-if="displayedQuestion && !allAnswered">
 					<p class="question">{{ displayedQuestion.topic }}: {{ displayedQuestion.text }}</p>
-					<textarea v-model="currentAnswer" rows="5" placeholder="Type your reflection here..." @keydown="onKeydown"></textarea>
+					<ExploreTextarea v-model="currentAnswer" :rows="5" placeholder="Type your reflection here..." @blur="persistEntries()" @keydown="onKeydown" />
 					<p v-if="depthCheckShown" class="depth-follow-up">
 						<em>{{ depthCheckFollowUp }}</em>
 					</p>
@@ -391,14 +392,6 @@ h2 {
 	margin: 0 0 0.5rem;
 }
 
-.answered-text {
-	font-size: 1rem;
-	line-height: 1.5;
-	color: #555;
-	margin: 0;
-	white-space: pre-wrap;
-}
-
 .inferring-indicator {
 	display: flex;
 	align-items: center;
@@ -424,23 +417,6 @@ h2 {
 	to {
 		transform: rotate(360deg);
 	}
-}
-
-textarea {
-	width: 100%;
-	padding: 0.75rem;
-	font-size: 1rem;
-	font-family: inherit;
-	border: 1px solid #ccc;
-	border-radius: 6px;
-	resize: vertical;
-	box-sizing: border-box;
-}
-
-textarea:focus {
-	outline: none;
-	border-color: #2a6e4e;
-	box-shadow: 0 0 0 2px rgba(42, 110, 78, 0.2);
 }
 
 .submit-btn {
