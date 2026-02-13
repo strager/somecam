@@ -180,12 +180,32 @@ api.register({
 			};
 		}
 
-		const { cardSource, cardDescription, questionText, answer } = context.request.requestBody as {
-			cardSource: string;
-			cardDescription: string;
-			questionText: string;
+		const { cardId, questionId, answer } = context.request.requestBody as {
+			cardId: string;
+			questionId: string;
 			answer: string;
 		};
+
+		const cardsById = new Map(MEANING_CARDS.map((c) => [c.id, c]));
+		const questionsById = new Map(EXPLORE_QUESTIONS.map((q) => [q.id, q]));
+
+		const card = cardsById.get(cardId);
+		if (card === undefined) {
+			return {
+				statusCode: 400,
+				headers: problemJsonHeader,
+				body: createProblemDetails(400, "Bad Request", `Unknown card ID: ${cardId}`),
+			};
+		}
+
+		const question = questionsById.get(questionId);
+		if (question === undefined) {
+			return {
+				statusCode: 400,
+				headers: problemJsonHeader,
+				body: createProblemDetails(400, "Bad Request", `Unknown question ID: ${questionId}`),
+			};
+		}
 
 		try {
 			const content = await createChatCompletion({
@@ -198,7 +218,7 @@ api.register({
 					},
 					{
 						role: "user",
-						content: `Card: ${cardSource} — ${cardDescription}\nQuestion: ${questionText}\nAnswer: ${answer}`,
+						content: `Card: ${card.source} — ${card.description}\nQuestion: ${question.text}\nAnswer: ${answer}`,
 					},
 				],
 				maxTokens: 30,

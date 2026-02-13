@@ -69,7 +69,7 @@ interface SummaryEntry {
 
 const cardSummaryEntries = ref<Partial<Record<string, SummaryEntry[]>>>({});
 
-async function loadSummary(cardId: string, questionId: string, card: MeaningCard, questionText: string, answer: string, cache: SummaryCache): Promise<void> {
+async function loadSummary(cardId: string, questionId: string, answer: string, cache: SummaryCache): Promise<void> {
 	const cacheKey = `${cardId}:${questionId}`;
 	const entry = cardSummaryEntries.value[cardId]?.find((e) => e.questionId === questionId);
 	if (entry === undefined) return;
@@ -82,9 +82,8 @@ async function loadSummary(cardId: string, questionId: string, card: MeaningCard
 	entry.loading = true;
 	try {
 		const result = await fetchSummary({
-			cardSource: card.source,
-			cardDescription: card.description,
-			questionText,
+			cardId,
+			questionId,
 			answer,
 		});
 		entry.summary = result.summary;
@@ -141,7 +140,7 @@ onMounted(() => {
 			}));
 
 			for (const v of validEntries) {
-				promises.push(loadSummary(cardId, v.entry.questionId, card, v.question.text, v.entry.userAnswer, cache));
+				promises.push(loadSummary(cardId, v.entry.questionId, v.entry.userAnswer, cache));
 			}
 		}
 

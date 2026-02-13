@@ -119,13 +119,9 @@ async function summarize(row: QuestionRow) {
 	row.summarizeError = null;
 	row.summarizeResult = null;
 	try {
-		const card = MEANING_CARDS.find((c) => c.id === selectedCardId.value);
-		const question = EXPLORE_QUESTIONS.find((q) => q.id === row.questionId);
-		if (!card || !question) return;
 		const result = await fetchSummary({
-			cardSource: card.source,
-			cardDescription: card.description,
-			questionText: question.text,
+			cardId: selectedCardId.value,
+			questionId: row.questionId,
 			answer: row.answer,
 		});
 		row.summarizeResult = JSON.stringify(result, null, 2);

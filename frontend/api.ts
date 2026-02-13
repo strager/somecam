@@ -1,7 +1,6 @@
 interface SummarizeRequest {
-	cardSource: string;
-	cardDescription: string;
-	questionText: string;
+	cardId: string;
+	questionId: string;
 	answer: string;
 }
 

@@ -202,18 +202,14 @@ components:
       type: object
       additionalProperties: false
       required:
-        - cardSource
-        - cardDescription
-        - questionText
+        - cardId
+        - questionId
         - answer
       properties:
-        cardSource:
+        cardId:
           type: string
           minLength: 1
-        cardDescription:
-          type: string
-          minLength: 1
-        questionText:
+        questionId:
           type: string
           minLength: 1
         answer:

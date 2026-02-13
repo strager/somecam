@@ -59,7 +59,7 @@ describe("API", () => {
 		const response = await fetch(`${baseUrl}/api/summarize`, {
 			method: "POST",
 			headers: { "Content-Type": "application/json" },
-			body: JSON.stringify({ cardSource: "Test" }),
+			body: JSON.stringify({ cardId: "self-knowledge" }),
 		});
 		expect(response.status).toBe(400);
 		expect(response.headers.get("content-type")).toContain("application/problem+json");
@@ -85,9 +85,8 @@ describe("API", () => {
 			method: "POST",
 			headers: { "Content-Type": "application/json" },
 			body: JSON.stringify({
-				cardSource: "Family",
-				cardDescription: "Close relationships with family members",
-				questionText: "Why is this important to you?",
+				cardId: "self-knowledge",
+				questionId: "interpretation",
 				answer: "Family gives me a sense of belonging.",
 			}),
 		});
