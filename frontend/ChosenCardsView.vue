@@ -52,10 +52,13 @@ const chosenCards = ref<MeaningCard[]>([]);
 const answeredCards = ref<Set<string>>(new Set());
 
 const summaries = ref<Record<string, string>>({});
+const summaryTopics = ref<Record<string, string>>({});
 const summaryLoading = ref<Record<string, boolean>>({});
 const summaryErrors = ref<Record<string, string>>({});
 
-async function loadSummary(cardId: string, card: MeaningCard, questionText: string, answer: string, cache: SummaryCache): Promise<void> {
+async function loadSummary(cardId: string, card: MeaningCard, topic: string, questionText: string, answer: string, cache: SummaryCache): Promise<void> {
+	summaryTopics.value[cardId] = topic;
+
 	if (cardId in cache && cache[cardId].answer === answer) {
 		summaries.value[cardId] = cache[cardId].summary;
 		return;
@@ -111,7 +114,7 @@ onMounted(() => {
 				const card = cardsById.get(cardId);
 				const question = questionsById.get(entry.questionId);
 				if (card !== undefined && question !== undefined) {
-					promises.push(loadSummary(cardId, card, question.text, entry.answer, cache));
+					promises.push(loadSummary(cardId, card, question.topic, question.text, entry.answer, cache));
 				}
 			}
 		}
@@ -140,7 +143,7 @@ onMounted(() => {
 				<div v-if="summaryLoading[card.id]" class="summary-loading">Generating summary...</div>
 				<div v-else-if="summaryErrors[card.id]" class="summary-error">Could not load summary.</div>
 				<div v-else-if="summaries[card.id]" class="summary-block">
-					{{ summaries[card.id] }}
+					<strong>{{ summaryTopics[card.id] }}:</strong> {{ summaries[card.id] }}
 				</div>
 			</div>
 		</div>
