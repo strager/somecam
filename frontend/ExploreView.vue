@@ -77,6 +77,16 @@ function persistEntries(): void {
 	localStorage.setItem(EXPLORE_KEY, JSON.stringify(data));
 }
 
+let persistTimer: ReturnType<typeof setTimeout> | undefined;
+
+function debouncedPersist(): void {
+	if (persistTimer !== undefined) return;
+	persistTimer = setTimeout(() => {
+		persistTimer = undefined;
+		persistEntries();
+	}, 300);
+}
+
 function answeredQuestionIds(): Set<string> {
 	return new Set(entries.value.filter((e) => e.submitted).map((e) => e.questionId));
 }
@@ -311,7 +321,7 @@ onMounted(() => {
 
 				<div v-for="entry in answeredEntries" :key="entry.questionId" class="answered-question">
 					<p class="question">{{ questionsById.get(entry.questionId)?.topic }}: {{ questionsById.get(entry.questionId)?.text }}</p>
-					<ExploreTextarea v-model="entry.userAnswer" variant="answered" :rows="3" @blur="persistEntries()" />
+					<ExploreTextarea v-model="entry.userAnswer" variant="answered" :rows="3" @update:model-value="debouncedPersist" @blur="persistEntries()" />
 				</div>
 
 				<div v-if="inferring" class="inferring-indicator">
@@ -321,7 +331,7 @@ onMounted(() => {
 
 				<div v-else-if="displayedQuestion && !allAnswered">
 					<p class="question">{{ displayedQuestion.topic }}: {{ displayedQuestion.text }}</p>
-					<ExploreTextarea v-model="currentAnswer" :rows="5" placeholder="Type your reflection here..." @blur="persistEntries()" @keydown="onKeydown" />
+					<ExploreTextarea v-model="currentAnswer" :rows="5" placeholder="Type your reflection here..." @update:model-value="debouncedPersist" @blur="persistEntries()" @keydown="onKeydown" />
 					<p v-if="depthCheckShown" class="depth-follow-up">
 						<em>{{ depthCheckFollowUp }}</em>
 					</p>
