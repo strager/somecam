@@ -43,6 +43,11 @@ export default [
 	// Rule overrides
 	{
 		rules: {
+			// TypeScript already catches undefined variables; disable the
+			// base ESLint rule so browser globals like localStorage don't
+			// need manual declarations.
+			"no-undef": "off",
+
 			// Allow _-prefixed unused args
 			"@typescript-eslint/no-unused-vars": [
 				"error",

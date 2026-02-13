@@ -6,9 +6,16 @@ import { MEANING_CARDS } from "../shared/meaning-cards";
 import SwipeCard from "./SwipeCard.vue";
 
 interface SwipeRecord {
-	cardIndex: number;
+	cardId: string;
 	direction: SwipeDirection;
 }
+
+interface SavedProgress {
+	shuffledCardIds: string[];
+	swipeHistory: SwipeRecord[];
+}
+
+const STORAGE_KEY = "somecam-progress";
 
 const shuffledCards = ref<MeaningCard[]>([]);
 const currentIndex = ref(0);
@@ -31,16 +38,50 @@ function shuffle<T>(array: readonly T[]): T[] {
 	return result;
 }
 
+const cardsById = new Map(MEANING_CARDS.map((c) => [c.id, c]));
+
+function saveProgress(): void {
+	const data: SavedProgress = {
+		shuffledCardIds: shuffledCards.value.map((c) => c.id),
+		swipeHistory: swipeHistory.value,
+	};
+	localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+}
+
+function loadProgress(): SavedProgress | null {
+	try {
+		const raw = localStorage.getItem(STORAGE_KEY);
+		if (raw === null) return null;
+		const data = JSON.parse(raw) as SavedProgress;
+		if (!Array.isArray(data.shuffledCardIds) || data.shuffledCardIds.length === 0) return null;
+		if (!Array.isArray(data.swipeHistory)) return null;
+		return data;
+	} catch {
+		return null;
+	}
+}
+
 onMounted(() => {
+	const saved = loadProgress();
+	if (saved) {
+		const cards = saved.shuffledCardIds.map((id) => cardsById.get(id)).filter((c): c is MeaningCard => c !== undefined);
+		if (cards.length > 0) {
+			shuffledCards.value = cards;
+			swipeHistory.value = saved.swipeHistory;
+			currentIndex.value = saved.swipeHistory.length;
+			return;
+		}
+	}
 	shuffledCards.value = shuffle(MEANING_CARDS);
 });
 
 function handleSwipe(direction: SwipeDirection): void {
 	swipeHistory.value.push({
-		cardIndex: currentIndex.value,
+		cardId: currentCard.value.id,
 		direction,
 	});
 	currentIndex.value++;
+	saveProgress();
 }
 
 function handleButtonSwipe(direction: SwipeDirection): void {
@@ -53,10 +94,10 @@ function handleButtonSwipe(direction: SwipeDirection): void {
 }
 
 function handleUndo(): void {
-	const last = swipeHistory.value.pop();
-	if (last !== undefined) {
-		currentIndex.value = last.cardIndex;
-	}
+	if (swipeHistory.value.length === 0) return;
+	swipeHistory.value.pop();
+	currentIndex.value = swipeHistory.value.length;
+	saveProgress();
 }
 </script>
 
