@@ -8,6 +8,7 @@ import ExploreView from "./ExploreView.vue";
 import HomeView from "./HomeView.vue";
 import LlmTestView from "./LlmTestView.vue";
 import NarrowDownView from "./NarrowDownView.vue";
+import ReportView from "./ReportView.vue";
 
 const router = createRouter({
 	history: createWebHistory(),
@@ -27,6 +28,10 @@ const router = createRouter({
 		{
 			path: "/chosen",
 			component: ChosenCardsView,
+		},
+		{
+			path: "/report",
+			component: ReportView,
 		},
 		{
 			path: "/explore/:cardId",

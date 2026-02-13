@@ -176,6 +176,8 @@ onMounted(() => {
 				</div>
 			</div>
 		</div>
+
+		<button class="report-btn" @click="router.push('/report')">Download Report</button>
 	</main>
 </template>
 
@@ -285,5 +287,22 @@ h2 {
 
 .summary-item p {
 	margin: 0;
+}
+
+.report-btn {
+	display: block;
+	margin: 1.5rem auto 0;
+	padding: 0.5rem 1.25rem;
+	font-size: 0.95rem;
+	font-weight: 600;
+	background: transparent;
+	color: #2a6e4e;
+	border: 1.5px solid #2a6e4e;
+	border-radius: 6px;
+	cursor: pointer;
+}
+
+.report-btn:hover {
+	background: #eaf5ef;
 }
 </style>
