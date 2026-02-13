@@ -41,3 +41,9 @@ npm run dev
 ```
 
 Then open: <http://localhost:3011/>
+
+## Developer pages
+
+- `/llm-test` — Debug page for manually testing the LLM-backed API endpoints
+  (check-answer-depth, infer-answers, summarize). Select a card and question,
+  type an answer, and fire each endpoint to see the raw JSON responses.

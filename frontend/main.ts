@@ -6,6 +6,7 @@ import CardSwipeView from "./CardSwipeView.vue";
 import ChosenCardsView from "./ChosenCardsView.vue";
 import ExploreView from "./ExploreView.vue";
 import HomeView from "./HomeView.vue";
+import LlmTestView from "./LlmTestView.vue";
 import NarrowDownView from "./NarrowDownView.vue";
 
 const router = createRouter({
@@ -30,6 +31,10 @@ const router = createRouter({
 		{
 			path: "/explore/:cardId",
 			component: ExploreView,
+		},
+		{
+			path: "/llm-test",
+			component: LlmTestView,
 		},
 	],
 });
