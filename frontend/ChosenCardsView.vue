@@ -3,39 +3,17 @@ import { onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
 
 import { fetchSummary } from "./api";
+import { assignQuestions, EXPLORE_KEY } from "./explore-data";
+import type { ExploreData, ExploreEntry } from "./explore-data";
 import StartOverButton from "./StartOverButton.vue";
 import { EXPLORE_QUESTIONS } from "../shared/explore-questions";
 import type { MeaningCard } from "../shared/meaning-cards";
 import { MEANING_CARDS } from "../shared/meaning-cards";
 
 const CHOSEN_KEY = "somecam-chosen";
-const EXPLORE_KEY = "somecam-explore";
 const SUMMARIES_KEY = "somecam-summaries";
 
-interface ExploreEntry {
-	questionId: string;
-	userAnswer: string;
-	prefilledAnswer: string;
-	submitted: boolean;
-}
-
-type ExploreData = Record<string, ExploreEntry[]>;
 type SummaryCache = Record<string, { answer: string; summary: string }>;
-
-function assignQuestions(cardIds: string[]): ExploreData {
-	const data: ExploreData = {};
-	let pool: string[] = [];
-	for (const cardId of cardIds) {
-		if (pool.length === 0) {
-			pool = EXPLORE_QUESTIONS.map((q) => q.id);
-		}
-		const index = Math.floor(Math.random() * pool.length);
-		const questionId = pool[index];
-		pool.splice(index, 1);
-		data[cardId] = [{ questionId, userAnswer: "", prefilledAnswer: "", submitted: false }];
-	}
-	return data;
-}
 
 function loadSummaryCache(): SummaryCache {
 	try {
@@ -163,6 +141,8 @@ onMounted(() => {
 			<h1>SoMeCaM</h1>
 			<h2>Your Sources of Meaning</h2>
 		</header>
+
+		<button class="edit-cards-btn" @click="router.push('/edit-cards')">Edit selection</button>
 
 		<div class="card-list">
 			<div v-for="card in chosenCards" :key="card.id" class="card-surface chosen-card">
@@ -293,6 +273,23 @@ h2 {
 
 .summary-item p {
 	margin: 0;
+}
+
+.edit-cards-btn {
+	display: block;
+	margin: 0 auto 1.5rem;
+	padding: 0.5rem 1.25rem;
+	font-size: 0.95rem;
+	font-weight: 600;
+	background: transparent;
+	color: #2a6e4e;
+	border: 1.5px solid #2a6e4e;
+	border-radius: 6px;
+	cursor: pointer;
+}
+
+.edit-cards-btn:hover {
+	background: #eaf5ef;
 }
 
 .report-btn {
