@@ -252,17 +252,14 @@ api.register({
 			}
 		}
 
-		const promptQuestions = questions.map((q) => {
-			const question = questionsById.get(q.questionId) as { topic: string; text: string };
-			return {
-				source: card.source,
-				description: card.description,
-				questionId: q.questionId,
-				topic: question.topic,
-				text: question.text,
-				answer: q.answer,
-			};
-		});
+		const answeredById = new Map(questions.map((q) => [q.questionId, q.answer]));
+
+		const promptQuestions = EXPLORE_QUESTIONS.map((q) => ({
+			questionId: q.id,
+			topic: q.topic,
+			text: q.text,
+			answer: answeredById.get(q.id) ?? "",
+		}));
 
 		const userMessage = JSON.stringify(promptQuestions);
 
@@ -273,7 +270,7 @@ api.register({
 				messages: [
 					{
 						role: "system",
-						content: "You are a reflective coach helping someone explore their sources of meaning. " + "The user will provide a JSON array of question objects about a meaning card. " + 'Questions with a non-empty "answer" have been answered by the user. ' + 'Questions with an empty "answer" are unanswered. ' + "Determine which unanswered questions are already addressed by the user's existing answers. " + "For each addressed question, write a short answer (1-3 sentences) mimicking the user's writing style. " + 'Return a JSON array of objects with "questionId" and "answer" fields. ' + "Only include questions that are clearly addressed. If none are addressed, return an empty array. " + "Return ONLY the JSON array, no other text.",
+						content: "You are a reflective coach helping someone explore their sources of meaning. " + `The user is reflecting on a source of meaning in their life: "${card.source}" — ${card.description}. ` + "The user will provide a JSON array of question objects about this topic. " + 'Questions with a non-empty "answer" have been answered by the user. ' + 'Questions with an empty "answer" are unanswered. ' + "Determine which unanswered questions are already addressed by the user's existing answers. " + "For each addressed question, write a short answer (1-3 sentences) mimicking the user's writing style. " + 'Return a JSON array of objects with "questionId" and "answer" fields. ' + "Only include questions that are clearly addressed. If none are addressed, return an empty array. " + "Return ONLY the JSON array, no other text.",
 					},
 					{
 						role: "user",
