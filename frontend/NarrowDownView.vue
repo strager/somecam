@@ -2,11 +2,11 @@
 import { computed, onMounted, ref, watch } from "vue";
 import { useRouter } from "vue-router";
 
-import type { MeaningCard, SwipeDirection } from "../shared/meaning-cards";
-import { MEANING_CARDS } from "../shared/meaning-cards";
+import type { MeaningCard, SwipeDirection } from "../shared/meaning-cards.ts";
+import { MEANING_CARDS } from "../shared/meaning-cards.ts";
 import StartOverButton from "./StartOverButton.vue";
-import type { SwipeRecord } from "./store";
-import { loadNarrowDown, removeNarrowDown, saveChosenCardIds, saveNarrowDown } from "./store";
+import type { SwipeRecord } from "./store.ts";
+import { loadNarrowDown, removeNarrowDown, saveChosenCardIds, saveNarrowDown } from "./store.ts";
 import SwipeCard from "./SwipeCard.vue";
 
 const router = useRouter();

@@ -2,9 +2,9 @@
 import { computed, onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
 
-import { assignQuestions } from "./explore-data";
-import { loadChosenCardIds, loadExploreData, saveChosenCardIds, saveExploreData } from "./store";
-import { MEANING_CARDS } from "../shared/meaning-cards";
+import { assignQuestions } from "./explore-data.ts";
+import { loadChosenCardIds, loadExploreData, saveChosenCardIds, saveExploreData } from "./store.ts";
+import { MEANING_CARDS } from "../shared/meaning-cards.ts";
 
 const router = useRouter();
 const chosenIds = ref<Set<string>>(new Set());

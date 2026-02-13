@@ -1,11 +1,11 @@
 <script setup lang="ts">
 import { reactive, ref, watch } from "vue";
 
-import { fetchAnswerDepthCheck, fetchInferredAnswers, fetchSummary } from "./api";
-import type { LlmTestState } from "./store";
-import { loadLlmTestState, saveLlmTestState } from "./store";
-import { EXPLORE_QUESTIONS } from "../shared/explore-questions";
-import { MEANING_CARDS } from "../shared/meaning-cards";
+import { fetchAnswerDepthCheck, fetchInferredAnswers, fetchSummary } from "./api.ts";
+import type { LlmTestState } from "./store.ts";
+import { loadLlmTestState, saveLlmTestState } from "./store.ts";
+import { EXPLORE_QUESTIONS } from "../shared/explore-questions.ts";
+import { MEANING_CARDS } from "../shared/meaning-cards.ts";
 
 interface QuestionRow {
 	questionId: string;

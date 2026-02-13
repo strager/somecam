@@ -2,10 +2,10 @@
 import { onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
 
-import { loadChosenCardIds, loadExploreData, loadSummaryCache } from "./store";
-import { EXPLORE_QUESTIONS } from "../shared/explore-questions";
-import type { MeaningCard } from "../shared/meaning-cards";
-import { MEANING_CARDS } from "../shared/meaning-cards";
+import { loadChosenCardIds, loadExploreData, loadSummaryCache } from "./store.ts";
+import { EXPLORE_QUESTIONS } from "../shared/explore-questions.ts";
+import type { MeaningCard } from "../shared/meaning-cards.ts";
+import { MEANING_CARDS } from "../shared/meaning-cards.ts";
 
 interface QuestionReport {
 	topic: string;

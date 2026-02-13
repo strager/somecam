@@ -41,6 +41,7 @@ Vite runs in middleware mode and is attached by `backend/main.ts`.
 
 - Backend uses native Node TypeScript execution (`node` directly).
 - Keep backend code compatible with `erasableSyntaxOnly: true` (no `enum`, no parameter properties).
+- Use explicit `.ts` extensions for all local imports (both frontend and backend).
 
 ## Testing Guidance
 

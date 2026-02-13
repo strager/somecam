@@ -1,7 +1,3 @@
-## Coding style
-
-- Do NOT use `.ts` extensions in frontend imports (Vite's Bundler resolution doesn't support them).
-
 ## localStorage
 
 - All localStorage access goes through `frontend/store.ts`. Do not use `localStorage` directly in components.

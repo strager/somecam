@@ -2,14 +2,14 @@
 import { onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
 
-import { fetchSummary } from "./api";
-import { assignQuestions } from "./explore-data";
+import { fetchSummary } from "./api.ts";
+import { assignQuestions } from "./explore-data.ts";
 import StartOverButton from "./StartOverButton.vue";
-import type { ExploreEntry, SummaryCache } from "./store";
-import { loadChosenCardIds, loadExploreData, loadSummaryCache, saveExploreData, saveSummaryCache } from "./store";
-import { EXPLORE_QUESTIONS } from "../shared/explore-questions";
-import type { MeaningCard } from "../shared/meaning-cards";
-import { MEANING_CARDS } from "../shared/meaning-cards";
+import type { ExploreEntry, SummaryCache } from "./store.ts";
+import { loadChosenCardIds, loadExploreData, loadSummaryCache, saveExploreData, saveSummaryCache } from "./store.ts";
+import { EXPLORE_QUESTIONS } from "../shared/explore-questions.ts";
+import type { MeaningCard } from "../shared/meaning-cards.ts";
+import { MEANING_CARDS } from "../shared/meaning-cards.ts";
 
 const router = useRouter();
 const cardsById = new Map(MEANING_CARDS.map((c) => [c.id, c]));

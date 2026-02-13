@@ -3,8 +3,8 @@
 import { JSDOM } from "jsdom";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { clearAllProgress, loadChosenCardIds, loadExploreData, loadExploreDataFull, loadLlmTestState, loadNarrowDown, loadSummaryCache, loadSwipeProgress, removeNarrowDown, saveChosenCardIds, saveExploreData, saveLlmTestState, saveNarrowDown, saveSummaryCache, saveSwipeProgress } from "./store.js";
-import { EXPLORE_QUESTIONS } from "../shared/explore-questions.js";
+import { clearAllProgress, loadChosenCardIds, loadExploreData, loadExploreDataFull, loadLlmTestState, loadNarrowDown, loadSummaryCache, loadSwipeProgress, removeNarrowDown, saveChosenCardIds, saveExploreData, saveLlmTestState, saveNarrowDown, saveSummaryCache, saveSwipeProgress } from "./store.ts";
+import { EXPLORE_QUESTIONS } from "../shared/explore-questions.ts";
 
 const STORAGE_PREFIX = "somecam";
 

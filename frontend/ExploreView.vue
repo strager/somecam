@@ -2,15 +2,15 @@
 import { computed, nextTick, onMounted, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
 
-import { fetchAnswerDepthCheck, fetchInferredAnswers } from "./api";
+import { fetchAnswerDepthCheck, fetchInferredAnswers } from "./api.ts";
 import ExploreTextarea from "./ExploreTextarea.vue";
 import StartOverButton from "./StartOverButton.vue";
-import type { ExploreEntryFull } from "./store";
-import { loadExploreDataFull, saveExploreData } from "./store";
-import type { ExploreQuestion } from "../shared/explore-questions";
-import { EXPLORE_QUESTIONS } from "../shared/explore-questions";
-import type { MeaningCard } from "../shared/meaning-cards";
-import { MEANING_CARDS } from "../shared/meaning-cards";
+import type { ExploreEntryFull } from "./store.ts";
+import { loadExploreDataFull, saveExploreData } from "./store.ts";
+import type { ExploreQuestion } from "../shared/explore-questions.ts";
+import { EXPLORE_QUESTIONS } from "../shared/explore-questions.ts";
+import type { MeaningCard } from "../shared/meaning-cards.ts";
+import { MEANING_CARDS } from "../shared/meaning-cards.ts";
 
 const route = useRoute();
 const router = useRouter();

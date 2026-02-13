@@ -1,5 +1,5 @@
-import { EXPLORE_QUESTIONS } from "../shared/explore-questions.js";
-import type { SwipeDirection } from "../shared/meaning-cards.js";
+import { EXPLORE_QUESTIONS } from "../shared/explore-questions.ts";
+import type { SwipeDirection } from "../shared/meaning-cards.ts";
 
 const PROGRESS_KEY = "somecam-progress";
 const NARROWDOWN_KEY = "somecam-narrowdown";

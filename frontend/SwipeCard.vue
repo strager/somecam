@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
 
-import type { MeaningCard } from "../shared/meaning-cards";
-import type { SwipeDirection } from "../shared/meaning-cards";
+import type { MeaningCard } from "../shared/meaning-cards.ts";
+import type { SwipeDirection } from "../shared/meaning-cards.ts";
 
 const props = withDefaults(
 	defineProps<{

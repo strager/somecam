@@ -1,5 +1,5 @@
-import { EXPLORE_QUESTIONS } from "../shared/explore-questions.js";
-import type { ExploreData } from "./store.js";
+import { EXPLORE_QUESTIONS } from "../shared/explore-questions.ts";
+import type { ExploreData } from "./store.ts";
 
 export function assignQuestions(cardIds: string[]): ExploreData {
 	const data: ExploreData = {};
