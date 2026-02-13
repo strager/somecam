@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { ref } from "vue";
+
 defineProps<{
 	modelValue: string;
 	rows?: number;
@@ -11,13 +13,21 @@ const emit = defineEmits<{
 	blur: [];
 }>();
 
+const textareaRef = ref<HTMLTextAreaElement | null>(null);
+
+function focus(): void {
+	textareaRef.value?.focus();
+}
+
 function onInput(event: Event): void {
 	emit("update:modelValue", (event.target as HTMLTextAreaElement).value);
 }
+
+defineExpose({ focus });
 </script>
 
 <template>
-	<textarea :class="variant ?? 'active'" :value="modelValue" :rows="rows ?? 5" :placeholder="placeholder ?? ''" @input="onInput" @blur="emit('blur')"></textarea>
+	<textarea ref="textareaRef" :class="variant ?? 'active'" :value="modelValue" :rows="rows ?? 5" :placeholder="placeholder ?? ''" @input="onInput" @blur="emit('blur')"></textarea>
 </template>
 
 <style scoped>

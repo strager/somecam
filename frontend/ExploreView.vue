@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue";
+import { computed, nextTick, onMounted, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
 
 import { fetchAnswerDepthCheck, fetchInferredAnswers } from "./api";
@@ -37,6 +37,7 @@ const inferring = ref(false);
 const depthCheckFollowUp = ref("");
 const depthCheckShown = ref(false);
 const pendingInferResult = ref<Map<string, string> | null>(null);
+const activeTextarea = ref<InstanceType<typeof ExploreTextarea> | null>(null);
 
 const activeIndex = computed(() => {
 	const idx = entries.value.findIndex((e) => !e.submitted);
@@ -155,6 +156,7 @@ async function submitAnswer(): Promise<void> {
 		persistEntries();
 		depthCheckFollowUp.value = depthResult.followUpQuestion;
 		depthCheckShown.value = true;
+		void nextTick(() => activeTextarea.value?.focus());
 		// Resolve infer in background so it's ready when user skips
 		void inferPromise.then((result) => {
 			pendingInferResult.value = result;
@@ -322,7 +324,7 @@ onMounted(() => {
 				<div v-else-if="displayedQuestion && (!allAnswered || depthCheckShown)">
 					<p class="question">{{ displayedQuestion.topic }}: {{ displayedQuestion.text }}</p>
 					<p v-if="activeEntryPrefilled" class="prefill-hint"><em>This answer was pre-filled based on your previous responses. Feel free to edit it.</em></p>
-					<ExploreTextarea v-model="currentAnswer" :rows="5" placeholder="Type your reflection here..." @update:model-value="debouncedPersist" @blur="persistEntries()" @keydown="onKeydown" />
+					<ExploreTextarea ref="activeTextarea" v-model="currentAnswer" :rows="5" placeholder="Type your reflection here..." @update:model-value="debouncedPersist" @blur="persistEntries()" @keydown="onKeydown" />
 					<p v-if="depthCheckShown" class="depth-follow-up">
 						<em>{{ depthCheckFollowUp }}</em>
 					</p>
