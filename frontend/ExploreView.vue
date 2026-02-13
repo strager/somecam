@@ -65,6 +65,12 @@ const answeredEntries = computed(() => {
 	return submitted;
 });
 
+const activeEntryPrefilled = computed(() => {
+	const idx = activeIndex.value;
+	if (idx >= entries.value.length) return false;
+	return entries.value[idx].prefilledAnswer !== "";
+});
+
 const allAnswered = computed(() => {
 	return entries.value.length === EXPLORE_QUESTIONS.length && entries.value.every((e) => e.submitted);
 });
@@ -331,6 +337,7 @@ onMounted(() => {
 
 				<div v-else-if="displayedQuestion && !allAnswered">
 					<p class="question">{{ displayedQuestion.topic }}: {{ displayedQuestion.text }}</p>
+					<p v-if="activeEntryPrefilled" class="prefill-hint"><em>This answer was pre-filled based on your previous responses. Feel free to edit it.</em></p>
 					<ExploreTextarea v-model="currentAnswer" :rows="5" placeholder="Type your reflection here..." @update:model-value="debouncedPersist" @blur="persistEntries()" @keydown="onKeydown" />
 					<p v-if="depthCheckShown" class="depth-follow-up">
 						<em>{{ depthCheckFollowUp }}</em>
@@ -462,6 +469,12 @@ h2 {
 .depth-follow-up {
 	font-size: 1.1rem;
 	font-weight: 600;
+	color: #b8860b;
+	margin: 0 0 0.5rem;
+}
+
+.prefill-hint {
+	font-size: 0.9rem;
 	color: #b8860b;
 	margin: 0 0 0.5rem;
 }
