@@ -158,7 +158,9 @@ async function submitAnswer(): Promise<void> {
 		persistEntries();
 		depthCheckFollowUp.value = depthResult.followUpQuestion;
 		depthCheckShown.value = true;
-		void nextTick(() => activeTextarea.value?.focus());
+		void nextTick(() => {
+			activeTextarea.value?.focus();
+		});
 		// Resolve infer in background so it's ready when user skips
 		void inferPromise.then((result) => {
 			pendingInferResult.value = result;
