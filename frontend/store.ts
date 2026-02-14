@@ -22,7 +22,7 @@ export interface SwipeProgress {
 	swipeHistory: SwipeRecord[];
 }
 
-export interface NarrowDownProgress {
+export interface PrioritizeProgress {
 	cardIds: string[];
 	swipeHistory: SwipeRecord[];
 }
@@ -148,7 +148,7 @@ export function saveSwipeProgress(data: SwipeProgress): void {
 	localStorage.setItem(PROGRESS_KEY, JSON.stringify(data));
 }
 
-export function loadNarrowDown(): NarrowDownProgress | null {
+export function loadPrioritize(): PrioritizeProgress | null {
 	const parsed = parseJsonFromStorage(NARROWDOWN_KEY);
 	if (!isObjectRecord(parsed)) {
 		return null;
@@ -165,11 +165,11 @@ export function loadNarrowDown(): NarrowDownProgress | null {
 	};
 }
 
-export function saveNarrowDown(data: NarrowDownProgress): void {
+export function savePrioritize(data: PrioritizeProgress): void {
 	localStorage.setItem(NARROWDOWN_KEY, JSON.stringify(data));
 }
 
-export function removeNarrowDown(): void {
+export function removePrioritize(): void {
 	localStorage.removeItem(NARROWDOWN_KEY);
 }
 
@@ -297,18 +297,18 @@ export function saveLlmTestState(data: LlmTestState): void {
 	localStorage.setItem(LLM_TEST_KEY, JSON.stringify(data));
 }
 
-export type ProgressPhase = "explore" | "narrow-complete" | "narrow" | "swipe" | "none";
+export type ProgressPhase = "explore" | "prioritize-complete" | "prioritize" | "swipe" | "none";
 
 export function detectProgressPhase(): ProgressPhase {
 	if (loadChosenCardIds() !== null) {
 		return "explore";
 	}
-	const narrow = loadNarrowDown();
-	if (narrow !== null) {
-		if (narrow.swipeHistory.length >= narrow.cardIds.length) {
-			return "narrow-complete";
+	const prioritize = loadPrioritize();
+	if (prioritize !== null) {
+		if (prioritize.swipeHistory.length >= prioritize.cardIds.length) {
+			return "prioritize-complete";
 		}
-		return "narrow";
+		return "prioritize";
 	}
 	const swipe = loadSwipeProgress();
 	if (swipe !== null && swipe.swipeHistory.length > 0) {

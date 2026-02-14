@@ -2,7 +2,7 @@
 
 SoMeCaM presents you with 26 cards, each representing a potential source
 of meaning in your life. Through a multi-step sorting process, you
-narrow these down to a small handful that resonate most with you.
+prioritize a small handful that resonate most with you.
 
 ## Step 1: Initial sorting
 
@@ -25,13 +25,13 @@ progress bar tracks how far along you are.
 After all 26 cards have been sorted, you move on. If you agreed with
 5 or fewer cards, those become your chosen sources of meaning and you
 skip straight to your results. If you agreed with more than 5, you
-continue to the narrowing step.
+continue to the prioritizing step.
 
 > **Note:** If you agreed with fewer than 3 cards, your "unsure" cards
-> are included alongside your "agree" cards for the narrowing step, so
+> are included alongside your "agree" cards for the prioritizing step, so
 > you have enough to work with.
 
-## Step 2: Narrowing down
+## Step 2: Prioritizing
 
 In this step, you revisit only the cards that passed the initial sort.
 The goal is to keep your top 3–5 sources of meaning.

@@ -11,9 +11,9 @@ const phase = ref<ProgressPhase>(detectProgressPhase());
 function phaseLabel(p: ProgressPhase): string {
 	switch (p) {
 		case "explore":
-		case "narrow-complete":
+		case "prioritize-complete":
 			return "Explore Meaning";
-		case "narrow":
+		case "prioritize":
 		case "swipe":
 			return "Continue Finding Meaning";
 		case "none":
@@ -25,9 +25,9 @@ function phaseRoute(p: ProgressPhase): string {
 	switch (p) {
 		case "explore":
 			return "/explore";
-		case "narrow-complete":
-		case "narrow":
-			return "/find-meaning/narrow";
+		case "prioritize-complete":
+		case "prioritize":
+			return "/find-meaning/prioritize";
 		case "swipe":
 		case "none":
 			return "/find-meaning";

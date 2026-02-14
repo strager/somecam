@@ -5,7 +5,7 @@ import App from "./App.vue";
 import ExploreMeaningView from "./ExploreMeaningView.vue";
 import ExploreView from "./ExploreView.vue";
 import FindMeaningManualView from "./FindMeaningManualView.vue";
-import FindMeaningNarrowView from "./FindMeaningNarrowView.vue";
+import FindMeaningPrioritizeView from "./FindMeaningPrioritizeView.vue";
 import FindMeaningView from "./FindMeaningView.vue";
 import HomeView from "./HomeView.vue";
 import LlmTestView from "./LlmTestView.vue";
@@ -26,8 +26,8 @@ const router = createRouter({
 			component: FindMeaningView,
 		},
 		{
-			path: "/find-meaning/narrow",
-			component: FindMeaningNarrowView,
+			path: "/find-meaning/prioritize",
+			component: FindMeaningPrioritizeView,
 		},
 		{
 			path: "/explore",

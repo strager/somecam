@@ -3,7 +3,7 @@
 import { JSDOM } from "jsdom";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { clearAllProgress, exportProgressData, hasProgressData, importProgressData, loadChosenCardIds, loadExploreData, loadExploreDataFull, loadFreeformNotes, loadLlmTestState, loadNarrowDown, loadSummaryCache, loadSwipeProgress, removeNarrowDown, saveChosenCardIds, saveExploreData, saveFreeformNotes, saveLlmTestState, saveNarrowDown, saveSummaryCache, saveSwipeProgress } from "./store.ts";
+import { clearAllProgress, exportProgressData, hasProgressData, importProgressData, loadChosenCardIds, loadExploreData, loadExploreDataFull, loadFreeformNotes, loadLlmTestState, loadPrioritize, loadSummaryCache, loadSwipeProgress, removePrioritize, saveChosenCardIds, saveExploreData, saveFreeformNotes, saveLlmTestState, savePrioritize, saveSummaryCache, saveSwipeProgress } from "./store.ts";
 import { EXPLORE_QUESTIONS } from "../shared/explore-questions.ts";
 
 const STORAGE_PREFIX = "somecam";
@@ -14,7 +14,7 @@ function storageKey(suffix: string): string {
 
 const CHOSEN_STORAGE_KEY = storageKey("chosen");
 const PROGRESS_STORAGE_KEY = storageKey("progress");
-const NARROWDOWN_STORAGE_KEY = storageKey("narrowdown");
+const PRIORITIZE_STORAGE_KEY = storageKey("narrowdown");
 const EXPLORE_STORAGE_KEY = storageKey("explore");
 const SUMMARIES_STORAGE_KEY = storageKey("summaries");
 const FREEFORM_STORAGE_KEY = storageKey("freeform");
@@ -155,62 +155,62 @@ describe("loadSwipeProgress/saveSwipeProgress", () => {
 	});
 });
 
-describe("loadNarrowDown/saveNarrowDown/removeNarrowDown", () => {
+describe("loadPrioritize/savePrioritize/removePrioritize", () => {
 	it("returns null when key is absent", () => {
-		expect(loadNarrowDown()).toBeNull();
+		expect(loadPrioritize()).toBeNull();
 	});
 
 	it("returns null when cardIds is missing", () => {
 		localStorage.setItem(
-			NARROWDOWN_STORAGE_KEY,
+			PRIORITIZE_STORAGE_KEY,
 			JSON.stringify({
 				swipeHistory: [],
 			}),
 		);
-		expect(loadNarrowDown()).toBeNull();
+		expect(loadPrioritize()).toBeNull();
 	});
 
 	it("returns null when cardIds is empty", () => {
 		localStorage.setItem(
-			NARROWDOWN_STORAGE_KEY,
+			PRIORITIZE_STORAGE_KEY,
 			JSON.stringify({
 				cardIds: [],
 				swipeHistory: [],
 			}),
 		);
-		expect(loadNarrowDown()).toBeNull();
+		expect(loadPrioritize()).toBeNull();
 	});
 
 	it("returns null when swipeHistory is missing", () => {
 		localStorage.setItem(
-			NARROWDOWN_STORAGE_KEY,
+			PRIORITIZE_STORAGE_KEY,
 			JSON.stringify({
 				cardIds: ["self-knowledge"],
 			}),
 		);
-		expect(loadNarrowDown()).toBeNull();
+		expect(loadPrioritize()).toBeNull();
 	});
 
 	it("round-trips saved progress", () => {
-		saveNarrowDown({
+		savePrioritize({
 			cardIds: ["self-knowledge", "community"],
 			swipeHistory: [{ cardId: "community", direction: "agree" }],
 		});
 
-		expect(loadNarrowDown()).toEqual({
+		expect(loadPrioritize()).toEqual({
 			cardIds: ["self-knowledge", "community"],
 			swipeHistory: [{ cardId: "community", direction: "agree" }],
 		});
 	});
 
-	it("removeNarrowDown clears the key so loadNarrowDown returns null", () => {
-		saveNarrowDown({
+	it("removePrioritize clears the key so loadPrioritize returns null", () => {
+		savePrioritize({
 			cardIds: ["self-knowledge"],
 			swipeHistory: [],
 		});
 
-		removeNarrowDown();
-		expect(loadNarrowDown()).toBeNull();
+		removePrioritize();
+		expect(loadPrioritize()).toBeNull();
 	});
 });
 
@@ -555,7 +555,7 @@ describe("clearAllProgress", () => {
 			shuffledCardIds: ["self-knowledge"],
 			swipeHistory: [],
 		});
-		saveNarrowDown({
+		savePrioritize({
 			cardIds: ["self-knowledge"],
 			swipeHistory: [],
 		});
@@ -586,7 +586,7 @@ describe("clearAllProgress", () => {
 		clearAllProgress();
 
 		expect(loadSwipeProgress()).toBeNull();
-		expect(loadNarrowDown()).toBeNull();
+		expect(loadPrioritize()).toBeNull();
 		expect(loadChosenCardIds()).toBeNull();
 		expect(loadExploreData()).toBeNull();
 		expect(loadSummaryCache()).toEqual({});
@@ -712,7 +712,7 @@ describe("exportProgressData/importProgressData", () => {
 				{ cardId: "community", direction: "disagree" },
 			],
 		});
-		expect(loadNarrowDown()).toEqual({
+		expect(loadPrioritize()).toEqual({
 			cardIds: ["self-knowledge", "challenge"],
 			swipeHistory: [{ cardId: "challenge", direction: "unsure" }],
 		});

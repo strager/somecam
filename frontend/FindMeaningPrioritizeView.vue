@@ -6,7 +6,7 @@ import type { MeaningCard, SwipeDirection } from "../shared/meaning-cards.ts";
 import { MEANING_CARDS } from "../shared/meaning-cards.ts";
 import StartOverButton from "./StartOverButton.vue";
 import type { SwipeRecord } from "./store.ts";
-import { loadNarrowDown, removeNarrowDown, saveChosenCardIds, saveNarrowDown } from "./store.ts";
+import { loadPrioritize, removePrioritize, saveChosenCardIds, savePrioritize } from "./store.ts";
 import SwipeCard from "./SwipeCard.vue";
 
 const router = useRouter();
@@ -26,7 +26,7 @@ const canUndo = computed(() => swipeHistory.value.length > 0);
 const keptCount = computed(() => swipeHistory.value.filter((r) => r.direction === "agree").length);
 
 onMounted(() => {
-	const saved = loadNarrowDown();
+	const saved = loadPrioritize();
 	if (!saved) {
 		void router.replace("/find-meaning");
 		return;
@@ -47,7 +47,7 @@ function handleSwipe(direction: SwipeDirection): void {
 		direction,
 	});
 	currentIndex.value++;
-	saveNarrowDown({
+	savePrioritize({
 		cardIds: cards.value.map((c) => c.id),
 		swipeHistory: swipeHistory.value,
 	});
@@ -66,7 +66,7 @@ function handleUndo(): void {
 	if (swipeHistory.value.length === 0) return;
 	swipeHistory.value.pop();
 	currentIndex.value = swipeHistory.value.length;
-	saveNarrowDown({
+	savePrioritize({
 		cardIds: cards.value.map((c) => c.id),
 		swipeHistory: swipeHistory.value,
 	});
@@ -76,7 +76,7 @@ watch(isComplete, (done) => {
 	if (!done) return;
 	const keptCardIds = swipeHistory.value.filter((r) => r.direction === "agree").map((r) => r.cardId);
 	saveChosenCardIds(keptCardIds);
-	removeNarrowDown();
+	removePrioritize();
 	void router.push("/explore");
 });
 </script>
@@ -84,7 +84,7 @@ watch(isComplete, (done) => {
 <template>
 	<main>
 		<header>
-			<h1>Find Meaning — Narrow</h1>
+			<h1>Find Meaning — Prioritize</h1>
 			<p class="instruction">Keep your top sources of meaning (aim for 3–5)</p>
 			<div class="progress">
 				<div class="progress-bar">

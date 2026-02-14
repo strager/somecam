@@ -6,7 +6,7 @@ import type { MeaningCard, SwipeDirection } from "../shared/meaning-cards.ts";
 import { MEANING_CARDS } from "../shared/meaning-cards.ts";
 import StartOverButton from "./StartOverButton.vue";
 import type { SwipeRecord } from "./store.ts";
-import { detectProgressPhase, loadSwipeProgress, saveChosenCardIds, saveNarrowDown, saveSwipeProgress } from "./store.ts";
+import { detectProgressPhase, loadSwipeProgress, saveChosenCardIds, savePrioritize, saveSwipeProgress } from "./store.ts";
 import SwipeCard from "./SwipeCard.vue";
 
 const router = useRouter();
@@ -23,10 +23,10 @@ function detectNextPhase(): { label: string; route: string } | null {
 	switch (phase) {
 		case "explore":
 			return { label: "Explore Meaning", route: "/explore" };
-		case "narrow-complete":
-			return { label: "Explore Meaning", route: "/find-meaning/narrow" };
-		case "narrow":
-			return { label: "Prioritize Meaning", route: "/find-meaning/narrow" };
+		case "prioritize-complete":
+			return { label: "Explore Meaning", route: "/find-meaning/prioritize" };
+		case "prioritize":
+			return { label: "Prioritize Meaning", route: "/find-meaning/prioritize" };
 		default:
 			return null;
 	}
@@ -111,8 +111,8 @@ function continueToNextPhase(): void {
 	const cardIdsToConsider = agreeCardIds.length < 3 ? agreeCardIds.concat(unsureCardIds) : agreeCardIds;
 
 	if (cardIdsToConsider.length > 5) {
-		saveNarrowDown({ cardIds: cardIdsToConsider, swipeHistory: [] });
-		void router.push("/find-meaning/narrow");
+		savePrioritize({ cardIds: cardIdsToConsider, swipeHistory: [] });
+		void router.push("/find-meaning/prioritize");
 	} else {
 		saveChosenCardIds(cardIdsToConsider);
 		void router.push("/explore");
