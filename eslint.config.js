@@ -6,7 +6,7 @@ import tseslint from "typescript-eslint";
 export default [
 	// Ignore build artifacts and declaration files
 	{
-		ignores: ["dist/", "*.d.ts", "eslint.config.js"],
+		ignores: ["**/dist/", "*.d.ts", "eslint.config.js"],
 	},
 
 	// Base JS recommended
