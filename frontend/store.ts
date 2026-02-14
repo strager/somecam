@@ -208,6 +208,12 @@ export function renameSession(id: string, newName: string): void {
 	saveSessionsMeta(sessions);
 }
 
+export function getSessionName(id: string): string | null {
+	const sessions = loadSessionsMeta();
+	const session = sessions.find((s) => s.id === id);
+	return session?.name ?? null;
+}
+
 export function deleteSession(id: string): void {
 	const sessions = loadSessionsMeta();
 	const index = sessions.findIndex((s) => s.id === id);
