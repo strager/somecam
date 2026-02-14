@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { onMounted, ref } from "vue";
-import { useRouter } from "vue-router";
+import { useRoute, useRouter } from "vue-router";
 
 import { loadChosenCardIds, loadExploreData, loadFreeformNotes, loadSummaryCache } from "./store.ts";
 import { EXPLORE_QUESTIONS } from "../shared/explore-questions.ts";
@@ -20,7 +20,9 @@ interface CardReport {
 	freeformNote: string;
 }
 
+const route = useRoute();
 const router = useRouter();
+const sessionId = route.params.sessionId as string;
 const cardsById = new Map(MEANING_CARDS.map((c) => [c.id, c]));
 
 const reports = ref<CardReport[]>([]);
@@ -31,15 +33,15 @@ function downloadPdf(): void {
 
 onMounted(() => {
 	try {
-		const cardIds = loadChosenCardIds();
+		const cardIds = loadChosenCardIds(sessionId);
 		if (cardIds === null) {
-			void router.replace("/find-meaning");
+			void router.replace(`/${sessionId}/find-meaning`);
 			return;
 		}
 
-		const exploreData = loadExploreData() ?? {};
-		const summaryCache = loadSummaryCache();
-		const freeformNotes = loadFreeformNotes();
+		const exploreData = loadExploreData(sessionId) ?? {};
+		const summaryCache = loadSummaryCache(sessionId);
+		const freeformNotes = loadFreeformNotes(sessionId);
 
 		for (const cardId of cardIds) {
 			const card = cardsById.get(cardId);
@@ -64,7 +66,7 @@ onMounted(() => {
 			reports.value.push({ card, questions, freeformNote: freeformNotes[cardId] ?? "" });
 		}
 	} catch {
-		void router.replace("/find-meaning");
+		void router.replace(`/${sessionId}/find-meaning`);
 	}
 });
 </script>

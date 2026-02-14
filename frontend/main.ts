@@ -22,27 +22,27 @@ const router = createRouter({
 			component: HomeView,
 		},
 		{
-			path: "/find-meaning",
+			path: "/:sessionId/find-meaning",
 			component: FindMeaningView,
 		},
 		{
-			path: "/find-meaning/prioritize",
+			path: "/:sessionId/find-meaning/prioritize",
 			component: FindMeaningPrioritizeView,
 		},
 		{
-			path: "/explore",
+			path: "/:sessionId/explore",
 			component: ExploreView,
 		},
 		{
-			path: "/find-meaning/manual",
+			path: "/:sessionId/find-meaning/manual",
 			component: FindMeaningManualView,
 		},
 		{
-			path: "/report",
+			path: "/:sessionId/report",
 			component: ReportView,
 		},
 		{
-			path: "/explore/:meaningId",
+			path: "/:sessionId/explore/:meaningId",
 			component: ExploreMeaningView,
 		},
 		{

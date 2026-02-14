@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue";
-import { useRouter } from "vue-router";
+import { useRoute, useRouter } from "vue-router";
 
 import type { MeaningCard, SwipeDirection } from "../shared/meaning-cards.ts";
 import { MEANING_CARDS } from "../shared/meaning-cards.ts";
@@ -9,7 +9,9 @@ import type { SwipeRecord } from "./store.ts";
 import { loadPrioritize, needsPrioritization, removePrioritize, saveChosenCardIds, savePrioritize } from "./store.ts";
 import SwipeCard from "./SwipeCard.vue";
 
+const route = useRoute();
 const router = useRouter();
+const sessionId = route.params.sessionId as string;
 const cardsById = new Map(MEANING_CARDS.map((c) => [c.id, c]));
 
 const cards = ref<MeaningCard[]>([]);
@@ -26,20 +28,20 @@ const canUndo = computed(() => swipeHistory.value.length > 0);
 const keptCount = computed(() => swipeHistory.value.filter((r) => r.direction === "agree").length);
 
 onMounted(() => {
-	const saved = loadPrioritize();
+	const saved = loadPrioritize(sessionId);
 	if (!saved) {
-		void router.replace("/find-meaning");
+		void router.replace(`/${sessionId}/find-meaning`);
 		return;
 	}
-	if (!needsPrioritization()) {
-		saveChosenCardIds(saved.cardIds);
-		removePrioritize();
-		void router.replace("/explore");
+	if (!needsPrioritization(sessionId)) {
+		saveChosenCardIds(sessionId, saved.cardIds);
+		removePrioritize(sessionId);
+		void router.replace(`/${sessionId}/explore`);
 		return;
 	}
 	const resolved = saved.cardIds.map((id) => cardsById.get(id)).filter((c): c is MeaningCard => c !== undefined);
 	if (resolved.length === 0) {
-		void router.replace("/find-meaning");
+		void router.replace(`/${sessionId}/find-meaning`);
 		return;
 	}
 	cards.value = resolved;
@@ -53,7 +55,7 @@ function handleSwipe(direction: SwipeDirection): void {
 		direction,
 	});
 	currentIndex.value++;
-	savePrioritize({
+	savePrioritize(sessionId, {
 		cardIds: cards.value.map((c) => c.id),
 		swipeHistory: swipeHistory.value,
 	});
@@ -72,7 +74,7 @@ function handleUndo(): void {
 	if (swipeHistory.value.length === 0) return;
 	swipeHistory.value.pop();
 	currentIndex.value = swipeHistory.value.length;
-	savePrioritize({
+	savePrioritize(sessionId, {
 		cardIds: cards.value.map((c) => c.id),
 		swipeHistory: swipeHistory.value,
 	});
@@ -81,9 +83,9 @@ function handleUndo(): void {
 watch(isComplete, (done) => {
 	if (!done) return;
 	const keptCardIds = swipeHistory.value.filter((r) => r.direction === "agree").map((r) => r.cardId);
-	saveChosenCardIds(keptCardIds);
-	removePrioritize();
-	void router.push("/explore");
+	saveChosenCardIds(sessionId, keptCardIds);
+	removePrioritize(sessionId);
+	void router.push(`/${sessionId}/explore`);
 });
 </script>
 

@@ -1,16 +1,22 @@
 import { EXPLORE_QUESTIONS } from "../shared/explore-questions.ts";
 import type { SwipeDirection } from "../shared/meaning-cards.ts";
 
-const PROGRESS_KEY = "somecam-progress";
-const NARROWDOWN_KEY = "somecam-narrowdown";
-const CHOSEN_KEY = "somecam-chosen";
-const EXPLORE_KEY = "somecam-explore";
-const SUMMARIES_KEY = "somecam-summaries";
-const FREEFORM_KEY = "somecam-freeform";
+const SESSIONS_KEY = "somecam-sessions";
+const ACTIVE_SESSION_KEY = "somecam-active-session";
 const LLM_TEST_KEY = "somecam-llm-test";
 const PERSIST_REQUESTED_KEY = "somecam-persist-requested";
 
+const LEGACY_KEYS = ["somecam-progress", "somecam-narrowdown", "somecam-chosen", "somecam-explore", "somecam-summaries", "somecam-freeform"];
+const SESSION_DATA_SUFFIXES = ["progress", "narrowdown", "chosen", "explore", "summaries", "freeform"] as const;
+
 const DEFAULT_QUESTION_ID = EXPLORE_QUESTIONS[0]?.id ?? "";
+
+export interface SessionMeta {
+	id: string;
+	name: string;
+	createdAt: string;
+	lastUpdatedAt: string;
+}
 
 export interface SwipeRecord {
 	cardId: string;
@@ -53,6 +59,221 @@ export interface LlmTestState {
 	cardId: string;
 	rows: LlmTestRow[];
 }
+
+// --- Session management ---
+
+function generateUUID(): string {
+	return crypto.randomUUID();
+}
+
+export function formatSessionDate(date: Date): string {
+	return date.toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
+}
+
+function loadSessionsMeta(): SessionMeta[] {
+	const parsed = parseJsonFromStorage(SESSIONS_KEY);
+	if (!Array.isArray(parsed)) {
+		return [];
+	}
+	const result: SessionMeta[] = [];
+	for (const entry of parsed) {
+		if (!isObjectRecord(entry) || typeof entry.id !== "string" || typeof entry.name !== "string" || typeof entry.createdAt !== "string") {
+			continue;
+		}
+		result.push({
+			id: entry.id,
+			name: entry.name,
+			createdAt: entry.createdAt,
+			lastUpdatedAt: typeof entry.lastUpdatedAt === "string" ? entry.lastUpdatedAt : entry.createdAt,
+		});
+	}
+	return result;
+}
+
+function saveSessionsMeta(sessions: SessionMeta[]): void {
+	localStorage.setItem(SESSIONS_KEY, JSON.stringify(sessions));
+}
+
+function hasLegacyData(): boolean {
+	return LEGACY_KEYS.some((key) => localStorage.getItem(key) !== null);
+}
+
+function migrateToSessions(): void {
+	const id = generateUUID();
+	for (const suffix of SESSION_DATA_SUFFIXES) {
+		const legacyKey = `somecam-${suffix}`;
+		const raw = localStorage.getItem(legacyKey);
+		if (raw !== null) {
+			localStorage.setItem(`somecam-${id}-${suffix}`, raw);
+			localStorage.removeItem(legacyKey);
+		}
+	}
+	const now = new Date().toISOString();
+	const meta: SessionMeta = {
+		id,
+		name: formatSessionDate(new Date()),
+		createdAt: now,
+		lastUpdatedAt: now,
+	};
+	saveSessionsMeta([meta]);
+	localStorage.setItem(ACTIVE_SESSION_KEY, id);
+}
+
+export function ensureSessionsInitialized(): void {
+	if (localStorage.getItem(SESSIONS_KEY) !== null) {
+		return;
+	}
+	if (hasLegacyData()) {
+		migrateToSessions();
+		return;
+	}
+	const id = generateUUID();
+	const now = new Date().toISOString();
+	const meta: SessionMeta = {
+		id,
+		name: formatSessionDate(new Date()),
+		createdAt: now,
+		lastUpdatedAt: now,
+	};
+	saveSessionsMeta([meta]);
+	localStorage.setItem(ACTIVE_SESSION_KEY, id);
+}
+
+export function getActiveSessionId(): string {
+	ensureSessionsInitialized();
+	const id = localStorage.getItem(ACTIVE_SESSION_KEY);
+	if (id !== null) {
+		return id;
+	}
+	const sessions = loadSessionsMeta();
+	if (sessions.length > 0) {
+		localStorage.setItem(ACTIVE_SESSION_KEY, sessions[0].id);
+		return sessions[0].id;
+	}
+	ensureSessionsInitialized();
+	// ensureSessionsInitialized always creates a session and sets the active key
+	const activeId = localStorage.getItem(ACTIVE_SESSION_KEY);
+	if (activeId === null) {
+		throw new Error("ensureSessionsInitialized failed to create a session");
+	}
+	return activeId;
+}
+
+function sessionHasData(id: string): boolean {
+	return SESSION_DATA_SUFFIXES.some((suffix) => localStorage.getItem(`somecam-${id}-${suffix}`) !== null);
+}
+
+export function listSessions(): SessionMeta[] {
+	ensureSessionsInitialized();
+	const all = loadSessionsMeta();
+	const nonEmpty = all.filter((s) => sessionHasData(s.id));
+	if (nonEmpty.length < all.length) {
+		saveSessionsMeta(all.filter((s) => sessionHasData(s.id) || s.id === localStorage.getItem(ACTIVE_SESSION_KEY)));
+	}
+	return nonEmpty;
+}
+
+export function createSession(name?: string): string {
+	ensureSessionsInitialized();
+	const id = generateUUID();
+	const now = new Date().toISOString();
+	const meta: SessionMeta = {
+		id,
+		name: name ?? formatSessionDate(new Date()),
+		createdAt: now,
+		lastUpdatedAt: now,
+	};
+	const sessions = loadSessionsMeta();
+	sessions.push(meta);
+	saveSessionsMeta(sessions);
+	localStorage.setItem(ACTIVE_SESSION_KEY, id);
+	return id;
+}
+
+export function switchSession(id: string): void {
+	const sessions = loadSessionsMeta();
+	if (!sessions.some((s) => s.id === id)) {
+		throw new Error(`Session not found: ${id}`);
+	}
+	localStorage.setItem(ACTIVE_SESSION_KEY, id);
+}
+
+export function renameSession(id: string, newName: string): void {
+	const sessions = loadSessionsMeta();
+	const session = sessions.find((s) => s.id === id);
+	if (!session) {
+		throw new Error(`Session not found: ${id}`);
+	}
+	session.name = newName;
+	saveSessionsMeta(sessions);
+}
+
+export function deleteSession(id: string): void {
+	const sessions = loadSessionsMeta();
+	const index = sessions.findIndex((s) => s.id === id);
+	if (index === -1) {
+		throw new Error(`Session not found: ${id}`);
+	}
+
+	for (const suffix of SESSION_DATA_SUFFIXES) {
+		localStorage.removeItem(`somecam-${id}-${suffix}`);
+	}
+
+	sessions.splice(index, 1);
+
+	if (sessions.length === 0) {
+		const newId = generateUUID();
+		const now = new Date().toISOString();
+		const meta: SessionMeta = {
+			id: newId,
+			name: formatSessionDate(new Date()),
+			createdAt: now,
+			lastUpdatedAt: now,
+		};
+		sessions.push(meta);
+		localStorage.setItem(ACTIVE_SESSION_KEY, newId);
+	} else if (localStorage.getItem(ACTIVE_SESSION_KEY) === id) {
+		localStorage.setItem(ACTIVE_SESSION_KEY, sessions[sessions.length - 1].id);
+	}
+
+	saveSessionsMeta(sessions);
+}
+
+function touchSession(sessionId: string): void {
+	const sessions = loadSessionsMeta();
+	const session = sessions.find((s) => s.id === sessionId);
+	if (session) {
+		session.lastUpdatedAt = new Date().toISOString();
+		saveSessionsMeta(sessions);
+	}
+}
+
+// --- Dynamic key resolution ---
+
+function sessionKey(sessionId: string, suffix: string): string {
+	return `somecam-${sessionId}-${suffix}`;
+}
+
+function progressKey(sessionId: string): string {
+	return sessionKey(sessionId, "progress");
+}
+function narrowdownKey(sessionId: string): string {
+	return sessionKey(sessionId, "narrowdown");
+}
+function chosenKey(sessionId: string): string {
+	return sessionKey(sessionId, "chosen");
+}
+function exploreKey(sessionId: string): string {
+	return sessionKey(sessionId, "explore");
+}
+function summariesKey(sessionId: string): string {
+	return sessionKey(sessionId, "summaries");
+}
+function freeformKey(sessionId: string): string {
+	return sessionKey(sessionId, "freeform");
+}
+
+// --- Internal helpers ---
 
 function parseJsonFromStorage(key: string): unknown {
 	try {
@@ -127,8 +348,10 @@ function isSummaryCacheEntry(value: unknown): value is { answer: string; summary
 	return typeof value.answer === "string" && typeof value.summary === "string";
 }
 
-export function loadSwipeProgress(): SwipeProgress | null {
-	const parsed = parseJsonFromStorage(PROGRESS_KEY);
+// --- Session-scoped load/save ---
+
+export function loadSwipeProgress(sessionId: string): SwipeProgress | null {
+	const parsed = parseJsonFromStorage(progressKey(sessionId));
 	if (!isObjectRecord(parsed)) {
 		return null;
 	}
@@ -144,12 +367,13 @@ export function loadSwipeProgress(): SwipeProgress | null {
 	};
 }
 
-export function saveSwipeProgress(data: SwipeProgress): void {
-	localStorage.setItem(PROGRESS_KEY, JSON.stringify(data));
+export function saveSwipeProgress(sessionId: string, data: SwipeProgress): void {
+	localStorage.setItem(progressKey(sessionId), JSON.stringify(data));
+	touchSession(sessionId);
 }
 
-export function loadPrioritize(): PrioritizeProgress | null {
-	const parsed = parseJsonFromStorage(NARROWDOWN_KEY);
+export function loadPrioritize(sessionId: string): PrioritizeProgress | null {
+	const parsed = parseJsonFromStorage(narrowdownKey(sessionId));
 	if (!isObjectRecord(parsed)) {
 		return null;
 	}
@@ -165,44 +389,46 @@ export function loadPrioritize(): PrioritizeProgress | null {
 	};
 }
 
-export function savePrioritize(data: PrioritizeProgress): void {
-	localStorage.setItem(NARROWDOWN_KEY, JSON.stringify(data));
+export function savePrioritize(sessionId: string, data: PrioritizeProgress): void {
+	localStorage.setItem(narrowdownKey(sessionId), JSON.stringify(data));
+	touchSession(sessionId);
 }
 
-export function removePrioritize(): void {
-	localStorage.removeItem(NARROWDOWN_KEY);
+export function removePrioritize(sessionId: string): void {
+	localStorage.removeItem(narrowdownKey(sessionId));
 }
 
-export function loadChosenCardIds(): string[] | null {
-	const parsed = parseJsonFromStorage(CHOSEN_KEY);
+export function loadChosenCardIds(sessionId: string): string[] | null {
+	const parsed = parseJsonFromStorage(chosenKey(sessionId));
 	if (!isStringArray(parsed) || parsed.length === 0) {
 		return null;
 	}
 	return parsed;
 }
 
-export function saveChosenCardIds(ids: string[]): void {
-	localStorage.setItem(CHOSEN_KEY, JSON.stringify(ids));
+export function saveChosenCardIds(sessionId: string, ids: string[]): void {
+	localStorage.setItem(chosenKey(sessionId), JSON.stringify(ids));
+	touchSession(sessionId);
 }
 
-export function selectCandidateCards(): string[] {
-	const progress = loadSwipeProgress();
+export function selectCandidateCards(sessionId: string): string[] {
+	const progress = loadSwipeProgress(sessionId);
 	if (progress === null) return [];
 	const agreeCardIds = progress.swipeHistory.filter((r) => r.direction === "agree").map((r) => r.cardId);
 	const unsureCardIds = progress.swipeHistory.filter((r) => r.direction === "unsure").map((r) => r.cardId);
 	return agreeCardIds.length < 3 ? agreeCardIds.concat(unsureCardIds) : agreeCardIds;
 }
 
-export function needsPrioritization(): boolean {
-	const prioritize = loadPrioritize();
+export function needsPrioritization(sessionId: string): boolean {
+	const prioritize = loadPrioritize(sessionId);
 	if (prioritize !== null) {
 		return prioritize.cardIds.length > 5;
 	}
-	return selectCandidateCards().length > 5;
+	return selectCandidateCards(sessionId).length > 5;
 }
 
-export function loadExploreData(): ExploreData | null {
-	const parsed = parseJsonFromStorage(EXPLORE_KEY);
+export function loadExploreData(sessionId: string): ExploreData | null {
+	const parsed = parseJsonFromStorage(exploreKey(sessionId));
 	if (!isObjectRecord(parsed)) {
 		return null;
 	}
@@ -214,8 +440,8 @@ export function loadExploreData(): ExploreData | null {
 	return parsed as ExploreData;
 }
 
-export function loadExploreDataFull(): ExploreDataFull | null {
-	const parsed = parseJsonFromStorage(EXPLORE_KEY);
+export function loadExploreDataFull(sessionId: string): ExploreDataFull | null {
+	const parsed = parseJsonFromStorage(exploreKey(sessionId));
 	if (!isObjectRecord(parsed)) {
 		return null;
 	}
@@ -240,12 +466,13 @@ export function loadExploreDataFull(): ExploreDataFull | null {
 	return result;
 }
 
-export function saveExploreData(data: ExploreData | ExploreDataFull): void {
-	localStorage.setItem(EXPLORE_KEY, JSON.stringify(data));
+export function saveExploreData(sessionId: string, data: ExploreData | ExploreDataFull): void {
+	localStorage.setItem(exploreKey(sessionId), JSON.stringify(data));
+	touchSession(sessionId);
 }
 
-export function loadSummaryCache(): SummaryCache {
-	const parsed = parseJsonFromStorage(SUMMARIES_KEY);
+export function loadSummaryCache(sessionId: string): SummaryCache {
+	const parsed = parseJsonFromStorage(summariesKey(sessionId));
 	if (!isObjectRecord(parsed)) {
 		return {};
 	}
@@ -257,12 +484,13 @@ export function loadSummaryCache(): SummaryCache {
 	return parsed as SummaryCache;
 }
 
-export function saveSummaryCache(cache: SummaryCache): void {
-	localStorage.setItem(SUMMARIES_KEY, JSON.stringify(cache));
+export function saveSummaryCache(sessionId: string, cache: SummaryCache): void {
+	localStorage.setItem(summariesKey(sessionId), JSON.stringify(cache));
+	touchSession(sessionId);
 }
 
-export function loadFreeformNotes(): FreeformNotes {
-	const parsed = parseJsonFromStorage(FREEFORM_KEY);
+export function loadFreeformNotes(sessionId: string): FreeformNotes {
+	const parsed = parseJsonFromStorage(freeformKey(sessionId));
 	if (!isObjectRecord(parsed)) {
 		return {};
 	}
@@ -274,9 +502,12 @@ export function loadFreeformNotes(): FreeformNotes {
 	return parsed as FreeformNotes;
 }
 
-export function saveFreeformNotes(notes: FreeformNotes): void {
-	localStorage.setItem(FREEFORM_KEY, JSON.stringify(notes));
+export function saveFreeformNotes(sessionId: string, notes: FreeformNotes): void {
+	localStorage.setItem(freeformKey(sessionId), JSON.stringify(notes));
+	touchSession(sessionId);
 }
+
+// --- Global (non-session-scoped) ---
 
 export function loadLlmTestState(): LlmTestState | null {
 	const parsed = parseJsonFromStorage(LLM_TEST_KEY);
@@ -313,48 +544,60 @@ export function saveLlmTestState(data: LlmTestState): void {
 	localStorage.setItem(LLM_TEST_KEY, JSON.stringify(data));
 }
 
+// --- Progress detection ---
+
 export type ProgressPhase = "explore" | "prioritize-complete" | "prioritize" | "swipe" | "none";
 
-export function detectProgressPhase(): ProgressPhase {
-	if (loadChosenCardIds() !== null) {
+export function detectSessionPhase(id: string): ProgressPhase {
+	const chosenRaw = parseJsonFromStorage(`somecam-${id}-chosen`);
+	if (isStringArray(chosenRaw) && chosenRaw.length > 0) {
 		return "explore";
 	}
-	const prioritize = loadPrioritize();
-	if (prioritize !== null) {
-		if (prioritize.swipeHistory.length >= prioritize.cardIds.length) {
+	const narrowRaw = parseJsonFromStorage(`somecam-${id}-narrowdown`);
+	if (isObjectRecord(narrowRaw) && isStringArray(narrowRaw.cardIds) && narrowRaw.cardIds.length > 0 && Array.isArray(narrowRaw.swipeHistory)) {
+		if (narrowRaw.swipeHistory.length >= narrowRaw.cardIds.length) {
 			return "prioritize-complete";
 		}
 		return "prioritize";
 	}
-	const swipe = loadSwipeProgress();
-	if (swipe !== null && swipe.swipeHistory.length > 0) {
+	const progressRaw = parseJsonFromStorage(`somecam-${id}-progress`);
+	if (isObjectRecord(progressRaw) && Array.isArray(progressRaw.swipeHistory) && progressRaw.swipeHistory.length > 0) {
 		return "swipe";
 	}
 	return "none";
 }
 
-export function clearAllProgress(): void {
-	localStorage.removeItem(PROGRESS_KEY);
-	localStorage.removeItem(NARROWDOWN_KEY);
-	localStorage.removeItem(CHOSEN_KEY);
-	localStorage.removeItem(EXPLORE_KEY);
-	localStorage.removeItem(SUMMARIES_KEY);
-	localStorage.removeItem(FREEFORM_KEY);
+export function clearAllProgress(sessionId: string): void {
+	for (const suffix of SESSION_DATA_SUFFIXES) {
+		localStorage.removeItem(sessionKey(sessionId, suffix));
+	}
 }
 
-const ALL_SOMECAM_KEYS = [PROGRESS_KEY, NARROWDOWN_KEY, CHOSEN_KEY, EXPLORE_KEY, SUMMARIES_KEY, FREEFORM_KEY, LLM_TEST_KEY];
+export function hasProgressData(sessionId: string): boolean {
+	return SESSION_DATA_SUFFIXES.some((suffix) => localStorage.getItem(sessionKey(sessionId, suffix)) !== null);
+}
 
-const EXPORT_VERSION = "somecam-v1";
+// --- Export / Import ---
+
+const EXPORT_VERSION_V1 = "somecam-v1";
+const EXPORT_VERSION_V2 = "somecam-v2";
+
+const LEGACY_V1_KEYS = ["somecam-progress", "somecam-narrowdown", "somecam-chosen", "somecam-explore", "somecam-summaries", "somecam-freeform", "somecam-llm-test"];
 
 export function exportProgressData(): string {
-	const result: Record<string, unknown> = { version: EXPORT_VERSION };
-	for (const key of ALL_SOMECAM_KEYS) {
-		const raw = localStorage.getItem(key);
-		if (raw !== null) {
-			result[key] = JSON.parse(raw) as unknown;
+	const sessions = loadSessionsMeta();
+	const exported: { id: string; name: string; createdAt: string; lastUpdatedAt: string; data: Record<string, unknown> }[] = [];
+	for (const session of sessions) {
+		const data: Record<string, unknown> = {};
+		for (const suffix of SESSION_DATA_SUFFIXES) {
+			const raw = localStorage.getItem(`somecam-${session.id}-${suffix}`);
+			if (raw !== null) {
+				data[suffix] = JSON.parse(raw) as unknown;
+			}
 		}
+		exported.push({ id: session.id, name: session.name, createdAt: session.createdAt, lastUpdatedAt: session.lastUpdatedAt, data });
 	}
-	return JSON.stringify(result);
+	return JSON.stringify({ version: EXPORT_VERSION_V2, sessions: exported });
 }
 
 export function importProgressData(json: string): void {
@@ -363,21 +606,84 @@ export function importProgressData(json: string): void {
 		throw new Error("Invalid progress data: expected an object");
 	}
 	const obj = parsed as Record<string, unknown>;
-	if (obj.version !== EXPORT_VERSION) {
-		throw new Error(`Invalid progress data: expected version "${EXPORT_VERSION}", got "${String(obj.version)}"`);
+
+	if (obj.version === EXPORT_VERSION_V1) {
+		importV1Data(obj);
+		return;
 	}
-	for (const key of ALL_SOMECAM_KEYS) {
-		localStorage.removeItem(key);
+
+	if (obj.version !== EXPORT_VERSION_V2) {
+		throw new Error(`Invalid progress data: unsupported version "${String(obj.version)}"`);
 	}
-	for (const key of ALL_SOMECAM_KEYS) {
-		if (key in obj) {
-			localStorage.setItem(key, JSON.stringify(obj[key]));
+
+	if (!Array.isArray(obj.sessions)) {
+		throw new Error("Invalid progress data: expected sessions array");
+	}
+
+	ensureSessionsInitialized();
+	const existingSessions = loadSessionsMeta();
+
+	for (const entry of obj.sessions) {
+		if (!isObjectRecord(entry) || typeof entry.id !== "string" || typeof entry.name !== "string" || typeof entry.createdAt !== "string") {
+			continue;
+		}
+		const data = isObjectRecord(entry.data) ? entry.data : {};
+
+		// Write session data keys
+		for (const suffix of SESSION_DATA_SUFFIXES) {
+			const key = `somecam-${entry.id}-${suffix}`;
+			if (suffix in data) {
+				localStorage.setItem(key, JSON.stringify(data[suffix]));
+			} else {
+				localStorage.removeItem(key);
+			}
+		}
+
+		// Update or add session metadata
+		const existingIndex = existingSessions.findIndex((s) => s.id === entry.id);
+		const meta: SessionMeta = {
+			id: entry.id,
+			name: entry.name,
+			createdAt: entry.createdAt,
+			lastUpdatedAt: typeof entry.lastUpdatedAt === "string" ? entry.lastUpdatedAt : entry.createdAt,
+		};
+		if (existingIndex !== -1) {
+			existingSessions[existingIndex] = meta;
+		} else {
+			existingSessions.push(meta);
 		}
 	}
+
+	saveSessionsMeta(existingSessions);
 }
 
-export function hasProgressData(): boolean {
-	return ALL_SOMECAM_KEYS.some((key) => localStorage.getItem(key) !== null);
+function importV1Data(obj: Record<string, unknown>): void {
+	ensureSessionsInitialized();
+	const id = generateUUID();
+
+	for (const suffix of SESSION_DATA_SUFFIXES) {
+		const legacyKey = `somecam-${suffix}`;
+		if (legacyKey in obj) {
+			localStorage.setItem(`somecam-${id}-${suffix}`, JSON.stringify(obj[legacyKey]));
+		}
+	}
+
+	// Also import llm-test if present (global key)
+	if (LEGACY_V1_KEYS.includes("somecam-llm-test") && "somecam-llm-test" in obj) {
+		localStorage.setItem(LLM_TEST_KEY, JSON.stringify(obj["somecam-llm-test"]));
+	}
+
+	const now = new Date().toISOString();
+	const meta: SessionMeta = {
+		id,
+		name: formatSessionDate(new Date()),
+		createdAt: now,
+		lastUpdatedAt: now,
+	};
+	const sessions = loadSessionsMeta();
+	sessions.push(meta);
+	saveSessionsMeta(sessions);
+	localStorage.setItem(ACTIVE_SESSION_KEY, id);
 }
 
 export function saveProgressFile(): void {
@@ -386,7 +692,7 @@ export function saveProgressFile(): void {
 	const url = URL.createObjectURL(blob);
 	const a = document.createElement("a");
 	a.href = url;
-	a.download = "somecam-progress.json";
+	a.download = "somecam-sessions.json";
 	a.click();
 	URL.revokeObjectURL(url);
 }

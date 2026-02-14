@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { onMounted, ref } from "vue";
-import { useRouter } from "vue-router";
+import { useRoute, useRouter } from "vue-router";
 
 import { fetchSummary } from "./api.ts";
 import { assignQuestions } from "./explore-data.ts";
@@ -11,7 +11,9 @@ import { EXPLORE_QUESTIONS } from "../shared/explore-questions.ts";
 import type { MeaningCard } from "../shared/meaning-cards.ts";
 import { MEANING_CARDS } from "../shared/meaning-cards.ts";
 
+const route = useRoute();
 const router = useRouter();
+const sessionId = route.params.sessionId as string;
 const cardsById = new Map(MEANING_CARDS.map((c) => [c.id, c]));
 const questionsById = new Map(EXPLORE_QUESTIONS.map((q) => [q.id, q]));
 const chosenCards = ref<MeaningCard[]>([]);
@@ -46,7 +48,7 @@ async function loadSummary(cardId: string, questionId: string, answer: string, c
 		});
 		entry.summary = result.summary;
 		cache[cacheKey] = { answer, summary: result.summary };
-		saveSummaryCache(cache);
+		saveSummaryCache(sessionId, cache);
 	} catch (error) {
 		entry.error = error instanceof Error ? error.message : "Failed to load summary.";
 	} finally {
@@ -56,20 +58,20 @@ async function loadSummary(cardId: string, questionId: string, answer: string, c
 
 onMounted(() => {
 	try {
-		const cardIds = loadChosenCardIds();
+		const cardIds = loadChosenCardIds(sessionId);
 		if (cardIds === null) {
-			void router.replace("/find-meaning");
+			void router.replace(`/${sessionId}/find-meaning`);
 			return;
 		}
 		const chosenSet = new Set(cardIds);
 		chosenCards.value = MEANING_CARDS.filter((c) => chosenSet.has(c.id));
 
-		let exploreData = loadExploreData();
+		let exploreData = loadExploreData(sessionId);
 		if (exploreData === null) {
 			exploreData = assignQuestions(cardIds);
-			saveExploreData(exploreData);
+			saveExploreData(sessionId, exploreData);
 		}
-		const cache = loadSummaryCache();
+		const cache = loadSummaryCache(sessionId);
 		const promises: Promise<void>[] = [];
 
 		for (const [cardId, entries] of Object.entries(exploreData)) {
@@ -102,7 +104,7 @@ onMounted(() => {
 			void Promise.all(promises);
 		}
 	} catch {
-		void router.replace("/find-meaning");
+		void router.replace(`/${sessionId}/find-meaning`);
 	}
 });
 </script>
@@ -113,13 +115,13 @@ onMounted(() => {
 			<h1>Explore</h1>
 		</header>
 
-		<button class="edit-cards-btn" @click="router.push('/find-meaning/manual')">Edit selection</button>
+		<button class="edit-cards-btn" @click="router.push(`/${sessionId}/find-meaning/manual`)">Edit selection</button>
 
 		<div class="card-list">
 			<div v-for="card in chosenCards" :key="card.id" class="card-surface chosen-card">
 				<h3>{{ card.source }}</h3>
 				<p>{{ card.description }}</p>
-				<button :class="['explore-btn', { answered: answeredCards.has(card.id) }]" @click="router.push(`/explore/${card.id}`)">Explore</button>
+				<button :class="['explore-btn', { answered: answeredCards.has(card.id) }]" @click="router.push(`/${sessionId}/explore/${card.id}`)">Explore</button>
 				<div v-if="cardSummaryEntries[card.id]?.some((e) => e.loading)" class="summary-loading">Generating summary...</div>
 				<div v-else-if="cardSummaryEntries[card.id]" class="summary-block">
 					<div v-for="entry in cardSummaryEntries[card.id]" :key="entry.questionId" class="summary-item">
@@ -132,7 +134,7 @@ onMounted(() => {
 			</div>
 		</div>
 
-		<button class="report-btn" @click="router.push('/report')">Download Report</button>
+		<button class="report-btn" @click="router.push(`/${sessionId}/report`)">Download Report</button>
 
 		<StartOverButton />
 	</main>

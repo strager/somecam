@@ -1,19 +1,21 @@
 <script setup lang="ts">
 import { onMounted, ref } from "vue";
-import { useRouter } from "vue-router";
-import { clearAllProgress, hasProgressData, saveProgressFile } from "./store.ts";
+import { useRoute, useRouter } from "vue-router";
+import { createSession, hasProgressData, saveProgressFile } from "./store.ts";
 
+const route = useRoute();
 const router = useRouter();
+const sessionId = route.params.sessionId as string;
 const hasData = ref(false);
 
 onMounted(() => {
-	hasData.value = hasProgressData();
+	hasData.value = hasProgressData(sessionId);
 });
 
 function startOver(): void {
-	if (!window.confirm("Start over? This will clear all your progress.")) return;
-	clearAllProgress();
-	void router.push("/");
+	if (!window.confirm("Start over with a new session? Your current session will be saved.")) return;
+	const newId = createSession();
+	void router.push(`/${newId}/find-meaning`);
 }
 </script>
 

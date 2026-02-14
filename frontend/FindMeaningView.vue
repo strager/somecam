@@ -1,15 +1,17 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
-import { useRouter } from "vue-router";
+import { useRoute, useRouter } from "vue-router";
 
 import type { MeaningCard, SwipeDirection } from "../shared/meaning-cards.ts";
 import { MEANING_CARDS } from "../shared/meaning-cards.ts";
 import StartOverButton from "./StartOverButton.vue";
 import type { SwipeRecord } from "./store.ts";
-import { detectProgressPhase, loadSwipeProgress, needsPrioritization, saveChosenCardIds, savePrioritize, selectCandidateCards, saveSwipeProgress } from "./store.ts";
+import { detectSessionPhase, loadSwipeProgress, needsPrioritization, saveChosenCardIds, savePrioritize, selectCandidateCards, saveSwipeProgress } from "./store.ts";
 import SwipeCard from "./SwipeCard.vue";
 
+const route = useRoute();
 const router = useRouter();
+const sessionId = route.params.sessionId as string;
 
 const shuffledCards = ref<MeaningCard[]>([]);
 const currentIndex = ref(0);
@@ -19,14 +21,14 @@ const swipeCardRef = ref<InstanceType<typeof SwipeCard> | null>(null);
 const nextPhaseLabel = ref("Continue to Next Phase");
 
 function detectNextPhase(): { label: string; route: string } | null {
-	const phase = detectProgressPhase();
+	const phase = detectSessionPhase(sessionId);
 	switch (phase) {
 		case "explore":
-			return { label: "Explore Meaning", route: "/explore" };
+			return { label: "Explore Meaning", route: `/${sessionId}/explore` };
 		case "prioritize-complete":
-			return { label: "Explore Meaning", route: "/find-meaning/prioritize" };
+			return { label: "Explore Meaning", route: `/${sessionId}/find-meaning/prioritize` };
 		case "prioritize":
-			return { label: "Prioritize Meaning", route: "/find-meaning/prioritize" };
+			return { label: "Prioritize Meaning", route: `/${sessionId}/find-meaning/prioritize` };
 		default:
 			return null;
 	}
@@ -51,7 +53,7 @@ function shuffle<T>(array: readonly T[]): T[] {
 const cardsById = new Map(MEANING_CARDS.map((c) => [c.id, c]));
 
 onMounted(() => {
-	const saved = loadSwipeProgress();
+	const saved = loadSwipeProgress(sessionId);
 	if (saved) {
 		const cards = saved.shuffledCardIds.map((id) => cardsById.get(id)).filter((c): c is MeaningCard => c !== undefined);
 		if (cards.length > 0) {
@@ -74,7 +76,7 @@ function handleSwipe(direction: SwipeDirection): void {
 		direction,
 	});
 	currentIndex.value++;
-	saveSwipeProgress({
+	saveSwipeProgress(sessionId, {
 		shuffledCardIds: shuffledCards.value.map((c) => c.id),
 		swipeHistory: swipeHistory.value,
 	});
@@ -93,7 +95,7 @@ function handleUndo(): void {
 	if (swipeHistory.value.length === 0) return;
 	swipeHistory.value.pop();
 	currentIndex.value = swipeHistory.value.length;
-	saveSwipeProgress({
+	saveSwipeProgress(sessionId, {
 		shuffledCardIds: shuffledCards.value.map((c) => c.id),
 		swipeHistory: swipeHistory.value,
 	});
@@ -106,14 +108,14 @@ function continueToNextPhase(): void {
 		return;
 	}
 
-	const cardIdsToConsider = selectCandidateCards();
+	const cardIdsToConsider = selectCandidateCards(sessionId);
 
-	if (needsPrioritization()) {
-		savePrioritize({ cardIds: cardIdsToConsider, swipeHistory: [] });
-		void router.push("/find-meaning/prioritize");
+	if (needsPrioritization(sessionId)) {
+		savePrioritize(sessionId, { cardIds: cardIdsToConsider, swipeHistory: [] });
+		void router.push(`/${sessionId}/find-meaning/prioritize`);
 	} else {
-		saveChosenCardIds(cardIdsToConsider);
-		void router.push("/explore");
+		saveChosenCardIds(sessionId, cardIdsToConsider);
+		void router.push(`/${sessionId}/explore`);
 	}
 }
 </script>

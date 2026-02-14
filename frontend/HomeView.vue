@@ -1,51 +1,95 @@
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { nextTick, onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
-import type { ProgressPhase } from "./store.ts";
-import { detectProgressPhase, loadProgressFile } from "./store.ts";
+import type { ProgressPhase, SessionMeta } from "./store.ts";
+import { createSession, deleteSession, detectSessionPhase, ensureSessionsInitialized, formatSessionDate, listSessions, loadProgressFile, renameSession, saveProgressFile } from "./store.ts";
 
 const router = useRouter();
 
-const phase = ref<ProgressPhase>(detectProgressPhase());
+const sessions = ref<SessionMeta[]>([]);
+const sessionPhases = ref<Record<string, ProgressPhase>>({});
+const renamingId = ref<string | null>(null);
+const renameInput = ref("");
+const renameInputEl = ref<HTMLInputElement | null>(null);
 
-function phaseLabel(p: ProgressPhase): string {
+function refreshState(): void {
+	sessions.value = listSessions();
+	const phases: Record<string, ProgressPhase> = {};
+	for (const s of sessions.value) {
+		phases[s.id] = detectSessionPhase(s.id);
+	}
+	sessionPhases.value = phases;
+}
+
+onMounted(() => {
+	ensureSessionsInitialized();
+	refreshState();
+});
+
+function phaseRoute(sessionId: string, p: ProgressPhase): string {
 	switch (p) {
 		case "explore":
+			return `/${sessionId}/explore`;
 		case "prioritize-complete":
-			return "Explore Meaning";
 		case "prioritize":
+			return `/${sessionId}/find-meaning/prioritize`;
 		case "swipe":
-			return "Continue Finding Meaning";
 		case "none":
-			return "Start Finding Meaning";
+			return `/${sessionId}/find-meaning`;
 	}
 }
 
-function phaseRoute(p: ProgressPhase): string {
-	switch (p) {
-		case "explore":
-			return "/explore";
-		case "prioritize-complete":
-		case "prioritize":
-			return "/find-meaning/prioritize";
-		case "swipe":
-		case "none":
-			return "/find-meaning";
+function onNewSession(): void {
+	const newId = createSession();
+	refreshState();
+	void router.push(`/${newId}/find-meaning`);
+}
+
+function onStartRename(session: SessionMeta): void {
+	renamingId.value = session.id;
+	renameInput.value = session.name;
+	void nextTick(() => {
+		renameInputEl.value?.focus();
+		renameInputEl.value?.select();
+	});
+}
+
+function onConfirmRename(): void {
+	if (renamingId.value === null) return;
+	const trimmed = renameInput.value.trim();
+	if (trimmed.length > 0) {
+		renameSession(renamingId.value, trimmed);
+	}
+	renamingId.value = null;
+	refreshState();
+}
+
+function onCancelRename(): void {
+	renamingId.value = null;
+}
+
+function onRenameKeydown(event: KeyboardEvent): void {
+	if (event.key === "Enter") {
+		onConfirmRename();
+	} else if (event.key === "Escape") {
+		onCancelRename();
 	}
 }
 
-const ctaLabel = computed(() => phaseLabel(phase.value));
-const ctaRoute = computed(() => phaseRoute(phase.value));
+function onDelete(id: string): void {
+	if (!window.confirm("Delete this session? This cannot be undone.")) return;
+	deleteSession(id);
+	refreshState();
+}
 
-function onCtaClick(): void {
-	void router.push(ctaRoute.value);
+function onExport(): void {
+	saveProgressFile();
 }
 
 function onLoadFile(): void {
 	loadProgressFile().then(
 		() => {
-			phase.value = detectProgressPhase();
-			void router.push(ctaRoute.value);
+			refreshState();
 		},
 		(err: unknown) => {
 			window.alert(err instanceof Error ? err.message : "Failed to load progress file");
@@ -71,12 +115,37 @@ function onLoadFile(): void {
 			<p>Your data is never stored on our servers. Your responses are saved locally in your browser so you can return to them later.</p>
 		</section>
 
-		<div class="cta">
-			<button type="button" @click="onCtaClick">{{ ctaLabel }}</button>
-		</div>
+		<section class="sessions">
+			<div v-if="sessions.length === 0" class="cta">
+				<button type="button" @click="onNewSession">Start Finding Meaning</button>
+			</div>
+			<template v-else>
+				<h2>Your Sessions</h2>
+				<div class="session-list">
+					<div v-for="session in sessions" :key="session.id" class="session-item">
+						<div class="session-info">
+							<template v-if="renamingId === session.id">
+								<input ref="renameInputEl" v-model="renameInput" type="text" class="rename-input" @keydown="onRenameKeydown" @blur="onConfirmRename" />
+							</template>
+							<template v-else>
+								<a class="session-name" :href="phaseRoute(session.id, sessionPhases[session.id] ?? 'none')">{{ session.name }}</a>
+							</template>
+							<span class="session-date">
+								Created {{ formatSessionDate(new Date(session.createdAt)) }}<template v-if="formatSessionDate(new Date(session.lastUpdatedAt)) !== formatSessionDate(new Date(session.createdAt))"> · Updated {{ formatSessionDate(new Date(session.lastUpdatedAt)) }}</template>
+							</span>
+						</div>
+						<div class="session-actions">
+							<button type="button" class="action-btn" @click="onStartRename(session)">Rename</button>
+							<button type="button" class="action-btn delete-btn" @click="onDelete(session.id)">Delete</button>
+						</div>
+					</div>
+				</div>
+			</template>
+		</section>
 
-		<div class="load-file">
-			<button type="button" class="load-file-btn" @click="onLoadFile">Load progress file</button>
+		<div class="file-actions">
+			<button v-if="sessions.length > 0" type="button" class="file-btn" @click="onExport">Export all sessions</button>
+			<button type="button" class="file-btn" @click="onLoadFile">Import sessions file</button>
 		</div>
 
 		<footer>
@@ -129,6 +198,115 @@ section p {
 	margin: 0;
 }
 
+.sessions {
+	margin-bottom: 1rem;
+}
+
+.session-list {
+	display: flex;
+	flex-direction: column;
+	gap: 0.5rem;
+}
+
+.session-item {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	padding: 0.75rem 1rem;
+	border: 1px solid #ddd;
+	border-radius: 6px;
+	gap: 0.75rem;
+}
+
+.session-info {
+	display: flex;
+	flex-direction: column;
+	gap: 0.15rem;
+	min-width: 0;
+	flex: 1;
+}
+
+.session-name {
+	font-weight: 600;
+	font-size: 0.95rem;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	color: #2a6e4e;
+	text-decoration: none;
+}
+
+.session-name:hover {
+	text-decoration: underline;
+}
+
+.session-date {
+	font-size: 0.8rem;
+	color: #888;
+}
+
+.rename-input {
+	font-family: inherit;
+	font-size: 0.95rem;
+	font-weight: 600;
+	padding: 0.15rem 0.35rem;
+	border: 1px solid #2a6e4e;
+	border-radius: 4px;
+	outline: none;
+	width: 100%;
+	box-sizing: border-box;
+}
+
+.session-actions {
+	display: flex;
+	gap: 0.35rem;
+	flex-shrink: 0;
+}
+
+.action-btn {
+	background: none;
+	border: 1px solid #ccc;
+	border-radius: 4px;
+	font-size: 0.78rem;
+	padding: 0.25rem 0.5rem;
+	cursor: pointer;
+	font-family: inherit;
+	color: #555;
+	transition:
+		border-color 0.15s ease,
+		color 0.15s ease;
+}
+
+.action-btn:hover {
+	border-color: #888;
+	color: #1a1a1a;
+}
+
+.delete-btn:hover {
+	border-color: #c0392b;
+	color: #c0392b;
+}
+
+.new-session-btn {
+	font-size: 0.9rem;
+	padding: 0.5rem 1.25rem;
+	border: 2px solid #2a6e4e;
+	border-radius: 6px;
+	background: none;
+	color: #2a6e4e;
+	cursor: pointer;
+	font-family: inherit;
+	font-weight: 600;
+	transition:
+		background 0.15s ease,
+		color 0.15s ease;
+}
+
+.new-session-btn:hover {
+	background: #2a6e4e;
+	color: #fff;
+}
+
 .cta {
 	text-align: center;
 	margin: 2.5rem 0;
@@ -150,11 +328,14 @@ section p {
 	background: #1f5a3e;
 }
 
-.load-file {
+.file-actions {
 	text-align: center;
+	display: flex;
+	justify-content: center;
+	gap: 1rem;
 }
 
-.load-file-btn {
+.file-btn {
 	background: none;
 	border: none;
 	color: #999;
@@ -165,7 +346,7 @@ section p {
 	padding: 0.25rem 0.5rem;
 }
 
-.load-file-btn:hover {
+.file-btn:hover {
 	color: #666;
 }
 

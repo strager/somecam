@@ -1,12 +1,14 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
-import { useRouter } from "vue-router";
+import { useRoute, useRouter } from "vue-router";
 
 import { assignQuestions } from "./explore-data.ts";
 import { loadChosenCardIds, loadExploreData, saveChosenCardIds, saveExploreData } from "./store.ts";
 import { MEANING_CARDS } from "../shared/meaning-cards.ts";
 
+const route = useRoute();
 const router = useRouter();
+const sessionId = route.params.sessionId as string;
 const chosenIds = ref<Set<string>>(new Set());
 const exploredIds = ref<Set<string>>(new Set());
 const confirmingRemove = ref<string | null>(null);
@@ -15,7 +17,7 @@ const selectedCount = computed(() => chosenIds.value.size);
 
 function saveChosenIds(): void {
 	const ordered = MEANING_CARDS.filter((c) => chosenIds.value.has(c.id)).map((c) => c.id);
-	saveChosenCardIds(ordered);
+	saveChosenCardIds(sessionId, ordered);
 }
 
 function isExplored(cardId: string): boolean {
@@ -39,11 +41,11 @@ function addCard(cardId: string): void {
 	chosenIds.value = new Set(chosenIds.value);
 	saveChosenIds();
 
-	const exploreData = loadExploreData();
+	const exploreData = loadExploreData(sessionId);
 	if (exploreData !== null && !(cardId in exploreData)) {
 		const newEntry = assignQuestions([cardId]);
 		Object.assign(exploreData, newEntry);
-		saveExploreData(exploreData);
+		saveExploreData(sessionId, exploreData);
 	}
 }
 
@@ -60,14 +62,14 @@ function cancelRemove(): void {
 
 onMounted(() => {
 	try {
-		const cardIds = loadChosenCardIds();
+		const cardIds = loadChosenCardIds(sessionId);
 		if (cardIds === null) {
-			void router.replace("/find-meaning");
+			void router.replace(`/${sessionId}/find-meaning`);
 			return;
 		}
 		chosenIds.value = new Set(cardIds);
 
-		const exploreData = loadExploreData();
+		const exploreData = loadExploreData(sessionId);
 		if (exploreData !== null) {
 			for (const [cardId, entries] of Object.entries(exploreData)) {
 				if (entries.some((e) => e.userAnswer !== "")) {
@@ -76,7 +78,7 @@ onMounted(() => {
 			}
 		}
 	} catch {
-		void router.replace("/find-meaning");
+		void router.replace(`/${sessionId}/find-meaning`);
 	}
 });
 </script>
@@ -107,7 +109,7 @@ onMounted(() => {
 			</label>
 		</div>
 
-		<button class="done-btn" @click="router.push('/explore')">Done</button>
+		<button class="done-btn" @click="router.push(`/${sessionId}/explore`)">Done</button>
 	</main>
 </template>
 

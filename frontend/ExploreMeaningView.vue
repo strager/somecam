@@ -18,6 +18,7 @@ const router = useRouter();
 const cardsById = new Map(MEANING_CARDS.map((c) => [c.id, c]));
 const questionsById = new Map(EXPLORE_QUESTIONS.map((q) => [q.id, q]));
 
+const sessionId = route.params.sessionId as string;
 const cardId = route.params.meaningId as string;
 
 const card = ref<MeaningCard | undefined>(undefined);
@@ -68,10 +69,10 @@ const allAnswered = computed(() => {
 });
 
 function persistEntries(): void {
-	const data = loadExploreDataFull();
+	const data = loadExploreDataFull(sessionId);
 	if (data === null) return;
 	data[cardId] = entries.value;
-	saveExploreData(data);
+	saveExploreData(sessionId, data);
 }
 
 let persistTimer: ReturnType<typeof setTimeout> | undefined;
@@ -85,9 +86,9 @@ function debouncedPersist(): void {
 }
 
 function persistFreeform(): void {
-	const notes = loadFreeformNotes();
+	const notes = loadFreeformNotes(sessionId);
 	notes[cardId] = freeformNote.value;
-	saveFreeformNotes(notes);
+	saveFreeformNotes(sessionId, notes);
 }
 
 let freeformPersistTimer: ReturnType<typeof setTimeout> | undefined;
@@ -245,7 +246,7 @@ function finishExploring(): void {
 		persistEntries();
 	}
 	persistFreeform();
-	void router.push("/explore");
+	void router.push(`/${sessionId}/explore`);
 }
 
 function onKeydown(event: KeyboardEvent): void {
@@ -258,25 +259,25 @@ function onKeydown(event: KeyboardEvent): void {
 onMounted(() => {
 	const foundCard = cardsById.get(cardId);
 	if (foundCard === undefined) {
-		void router.replace("/explore");
+		void router.replace(`/${sessionId}/explore`);
 		return;
 	}
 
 	try {
-		const data = loadExploreDataFull();
+		const data = loadExploreDataFull(sessionId);
 		if (data === null) {
-			void router.replace("/explore");
+			void router.replace(`/${sessionId}/explore`);
 			return;
 		}
 		const cardEntries = data[cardId];
 		if (!Array.isArray(cardEntries) || cardEntries.length === 0) {
-			void router.replace("/explore");
+			void router.replace(`/${sessionId}/explore`);
 			return;
 		}
 
 		card.value = foundCard;
 		entries.value = cardEntries;
-		freeformNote.value = loadFreeformNotes()[cardId] ?? "";
+		freeformNote.value = loadFreeformNotes(sessionId)[cardId] ?? "";
 
 		const lastEntry = entries.value[entries.value.length - 1];
 		if (lastEntry.submitted) {
@@ -300,7 +301,7 @@ onMounted(() => {
 			}
 		}
 	} catch {
-		void router.replace("/explore");
+		void router.replace(`/${sessionId}/explore`);
 	}
 });
 </script>

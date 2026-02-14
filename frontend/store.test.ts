@@ -3,22 +3,13 @@
 import { JSDOM } from "jsdom";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { clearAllProgress, exportProgressData, hasProgressData, importProgressData, loadChosenCardIds, loadExploreData, loadExploreDataFull, loadFreeformNotes, loadLlmTestState, loadPrioritize, loadSummaryCache, loadSwipeProgress, removePrioritize, saveChosenCardIds, saveExploreData, saveFreeformNotes, saveLlmTestState, savePrioritize, saveSummaryCache, saveSwipeProgress } from "./store.ts";
+import { clearAllProgress, createSession, deleteSession, ensureSessionsInitialized, exportProgressData, formatSessionDate, getActiveSessionId, hasProgressData, importProgressData, listSessions, loadChosenCardIds, loadExploreData, loadExploreDataFull, loadFreeformNotes, loadLlmTestState, loadPrioritize, loadSummaryCache, loadSwipeProgress, removePrioritize, renameSession, saveChosenCardIds, saveExploreData, saveFreeformNotes, saveLlmTestState, savePrioritize, saveSummaryCache, saveSwipeProgress, switchSession } from "./store.ts";
+
+function sid(): string {
+	return getActiveSessionId();
+}
 import { EXPLORE_QUESTIONS } from "../shared/explore-questions.ts";
 
-const STORAGE_PREFIX = "somecam";
-
-function storageKey(suffix: string): string {
-	return `${STORAGE_PREFIX}-${suffix}`;
-}
-
-const CHOSEN_STORAGE_KEY = storageKey("chosen");
-const PROGRESS_STORAGE_KEY = storageKey("progress");
-const PRIORITIZE_STORAGE_KEY = storageKey("narrowdown");
-const EXPLORE_STORAGE_KEY = storageKey("explore");
-const SUMMARIES_STORAGE_KEY = storageKey("summaries");
-const FREEFORM_STORAGE_KEY = storageKey("freeform");
-const LLM_TEST_STORAGE_KEY = storageKey("llm-test");
 const DEFAULT_QUESTION_ID = EXPLORE_QUESTIONS[0].id;
 
 let currentDom: JSDOM | null = null;
@@ -41,6 +32,7 @@ function setGlobalDom(dom: JSDOM): void {
 beforeEach(() => {
 	currentDom = new JSDOM("", { url: "http://localhost" });
 	setGlobalDom(currentDom);
+	ensureSessionsInitialized();
 });
 
 afterEach(() => {
@@ -48,107 +40,111 @@ afterEach(() => {
 	currentDom = null;
 });
 
+function activeKey(suffix: string): string {
+	return `somecam-${getActiveSessionId()}-${suffix}`;
+}
+
 describe("loadChosenCardIds/saveChosenCardIds", () => {
 	it("returns null when key is absent", () => {
-		expect(loadChosenCardIds()).toBeNull();
+		expect(loadChosenCardIds(sid())).toBeNull();
 	});
 
 	it("returns null for corrupt JSON", () => {
-		localStorage.setItem(CHOSEN_STORAGE_KEY, "{");
-		expect(loadChosenCardIds()).toBeNull();
+		localStorage.setItem(activeKey("chosen"), "{");
+		expect(loadChosenCardIds(sid())).toBeNull();
 	});
 
 	it("returns null for empty array", () => {
-		localStorage.setItem(CHOSEN_STORAGE_KEY, JSON.stringify([]));
-		expect(loadChosenCardIds()).toBeNull();
+		localStorage.setItem(activeKey("chosen"), JSON.stringify([]));
+		expect(loadChosenCardIds(sid())).toBeNull();
 	});
 
 	it("returns null for non-array JSON", () => {
-		localStorage.setItem(CHOSEN_STORAGE_KEY, JSON.stringify("not-an-array"));
-		expect(loadChosenCardIds()).toBeNull();
+		localStorage.setItem(activeKey("chosen"), JSON.stringify("not-an-array"));
+		expect(loadChosenCardIds(sid())).toBeNull();
 	});
 
 	it("returns null for arrays with non-string values", () => {
-		localStorage.setItem(CHOSEN_STORAGE_KEY, JSON.stringify(["self-knowledge", 42]));
-		expect(loadChosenCardIds()).toBeNull();
+		localStorage.setItem(activeKey("chosen"), JSON.stringify(["self-knowledge", 42]));
+		expect(loadChosenCardIds(sid())).toBeNull();
 	});
 
 	it("round-trips a saved array of card IDs", () => {
-		saveChosenCardIds(["self-knowledge", "community"]);
-		expect(loadChosenCardIds()).toEqual(["self-knowledge", "community"]);
+		saveChosenCardIds(sid(), ["self-knowledge", "community"]);
+		expect(loadChosenCardIds(sid())).toEqual(["self-knowledge", "community"]);
 	});
 
 	it("preserves order of IDs", () => {
-		saveChosenCardIds(["community", "self-knowledge", "challenge"]);
-		expect(loadChosenCardIds()).toEqual(["community", "self-knowledge", "challenge"]);
+		saveChosenCardIds(sid(), ["community", "self-knowledge", "challenge"]);
+		expect(loadChosenCardIds(sid())).toEqual(["community", "self-knowledge", "challenge"]);
 	});
 });
 
 describe("loadSwipeProgress/saveSwipeProgress", () => {
 	it("returns null when key is absent", () => {
-		expect(loadSwipeProgress()).toBeNull();
+		expect(loadSwipeProgress(sid())).toBeNull();
 	});
 
 	it("returns null when shuffledCardIds is missing", () => {
 		localStorage.setItem(
-			PROGRESS_STORAGE_KEY,
+			activeKey("progress"),
 			JSON.stringify({
 				swipeHistory: [],
 			}),
 		);
-		expect(loadSwipeProgress()).toBeNull();
+		expect(loadSwipeProgress(sid())).toBeNull();
 	});
 
 	it("returns null when shuffledCardIds is empty", () => {
 		localStorage.setItem(
-			PROGRESS_STORAGE_KEY,
+			activeKey("progress"),
 			JSON.stringify({
 				shuffledCardIds: [],
 				swipeHistory: [],
 			}),
 		);
-		expect(loadSwipeProgress()).toBeNull();
+		expect(loadSwipeProgress(sid())).toBeNull();
 	});
 
 	it("returns null when swipeHistory is missing", () => {
 		localStorage.setItem(
-			PROGRESS_STORAGE_KEY,
+			activeKey("progress"),
 			JSON.stringify({
 				shuffledCardIds: ["self-knowledge"],
 			}),
 		);
-		expect(loadSwipeProgress()).toBeNull();
+		expect(loadSwipeProgress(sid())).toBeNull();
 	});
 
 	it("returns null when swipeHistory has invalid direction", () => {
 		localStorage.setItem(
-			PROGRESS_STORAGE_KEY,
+			activeKey("progress"),
 			JSON.stringify({
 				shuffledCardIds: ["self-knowledge"],
 				swipeHistory: [{ cardId: "self-knowledge", direction: "keep" }],
 			}),
 		);
-		expect(loadSwipeProgress()).toBeNull();
+		expect(loadSwipeProgress(sid())).toBeNull();
 	});
 
 	it("returns null when swipeHistory has non-string cardId", () => {
 		localStorage.setItem(
-			PROGRESS_STORAGE_KEY,
+			activeKey("progress"),
 			JSON.stringify({
 				shuffledCardIds: ["self-knowledge"],
 				swipeHistory: [{ cardId: 123, direction: "agree" }],
 			}),
 		);
-		expect(loadSwipeProgress()).toBeNull();
+		expect(loadSwipeProgress(sid())).toBeNull();
 	});
 
 	it("round-trips saved progress", () => {
-		saveSwipeProgress({
+		saveSwipeProgress(sid(), {
 			shuffledCardIds: ["self-knowledge", "community"],
 			swipeHistory: [{ cardId: "self-knowledge", direction: "agree" }],
 		});
 
-		expect(loadSwipeProgress()).toEqual({
+		expect(loadSwipeProgress(sid())).toEqual({
 			shuffledCardIds: ["self-knowledge", "community"],
 			swipeHistory: [{ cardId: "self-knowledge", direction: "agree" }],
 		});
@@ -157,76 +153,76 @@ describe("loadSwipeProgress/saveSwipeProgress", () => {
 
 describe("loadPrioritize/savePrioritize/removePrioritize", () => {
 	it("returns null when key is absent", () => {
-		expect(loadPrioritize()).toBeNull();
+		expect(loadPrioritize(sid())).toBeNull();
 	});
 
 	it("returns null when cardIds is missing", () => {
 		localStorage.setItem(
-			PRIORITIZE_STORAGE_KEY,
+			activeKey("narrowdown"),
 			JSON.stringify({
 				swipeHistory: [],
 			}),
 		);
-		expect(loadPrioritize()).toBeNull();
+		expect(loadPrioritize(sid())).toBeNull();
 	});
 
 	it("returns null when cardIds is empty", () => {
 		localStorage.setItem(
-			PRIORITIZE_STORAGE_KEY,
+			activeKey("narrowdown"),
 			JSON.stringify({
 				cardIds: [],
 				swipeHistory: [],
 			}),
 		);
-		expect(loadPrioritize()).toBeNull();
+		expect(loadPrioritize(sid())).toBeNull();
 	});
 
 	it("returns null when swipeHistory is missing", () => {
 		localStorage.setItem(
-			PRIORITIZE_STORAGE_KEY,
+			activeKey("narrowdown"),
 			JSON.stringify({
 				cardIds: ["self-knowledge"],
 			}),
 		);
-		expect(loadPrioritize()).toBeNull();
+		expect(loadPrioritize(sid())).toBeNull();
 	});
 
 	it("round-trips saved progress", () => {
-		savePrioritize({
+		savePrioritize(sid(), {
 			cardIds: ["self-knowledge", "community"],
 			swipeHistory: [{ cardId: "community", direction: "agree" }],
 		});
 
-		expect(loadPrioritize()).toEqual({
+		expect(loadPrioritize(sid())).toEqual({
 			cardIds: ["self-knowledge", "community"],
 			swipeHistory: [{ cardId: "community", direction: "agree" }],
 		});
 	});
 
 	it("removePrioritize clears the key so loadPrioritize returns null", () => {
-		savePrioritize({
+		savePrioritize(sid(), {
 			cardIds: ["self-knowledge"],
 			swipeHistory: [],
 		});
 
-		removePrioritize();
-		expect(loadPrioritize()).toBeNull();
+		removePrioritize(sid());
+		expect(loadPrioritize(sid())).toBeNull();
 	});
 });
 
 describe("loadExploreData/saveExploreData", () => {
 	it("returns null when key is absent", () => {
-		expect(loadExploreData()).toBeNull();
+		expect(loadExploreData(sid())).toBeNull();
 	});
 
 	it("returns null for corrupt JSON", () => {
-		localStorage.setItem(EXPLORE_STORAGE_KEY, "{");
-		expect(loadExploreData()).toBeNull();
+		localStorage.setItem(activeKey("explore"), "{");
+		expect(loadExploreData(sid())).toBeNull();
 	});
 
 	it("returns null for malformed explore entries", () => {
 		localStorage.setItem(
-			EXPLORE_STORAGE_KEY,
+			activeKey("explore"),
 			JSON.stringify({
 				"self-knowledge": [
 					{
@@ -238,11 +234,11 @@ describe("loadExploreData/saveExploreData", () => {
 				],
 			}),
 		);
-		expect(loadExploreData()).toBeNull();
+		expect(loadExploreData(sid())).toBeNull();
 	});
 
 	it("round-trips saved explore data", () => {
-		saveExploreData({
+		saveExploreData(sid(), {
 			"self-knowledge": [
 				{
 					questionId: "interpretation",
@@ -253,7 +249,7 @@ describe("loadExploreData/saveExploreData", () => {
 			],
 		});
 
-		expect(loadExploreData()).toEqual({
+		expect(loadExploreData(sid())).toEqual({
 			"self-knowledge": [
 				{
 					questionId: "interpretation",
@@ -268,12 +264,12 @@ describe("loadExploreData/saveExploreData", () => {
 
 describe("loadExploreDataFull", () => {
 	it("returns null when key is absent", () => {
-		expect(loadExploreDataFull()).toBeNull();
+		expect(loadExploreDataFull(sid())).toBeNull();
 	});
 
 	it("fills defaults for entries that lack guardrail fields", () => {
 		localStorage.setItem(
-			EXPLORE_STORAGE_KEY,
+			activeKey("explore"),
 			JSON.stringify({
 				"self-knowledge": [
 					{
@@ -286,7 +282,7 @@ describe("loadExploreDataFull", () => {
 			}),
 		);
 
-		expect(loadExploreDataFull()).toEqual({
+		expect(loadExploreDataFull(sid())).toEqual({
 			"self-knowledge": [
 				{
 					questionId: "interpretation",
@@ -302,7 +298,7 @@ describe("loadExploreDataFull", () => {
 
 	it("preserves existing guardrail fields", () => {
 		localStorage.setItem(
-			EXPLORE_STORAGE_KEY,
+			activeKey("explore"),
 			JSON.stringify({
 				"self-knowledge": [
 					{
@@ -317,7 +313,7 @@ describe("loadExploreDataFull", () => {
 			}),
 		);
 
-		expect(loadExploreDataFull()).toEqual({
+		expect(loadExploreDataFull(sid())).toEqual({
 			"self-knowledge": [
 				{
 					questionId: "interpretation",
@@ -333,7 +329,7 @@ describe("loadExploreDataFull", () => {
 
 	it("returns null when guardrailText is not a string", () => {
 		localStorage.setItem(
-			EXPLORE_STORAGE_KEY,
+			activeKey("explore"),
 			JSON.stringify({
 				"self-knowledge": [
 					{
@@ -346,12 +342,12 @@ describe("loadExploreDataFull", () => {
 				],
 			}),
 		);
-		expect(loadExploreDataFull()).toBeNull();
+		expect(loadExploreDataFull(sid())).toBeNull();
 	});
 
 	it("returns null when submittedAfterGuardrail is not a boolean", () => {
 		localStorage.setItem(
-			EXPLORE_STORAGE_KEY,
+			activeKey("explore"),
 			JSON.stringify({
 				"self-knowledge": [
 					{
@@ -364,35 +360,35 @@ describe("loadExploreDataFull", () => {
 				],
 			}),
 		);
-		expect(loadExploreDataFull()).toBeNull();
+		expect(loadExploreDataFull(sid())).toBeNull();
 	});
 
 	it("returns null when a card entry bucket is not an array", () => {
 		localStorage.setItem(
-			EXPLORE_STORAGE_KEY,
+			activeKey("explore"),
 			JSON.stringify({
 				"self-knowledge": {
 					questionId: "interpretation",
 				},
 			}),
 		);
-		expect(loadExploreDataFull()).toBeNull();
+		expect(loadExploreDataFull(sid())).toBeNull();
 	});
 });
 
 describe("loadSummaryCache/saveSummaryCache", () => {
 	it("returns empty object when key is absent", () => {
-		expect(loadSummaryCache()).toEqual({});
+		expect(loadSummaryCache(sid())).toEqual({});
 	});
 
 	it("returns empty object for corrupt JSON", () => {
-		localStorage.setItem(SUMMARIES_STORAGE_KEY, "{");
-		expect(loadSummaryCache()).toEqual({});
+		localStorage.setItem(activeKey("summaries"), "{");
+		expect(loadSummaryCache(sid())).toEqual({});
 	});
 
 	it("returns empty object for malformed cache entries", () => {
 		localStorage.setItem(
-			SUMMARIES_STORAGE_KEY,
+			activeKey("summaries"),
 			JSON.stringify({
 				"self-knowledge:interpretation": {
 					answer: "answer",
@@ -400,18 +396,18 @@ describe("loadSummaryCache/saveSummaryCache", () => {
 				},
 			}),
 		);
-		expect(loadSummaryCache()).toEqual({});
+		expect(loadSummaryCache(sid())).toEqual({});
 	});
 
 	it("round-trips saved cache", () => {
-		saveSummaryCache({
+		saveSummaryCache(sid(), {
 			"self-knowledge:interpretation": {
 				answer: "My answer",
 				summary: "My summary",
 			},
 		});
 
-		expect(loadSummaryCache()).toEqual({
+		expect(loadSummaryCache(sid())).toEqual({
 			"self-knowledge:interpretation": {
 				answer: "My answer",
 				summary: "My summary",
@@ -427,7 +423,7 @@ describe("loadLlmTestState/saveLlmTestState", () => {
 
 	it("returns null when cardId is not a string", () => {
 		localStorage.setItem(
-			LLM_TEST_STORAGE_KEY,
+			"somecam-llm-test",
 			JSON.stringify({
 				cardId: 42,
 				rows: [{ questionId: "interpretation", answer: "answer" }],
@@ -438,7 +434,7 @@ describe("loadLlmTestState/saveLlmTestState", () => {
 
 	it("returns null when rows is missing", () => {
 		localStorage.setItem(
-			LLM_TEST_STORAGE_KEY,
+			"somecam-llm-test",
 			JSON.stringify({
 				cardId: "self-knowledge",
 			}),
@@ -448,7 +444,7 @@ describe("loadLlmTestState/saveLlmTestState", () => {
 
 	it("returns null when rows is empty", () => {
 		localStorage.setItem(
-			LLM_TEST_STORAGE_KEY,
+			"somecam-llm-test",
 			JSON.stringify({
 				cardId: "self-knowledge",
 				rows: [],
@@ -459,7 +455,7 @@ describe("loadLlmTestState/saveLlmTestState", () => {
 
 	it("normalizes non-object rows", () => {
 		localStorage.setItem(
-			LLM_TEST_STORAGE_KEY,
+			"somecam-llm-test",
 			JSON.stringify({
 				cardId: "self-knowledge",
 				rows: [null],
@@ -473,7 +469,7 @@ describe("loadLlmTestState/saveLlmTestState", () => {
 
 	it("normalizes rows with non-string questionId", () => {
 		localStorage.setItem(
-			LLM_TEST_STORAGE_KEY,
+			"somecam-llm-test",
 			JSON.stringify({
 				cardId: "self-knowledge",
 				rows: [{ questionId: 99, answer: "answer" }],
@@ -487,7 +483,7 @@ describe("loadLlmTestState/saveLlmTestState", () => {
 
 	it("normalizes rows with non-string answer", () => {
 		localStorage.setItem(
-			LLM_TEST_STORAGE_KEY,
+			"somecam-llm-test",
 			JSON.stringify({
 				cardId: "self-knowledge",
 				rows: [{ questionId: "interpretation", answer: 99 }],
@@ -520,47 +516,47 @@ describe("loadLlmTestState/saveLlmTestState", () => {
 
 describe("loadFreeformNotes/saveFreeformNotes", () => {
 	it("returns empty object when key is absent", () => {
-		expect(loadFreeformNotes()).toEqual({});
+		expect(loadFreeformNotes(sid())).toEqual({});
 	});
 
 	it("returns empty object for corrupt JSON", () => {
-		localStorage.setItem(FREEFORM_STORAGE_KEY, "{");
-		expect(loadFreeformNotes()).toEqual({});
+		localStorage.setItem(activeKey("freeform"), "{");
+		expect(loadFreeformNotes(sid())).toEqual({});
 	});
 
 	it("returns empty object for non-object JSON", () => {
-		localStorage.setItem(FREEFORM_STORAGE_KEY, JSON.stringify("not-an-object"));
-		expect(loadFreeformNotes()).toEqual({});
+		localStorage.setItem(activeKey("freeform"), JSON.stringify("not-an-object"));
+		expect(loadFreeformNotes(sid())).toEqual({});
 	});
 
 	it("returns empty object when values are not strings", () => {
-		localStorage.setItem(FREEFORM_STORAGE_KEY, JSON.stringify({ "self-knowledge": 123 }));
-		expect(loadFreeformNotes()).toEqual({});
+		localStorage.setItem(activeKey("freeform"), JSON.stringify({ "self-knowledge": 123 }));
+		expect(loadFreeformNotes(sid())).toEqual({});
 	});
 
 	it("round-trips saved notes", () => {
-		saveFreeformNotes({ "self-knowledge": "Some extra thoughts", community: "Community notes" });
-		expect(loadFreeformNotes()).toEqual({ "self-knowledge": "Some extra thoughts", community: "Community notes" });
+		saveFreeformNotes(sid(), { "self-knowledge": "Some extra thoughts", community: "Community notes" });
+		expect(loadFreeformNotes(sid())).toEqual({ "self-knowledge": "Some extra thoughts", community: "Community notes" });
 	});
 
 	it("round-trips empty object", () => {
-		saveFreeformNotes({});
-		expect(loadFreeformNotes()).toEqual({});
+		saveFreeformNotes(sid(), {});
+		expect(loadFreeformNotes(sid())).toEqual({});
 	});
 });
 
 describe("clearAllProgress", () => {
 	it("removes all progress keys except llm-test", () => {
-		saveSwipeProgress({
+		saveSwipeProgress(sid(), {
 			shuffledCardIds: ["self-knowledge"],
 			swipeHistory: [],
 		});
-		savePrioritize({
+		savePrioritize(sid(), {
 			cardIds: ["self-knowledge"],
 			swipeHistory: [],
 		});
-		saveChosenCardIds(["self-knowledge"]);
-		saveExploreData({
+		saveChosenCardIds(sid(), ["self-knowledge"]);
+		saveExploreData(sid(), {
 			"self-knowledge": [
 				{
 					questionId: "interpretation",
@@ -570,72 +566,192 @@ describe("clearAllProgress", () => {
 				},
 			],
 		});
-		saveSummaryCache({
+		saveSummaryCache(sid(), {
 			"self-knowledge:interpretation": {
 				answer: "answer",
 				summary: "summary",
 			},
 		});
-		saveFreeformNotes({ "self-knowledge": "Some notes" });
+		saveFreeformNotes(sid(), { "self-knowledge": "Some notes" });
 		const llmTestState = {
 			cardId: "self-knowledge",
 			rows: [{ questionId: "interpretation", answer: "answer" }],
 		};
 		saveLlmTestState(llmTestState);
 
-		clearAllProgress();
+		clearAllProgress(sid());
 
-		expect(loadSwipeProgress()).toBeNull();
-		expect(loadPrioritize()).toBeNull();
-		expect(loadChosenCardIds()).toBeNull();
-		expect(loadExploreData()).toBeNull();
-		expect(loadSummaryCache()).toEqual({});
-		expect(loadFreeformNotes()).toEqual({});
+		expect(loadSwipeProgress(sid())).toBeNull();
+		expect(loadPrioritize(sid())).toBeNull();
+		expect(loadChosenCardIds(sid())).toBeNull();
+		expect(loadExploreData(sid())).toBeNull();
+		expect(loadSummaryCache(sid())).toEqual({});
+		expect(loadFreeformNotes(sid())).toEqual({});
 		expect(loadLlmTestState()).toEqual(llmTestState);
 	});
 });
 
 describe("exportProgressData/importProgressData", () => {
-	it("exportProgressData includes only version when localStorage is empty", () => {
-		const result: unknown = JSON.parse(exportProgressData());
-		expect(result).toEqual({ version: "somecam-v1" });
-	});
-
-	it("exportProgressData returns parsed (not double-encoded) values", () => {
-		saveChosenCardIds(["self-knowledge", "community"]);
+	it("exportProgressData returns v2 format with empty session data", () => {
 		const result = JSON.parse(exportProgressData()) as Record<string, unknown>;
-		expect(result["somecam-chosen"]).toEqual(["self-knowledge", "community"]);
-		expect(typeof result["somecam-chosen"]).not.toBe("string");
+		expect(result.version).toBe("somecam-v2");
+		expect(Array.isArray(result.sessions)).toBe(true);
+		const sessions = result.sessions as Record<string, unknown>[];
+		expect(sessions).toHaveLength(1);
+		expect(sessions[0].data).toEqual({});
 	});
 
-	it("importProgressData round-trips: export → clear → import → values restored", () => {
-		saveChosenCardIds(["self-knowledge", "community"]);
-		saveFreeformNotes({ "self-knowledge": "notes" });
+	it("exportProgressData includes session data", () => {
+		saveChosenCardIds(sid(), ["self-knowledge", "community"]);
+		const result = JSON.parse(exportProgressData()) as Record<string, unknown>;
+		const sessions = result.sessions as Record<string, unknown>[];
+		const data = sessions[0].data as Record<string, unknown>;
+		expect(data.chosen).toEqual(["self-knowledge", "community"]);
+	});
+
+	it("exportProgressData exports all sessions", () => {
+		saveChosenCardIds(sid(), ["self-knowledge"]);
+		const secondId = createSession("Second");
+		saveChosenCardIds(sid(), ["community"]);
+
+		const result = JSON.parse(exportProgressData()) as Record<string, unknown>;
+		const sessions = result.sessions as Record<string, unknown>[];
+		expect(sessions).toHaveLength(2);
+
+		const secondSession = sessions.find((s) => s.id === secondId);
+		expect(secondSession).toBeDefined();
+		expect((secondSession?.data as Record<string, unknown>).chosen).toEqual(["community"]);
+	});
+
+	it("importProgressData v1 creates a new session", () => {
+		saveChosenCardIds(sid(), ["existing-card"]);
+		expect(listSessions()).toHaveLength(1);
+
+		const v1Data = JSON.stringify({
+			version: "somecam-v1",
+			"somecam-chosen": ["self-knowledge", "community"],
+			"somecam-freeform": { "self-knowledge": "notes" },
+		});
+
+		importProgressData(v1Data);
+
+		const sessionsAfter = listSessions();
+		expect(sessionsAfter).toHaveLength(2);
+		expect(loadChosenCardIds(sid())).toEqual(["self-knowledge", "community"]);
+		expect(loadFreeformNotes(sid())).toEqual({ "self-knowledge": "notes" });
+	});
+
+	it("importProgressData v1 imports llm-test to global key", () => {
+		const v1Data = JSON.stringify({
+			version: "somecam-v1",
+			"somecam-llm-test": {
+				cardId: "self-knowledge",
+				rows: [{ questionId: "interpretation", answer: "test" }],
+			},
+		});
+
+		importProgressData(v1Data);
+
+		expect(loadLlmTestState()).toEqual({
+			cardId: "self-knowledge",
+			rows: [{ questionId: "interpretation", answer: "test" }],
+		});
+	});
+
+	it("importProgressData v2 merges sessions by UUID", () => {
+		saveChosenCardIds(sid(), ["self-knowledge"]);
+		const currentId = getActiveSessionId();
+		const currentSessions = listSessions();
+
+		const v2Data = JSON.stringify({
+			version: "somecam-v2",
+			sessions: [
+				{
+					id: currentId,
+					name: "Updated Name",
+					createdAt: currentSessions[0].createdAt,
+					data: {
+						chosen: ["community", "challenge"],
+					},
+				},
+			],
+		});
+
+		importProgressData(v2Data);
+
+		expect(loadChosenCardIds(sid())).toEqual(["community", "challenge"]);
+		const sessions = listSessions();
+		expect(sessions).toHaveLength(1);
+		expect(sessions[0].name).toBe("Updated Name");
+	});
+
+	it("importProgressData v2 adds new sessions", () => {
+		saveChosenCardIds(sid(), ["existing-card"]);
+
+		const v2Data = JSON.stringify({
+			version: "somecam-v2",
+			sessions: [
+				{
+					id: "new-session-uuid",
+					name: "Imported Session",
+					createdAt: "2026-01-01T00:00:00.000Z",
+					data: {
+						chosen: ["creativity"],
+					},
+				},
+			],
+		});
+
+		importProgressData(v2Data);
+
+		const sessions = listSessions();
+		expect(sessions).toHaveLength(2);
+		const imported = sessions.find((s) => s.id === "new-session-uuid");
+		expect(imported).toBeDefined();
+		expect(imported?.name).toBe("Imported Session");
+	});
+
+	it("importProgressData v2 round-trips: export → import restores data", () => {
+		saveChosenCardIds(sid(), ["self-knowledge", "community"]);
+		saveFreeformNotes(sid(), { "self-knowledge": "notes" });
 
 		const exported = exportProgressData();
+		const activeId = getActiveSessionId();
 
-		localStorage.removeItem(CHOSEN_STORAGE_KEY);
-		localStorage.removeItem(FREEFORM_STORAGE_KEY);
+		// Clear active session data
+		clearAllProgress(sid());
+		expect(loadChosenCardIds(sid())).toBeNull();
 
 		importProgressData(exported);
 
-		expect(loadChosenCardIds()).toEqual(["self-knowledge", "community"]);
-		expect(loadFreeformNotes()).toEqual({ "self-knowledge": "notes" });
+		switchSession(activeId);
+		expect(loadChosenCardIds(sid())).toEqual(["self-knowledge", "community"]);
+		expect(loadFreeformNotes(sid())).toEqual({ "self-knowledge": "notes" });
 	});
 
-	it("importProgressData clears keys not present in the imported data", () => {
-		saveChosenCardIds(["self-knowledge"]);
-		saveFreeformNotes({ "self-knowledge": "notes" });
+	it("importProgressData v2 clears data keys not present in import", () => {
+		saveChosenCardIds(sid(), ["self-knowledge"]);
+		saveFreeformNotes(sid(), { "self-knowledge": "notes" });
+		const currentId = getActiveSessionId();
 
-		const dataWithOnlyChosen = JSON.stringify({
-			version: "somecam-v1",
-			"somecam-chosen": ["community"],
+		const v2Data = JSON.stringify({
+			version: "somecam-v2",
+			sessions: [
+				{
+					id: currentId,
+					name: "Updated",
+					createdAt: new Date().toISOString(),
+					data: {
+						chosen: ["community"],
+					},
+				},
+			],
 		});
 
-		importProgressData(dataWithOnlyChosen);
+		importProgressData(v2Data);
 
-		expect(loadChosenCardIds()).toEqual(["community"]);
-		expect(loadFreeformNotes()).toEqual({});
+		expect(loadChosenCardIds(sid())).toEqual(["community"]);
+		expect(loadFreeformNotes(sid())).toEqual({});
 	});
 
 	it("importProgressData throws on invalid JSON", () => {
@@ -644,7 +760,19 @@ describe("exportProgressData/importProgressData", () => {
 		}).toThrow();
 	});
 
-	it("importProgressData restores all data types from a complete input", () => {
+	it("importProgressData throws on unsupported version", () => {
+		expect(() => {
+			importProgressData(JSON.stringify({ version: "somecam-v99" }));
+		}).toThrow(/version/);
+	});
+
+	it("importProgressData throws when version field is missing", () => {
+		expect(() => {
+			importProgressData(JSON.stringify({ "somecam-chosen": [] }));
+		}).toThrow(/version/);
+	});
+
+	it("importProgressData v1 restores all data types", () => {
 		const input = JSON.stringify({
 			version: "somecam-v1",
 			"somecam-progress": {
@@ -705,19 +833,19 @@ describe("exportProgressData/importProgressData", () => {
 
 		importProgressData(input);
 
-		expect(loadSwipeProgress()).toEqual({
+		expect(loadSwipeProgress(sid())).toEqual({
 			shuffledCardIds: ["self-knowledge", "community", "challenge"],
 			swipeHistory: [
 				{ cardId: "self-knowledge", direction: "agree" },
 				{ cardId: "community", direction: "disagree" },
 			],
 		});
-		expect(loadPrioritize()).toEqual({
+		expect(loadPrioritize(sid())).toEqual({
 			cardIds: ["self-knowledge", "challenge"],
 			swipeHistory: [{ cardId: "challenge", direction: "unsure" }],
 		});
-		expect(loadChosenCardIds()).toEqual(["self-knowledge", "challenge"]);
-		expect(loadExploreDataFull()).toEqual({
+		expect(loadChosenCardIds(sid())).toEqual(["self-knowledge", "challenge"]);
+		expect(loadExploreDataFull(sid())).toEqual({
 			"self-knowledge": [
 				{
 					questionId: "interpretation",
@@ -747,13 +875,13 @@ describe("exportProgressData/importProgressData", () => {
 				},
 			],
 		});
-		expect(loadSummaryCache()).toEqual({
+		expect(loadSummaryCache(sid())).toEqual({
 			"self-knowledge:interpretation": {
 				answer: "It means knowing yourself",
 				summary: "Self-awareness and introspection",
 			},
 		});
-		expect(loadFreeformNotes()).toEqual({
+		expect(loadFreeformNotes(sid())).toEqual({
 			"self-knowledge": "Extra thoughts about self-knowledge",
 		});
 		expect(loadLlmTestState()).toEqual({
@@ -764,27 +892,199 @@ describe("exportProgressData/importProgressData", () => {
 			],
 		});
 	});
-
-	it("importProgressData throws when version field is missing", () => {
-		expect(() => {
-			importProgressData(JSON.stringify({ "somecam-chosen": [] }));
-		}).toThrow(/version/);
-	});
-
-	it("importProgressData throws when version field is wrong", () => {
-		expect(() => {
-			importProgressData(JSON.stringify({ version: "somecam-v2" }));
-		}).toThrow(/version/);
-	});
 });
 
 describe("hasProgressData", () => {
 	it("returns false when empty", () => {
-		expect(hasProgressData()).toBe(false);
+		expect(hasProgressData(sid())).toBe(false);
 	});
 
 	it("returns true when any somecam key exists", () => {
-		saveChosenCardIds(["self-knowledge"]);
-		expect(hasProgressData()).toBe(true);
+		saveChosenCardIds(sid(), ["self-knowledge"]);
+		expect(hasProgressData(sid())).toBe(true);
+	});
+});
+
+describe("session management", () => {
+	it("listSessions hides empty sessions", () => {
+		expect(listSessions()).toHaveLength(0);
+		saveChosenCardIds(sid(), ["self-knowledge"]);
+		expect(listSessions()).toHaveLength(1);
+	});
+
+	it("listSessions hides empty sessions among non-empty ones", () => {
+		saveChosenCardIds(sid(), ["self-knowledge"]);
+		createSession("Empty Session");
+		expect(listSessions()).toHaveLength(1);
+		expect(listSessions()[0].name).not.toBe("Empty Session");
+	});
+
+	it("listSessions removes empty non-active sessions from localStorage", () => {
+		saveChosenCardIds(sid(), ["self-knowledge"]);
+		const firstId = getActiveSessionId();
+		const emptyId = createSession("Empty");
+		// Switch back so the empty session is not active
+		switchSession(firstId);
+
+		listSessions();
+
+		// The empty session should be purged from metadata
+		const raw = localStorage.getItem("somecam-sessions");
+		const meta = JSON.parse(raw ?? "[]") as { id: string }[];
+		expect(meta.find((s) => s.id === emptyId)).toBeUndefined();
+	});
+
+	it("ensureSessionsInitialized creates one session", () => {
+		expect(getActiveSessionId()).toBeTruthy();
+	});
+
+	it("ensureSessionsInitialized is idempotent", () => {
+		const id = getActiveSessionId();
+		ensureSessionsInitialized();
+		ensureSessionsInitialized();
+		expect(getActiveSessionId()).toBe(id);
+	});
+
+	it("createSession adds a new session and makes it active", () => {
+		saveChosenCardIds(sid(), ["self-knowledge"]);
+		const firstId = getActiveSessionId();
+		const secondId = createSession("Test Session");
+		saveChosenCardIds(sid(), ["community"]);
+		expect(secondId).not.toBe(firstId);
+		expect(getActiveSessionId()).toBe(secondId);
+		expect(listSessions()).toHaveLength(2);
+	});
+
+	it("createSession auto-names with formatted date when no name given", () => {
+		const id = createSession();
+		saveChosenCardIds(sid(), ["self-knowledge"]);
+		const sessions = listSessions();
+		const session = sessions.find((s) => s.id === id);
+		expect(session).toBeDefined();
+		expect(session?.name).toBe(formatSessionDate(new Date()));
+	});
+
+	it("switchSession changes active session", () => {
+		const firstId = getActiveSessionId();
+		createSession("Second");
+		switchSession(firstId);
+		expect(getActiveSessionId()).toBe(firstId);
+	});
+
+	it("switchSession throws for unknown id", () => {
+		expect(() => {
+			switchSession("nonexistent");
+		}).toThrow(/not found/);
+	});
+
+	it("renameSession updates the session name", () => {
+		const id = getActiveSessionId();
+		saveChosenCardIds(sid(), ["self-knowledge"]);
+		renameSession(id, "New Name");
+		const session = listSessions().find((s) => s.id === id);
+		expect(session).toBeDefined();
+		expect(session?.name).toBe("New Name");
+	});
+
+	it("renameSession throws for unknown id", () => {
+		expect(() => {
+			renameSession("nonexistent", "Name");
+		}).toThrow(/not found/);
+	});
+
+	it("deleteSession removes session and its data", () => {
+		saveChosenCardIds(sid(), ["self-knowledge"]);
+		const firstId = getActiveSessionId();
+		createSession("Second");
+		saveChosenCardIds(sid(), ["community"]);
+		deleteSession(firstId);
+		expect(listSessions()).toHaveLength(1);
+		expect(localStorage.getItem(`somecam-${firstId}-chosen`)).toBeNull();
+	});
+
+	it("deleteSession switches to another session when deleting active", () => {
+		const firstId = getActiveSessionId();
+		const secondId = createSession("Second");
+		switchSession(firstId);
+		deleteSession(firstId);
+		expect(getActiveSessionId()).toBe(secondId);
+	});
+
+	it("deleteSession creates new session when deleting the last one", () => {
+		const onlyId = getActiveSessionId();
+		deleteSession(onlyId);
+		expect(getActiveSessionId()).not.toBe(onlyId);
+	});
+
+	it("deleteSession throws for unknown id", () => {
+		expect(() => {
+			deleteSession("nonexistent");
+		}).toThrow(/not found/);
+	});
+});
+
+describe("session data isolation", () => {
+	it("data saved in one session is not visible in another", () => {
+		saveChosenCardIds(sid(), ["self-knowledge"]);
+		saveFreeformNotes(sid(), { "self-knowledge": "notes from session 1" });
+
+		createSession("Second");
+
+		expect(loadChosenCardIds(sid())).toBeNull();
+		expect(loadFreeformNotes(sid())).toEqual({});
+	});
+
+	it("switching back to a session restores its data", () => {
+		const firstId = getActiveSessionId();
+		saveChosenCardIds(sid(), ["self-knowledge"]);
+
+		createSession("Second");
+		saveChosenCardIds(sid(), ["community"]);
+
+		switchSession(firstId);
+		expect(loadChosenCardIds(sid())).toEqual(["self-knowledge"]);
+	});
+
+	it("clearAllProgress only affects the active session", () => {
+		saveChosenCardIds(sid(), ["self-knowledge"]);
+		const firstId = getActiveSessionId();
+
+		createSession("Second");
+		saveChosenCardIds(sid(), ["community"]);
+		clearAllProgress(sid());
+
+		expect(loadChosenCardIds(sid())).toBeNull();
+		switchSession(firstId);
+		expect(loadChosenCardIds(sid())).toEqual(["self-knowledge"]);
+	});
+});
+
+describe("migration from legacy data", () => {
+	it("migrates legacy keys into a new session", () => {
+		// Reset: remove sessions metadata to simulate pre-sessions state
+		localStorage.removeItem("somecam-sessions");
+		localStorage.removeItem("somecam-active-session");
+
+		// Write legacy keys directly
+		localStorage.setItem("somecam-chosen", JSON.stringify(["self-knowledge"]));
+		localStorage.setItem("somecam-freeform", JSON.stringify({ "self-knowledge": "notes" }));
+
+		ensureSessionsInitialized();
+
+		// Legacy keys should be removed
+		expect(localStorage.getItem("somecam-chosen")).toBeNull();
+		expect(localStorage.getItem("somecam-freeform")).toBeNull();
+
+		// Data should be accessible through session-scoped functions
+		expect(loadChosenCardIds(sid())).toEqual(["self-knowledge"]);
+		expect(loadFreeformNotes(sid())).toEqual({ "self-knowledge": "notes" });
+		expect(listSessions()).toHaveLength(1);
+	});
+});
+
+describe("formatSessionDate", () => {
+	it("formats a date as 'Month Day, Year'", () => {
+		const date = new Date(2026, 1, 13); // Feb 13, 2026
+		expect(formatSessionDate(date)).toBe("February 13, 2026");
 	});
 });
