@@ -8,6 +8,7 @@ const EXPLORE_KEY = "somecam-explore";
 const SUMMARIES_KEY = "somecam-summaries";
 const FREEFORM_KEY = "somecam-freeform";
 const LLM_TEST_KEY = "somecam-llm-test";
+const PERSIST_REQUESTED_KEY = "somecam-persist-requested";
 
 const DEFAULT_QUESTION_ID = EXPLORE_QUESTIONS[0]?.id ?? "";
 
@@ -352,6 +353,13 @@ export function saveProgressFile(): void {
 	a.download = "somecam-progress.json";
 	a.click();
 	URL.revokeObjectURL(url);
+}
+
+export function requestStoragePersistence(): void {
+	if (!sessionStorage.getItem(PERSIST_REQUESTED_KEY)) {
+		sessionStorage.setItem(PERSIST_REQUESTED_KEY, "1");
+		void navigator.storage.persist();
+	}
 }
 
 export function loadProgressFile(): Promise<void> {

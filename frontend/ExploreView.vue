@@ -6,7 +6,7 @@ import { fetchAnswerDepthCheck, fetchInferredAnswers } from "./api.ts";
 import ExploreTextarea from "./ExploreTextarea.vue";
 import StartOverButton from "./StartOverButton.vue";
 import type { ExploreEntryFull } from "./store.ts";
-import { loadExploreDataFull, loadFreeformNotes, saveExploreData, saveFreeformNotes } from "./store.ts";
+import { loadExploreDataFull, loadFreeformNotes, requestStoragePersistence, saveExploreData, saveFreeformNotes } from "./store.ts";
 import type { ExploreQuestion } from "../shared/explore-questions.ts";
 import { EXPLORE_QUESTIONS } from "../shared/explore-questions.ts";
 import type { MeaningCard } from "../shared/meaning-cards.ts";
@@ -135,6 +135,8 @@ async function submitAnswer(): Promise<void> {
 	entries.value[idx].userAnswer = answerText;
 	entries.value[idx].submitted = true;
 	persistEntries();
+
+	requestStoragePersistence();
 
 	const remaining = remainingQuestionIds();
 
