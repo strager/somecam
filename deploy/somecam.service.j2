@@ -1,0 +1,14 @@
+[Unit]
+Description=SoMeCaM
+After=network.target
+
+[Service]
+ExecStart={{ node_dir }}/bin/node --env-file-if-exists=.env backend/main.ts
+WorkingDirectory=/home/somecam/app
+User=somecam
+Group=somecam
+Environment=NODE_ENV=production PORT=3011
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,146 @@
+---
+- name: Deploy SoMeCaM
+  hosts: somecam
+
+  vars:
+    node_version: "25.6.1"
+    node_sha256: "97eec07e2a43c5a39e4968c1ae554461783914d872c27d856e98d2751094f5be"
+    node_tarball: "node-v{{ node_version }}-linux-x64.tar.xz"
+    node_dir: "/opt/node-25"
+
+  tasks:
+    - name: Download Node.js {{ node_version }}
+      ansible.builtin.get_url:
+        url: "https://nodejs.org/dist/v{{ node_version }}/{{ node_tarball }}"
+        dest: "/opt/{{ node_tarball }}"
+        checksum: "sha256:{{ node_sha256 }}"
+      become: true
+
+    - name: Extract Node.js {{ node_version }}
+      ansible.builtin.unarchive:
+        src: "/opt/{{ node_tarball }}"
+        dest: /opt
+        remote_src: true
+        creates: "/opt/node-v{{ node_version }}-linux-x64"
+      become: true
+
+    - name: Symlink Node.js install to {{ node_dir }}
+      ansible.builtin.file:
+        src: "/opt/node-v{{ node_version }}-linux-x64"
+        dest: "{{ node_dir }}"
+        state: link
+      become: true
+
+    - name: Create somecam user
+      ansible.builtin.user:
+        name: somecam
+        system: true
+        create_home: true
+        shell: /usr/sbin/nologin
+      become: true
+
+    - name: Build frontend locally
+      ansible.builtin.command:
+        cmd: npm run build
+        chdir: "{{ playbook_dir }}/.."
+      delegate_to: localhost
+      become: false
+
+    - name: Synchronize app files
+      ansible.builtin.synchronize:
+        src: "{{ playbook_dir }}/../"
+        dest: /home/somecam/app/
+        rsync_opts:
+          - "--include=backend/"
+          - "--include=backend/**"
+          - "--include=shared/"
+          - "--include=shared/**"
+          - "--include=frontend/"
+          - "--include=frontend/dist/"
+          - "--include=frontend/dist/**"
+          - "--include=package.json"
+          - "--include=package-lock.json"
+          - "--include=openapi.yaml"
+          - "--exclude=*"
+        delete: true
+      become: true
+      become_user: somecam
+      notify: Restart somecam
+
+    - name: Install production npm dependencies
+      ansible.builtin.command:
+        cmd: "{{ node_dir }}/bin/npm ci --omit=dev"
+        chdir: /home/somecam/app
+      become: true
+      become_user: somecam
+      notify: Restart somecam
+
+    - name: Deploy .env
+      ansible.builtin.copy:
+        src: "{{ playbook_dir }}/../.env"
+        dest: /home/somecam/app/.env
+        mode: "0600"
+      become: true
+      become_user: somecam
+      notify: Restart somecam
+
+    - name: Install systemd service
+      ansible.builtin.template:
+        src: somecam.service.j2
+        dest: /etc/systemd/system/somecam.service
+        mode: "0644"
+      become: true
+      notify: Restart somecam
+
+    - name: Create empty document root for Apache vhost
+      ansible.builtin.file:
+        path: /var/www/somecam.strager.net
+        state: directory
+        owner: root
+        group: root
+        mode: "0755"
+      become: true
+
+    - name: Enable Apache proxy_http module
+      ansible.builtin.command:
+        cmd: a2enmod --quiet proxy_http
+      become: true
+      notify: Reload Apache
+
+    - name: Deploy Apache vhost config
+      ansible.builtin.template:
+        src: 004-somecam.strager.net.conf.j2
+        dest: /etc/apache2/sites-available/004-somecam.strager.net.conf
+        owner: root
+        group: root
+        mode: "0644"
+      become: true
+      notify: Reload Apache
+
+    - name: Enable Apache site
+      ansible.builtin.command:
+        cmd: a2ensite --quiet 004-somecam.strager.net
+      become: true
+      notify: Reload Apache
+
+    - name: Enable and start somecam service
+      ansible.builtin.systemd:
+        name: somecam
+        enabled: true
+        state: started
+        daemon_reload: true
+      become: true
+
+  handlers:
+    - name: Reload Apache
+      ansible.builtin.service:
+        name: apache2
+        state: reloaded
+      become: true
+
+    - name: Restart somecam
+      ansible.builtin.systemd:
+        name: somecam
+        state: restarted
+        daemon_reload: true
+      become: true

@@ -1,26 +1,42 @@
-import { createServer as createViteServer, mergeConfig } from "vite";
+import path from "node:path";
+import url from "node:url";
+
+import express from "express";
 
 import { createApp } from "./app.ts";
-import viteConfig from "../vite.config.ts";
 
 const port = Number(process.env.PORT ?? "3011");
+const isProduction = process.env.NODE_ENV === "production";
 
 async function main(): Promise<void> {
 	const app = await createApp();
 
-	const vite = await createViteServer(
-		mergeConfig(viteConfig, {
-			// Avoid Vite's generated .vite-temp config module churn, which can trigger Node watch restarts.
-			configFile: false,
-			server: { middlewareMode: true },
-			appType: "spa",
-		}),
-	);
-
-	app.use(vite.middlewares);
+	if (isProduction) {
+		const frontendDist = path.resolve(path.dirname(url.fileURLToPath(import.meta.url)), "../frontend/dist");
+		app.use(express.static(frontendDist));
+		app.use((req, res, next) => {
+			if (req.method !== "GET" || req.path.startsWith("/api")) {
+				next();
+				return;
+			}
+			res.sendFile(path.join(frontendDist, "index.html"));
+		});
+	} else {
+		const { createServer: createViteServer, mergeConfig } = await import("vite");
+		const { default: viteConfig } = await import("../vite.config.ts");
+		const vite = await createViteServer(
+			mergeConfig(viteConfig, {
+				configFile: false,
+				server: { middlewareMode: true },
+				appType: "spa",
+			}),
+		);
+		app.use(vite.middlewares);
+	}
 
 	app.listen(port, () => {
-		console.log(`SoMeCaM dev server listening at http://localhost:${port.toString()}`);
+		const mode = isProduction ? "production" : "dev";
+		console.log(`SoMeCaM ${mode} server listening at http://localhost:${port.toString()}`);
 	});
 }
 

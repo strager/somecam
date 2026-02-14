@@ -3,8 +3,12 @@
 	"version": "0.1.0",
 	"private": true,
 	"type": "module",
+	"engines": {
+		"node": ">=25"
+	},
 	"scripts": {
 		"dev": "node --env-file-if-exists=.env backend/main.ts",
+		"build": "vite build",
 		"typecheck": "tsc -p tsconfig.backend.json && vue-tsc --noEmit -p tsconfig.frontend.json",
 		"test": "vitest run",
 		"lint": "eslint .",
