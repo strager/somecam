@@ -60,7 +60,7 @@ onMounted(() => {
 	try {
 		const cardIds = loadChosenCardIds(sessionId);
 		if (cardIds === null) {
-			void router.replace(`/${sessionId}/find-meaning`);
+			void router.replace({ name: "findMeaning", params: { sessionId } });
 			return;
 		}
 		const chosenSet = new Set(cardIds);
@@ -104,7 +104,7 @@ onMounted(() => {
 			void Promise.all(promises);
 		}
 	} catch {
-		void router.replace(`/${sessionId}/find-meaning`);
+		void router.replace({ name: "findMeaning", params: { sessionId } });
 	}
 });
 </script>
@@ -115,13 +115,13 @@ onMounted(() => {
 			<h1>Explore</h1>
 		</header>
 
-		<button class="edit-cards-btn" @click="router.push(`/${sessionId}/find-meaning/manual`)">Edit selection</button>
+		<button class="edit-cards-btn" @click="router.push({ name: 'findMeaningManual', params: { sessionId } })">Edit selection</button>
 
 		<div class="card-list">
 			<div v-for="card in chosenCards" :key="card.id" class="card-surface chosen-card">
 				<h3>{{ card.source }}</h3>
 				<p>{{ card.description }}</p>
-				<button :class="['explore-btn', { answered: answeredCards.has(card.id) }]" @click="router.push(`/${sessionId}/explore/${card.id}`)">Explore</button>
+				<button :class="['explore-btn', { answered: answeredCards.has(card.id) }]" @click="router.push({ name: 'exploreMeaning', params: { sessionId, meaningId: card.id } })">Explore</button>
 				<div v-if="cardSummaryEntries[card.id]?.some((e) => e.loading)" class="summary-loading">Generating summary...</div>
 				<div v-else-if="cardSummaryEntries[card.id]" class="summary-block">
 					<div v-for="entry in cardSummaryEntries[card.id]" :key="entry.questionId" class="summary-item">
@@ -134,7 +134,7 @@ onMounted(() => {
 			</div>
 		</div>
 
-		<button class="report-btn" @click="router.push(`/${sessionId}/report`)">Download Report</button>
+		<button class="report-btn" @click="router.push({ name: 'report', params: { sessionId } })">Download Report</button>
 
 		<StartOverButton />
 	</main>

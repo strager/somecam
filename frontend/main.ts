@@ -19,34 +19,42 @@ const router = createRouter({
 	routes: [
 		{
 			path: "/",
+			name: "home",
 			component: HomeView,
 		},
 		{
 			path: "/:sessionId/find-meaning",
+			name: "findMeaning",
 			component: FindMeaningView,
 		},
 		{
 			path: "/:sessionId/find-meaning/prioritize",
+			name: "findMeaningPrioritize",
 			component: FindMeaningPrioritizeView,
 		},
 		{
 			path: "/:sessionId/explore",
+			name: "explore",
 			component: ExploreView,
 		},
 		{
 			path: "/:sessionId/find-meaning/manual",
+			name: "findMeaningManual",
 			component: FindMeaningManualView,
 		},
 		{
 			path: "/:sessionId/report",
+			name: "report",
 			component: ReportView,
 		},
 		{
 			path: "/:sessionId/explore/:meaningId",
+			name: "exploreMeaning",
 			component: ExploreMeaningView,
 		},
 		{
 			path: "/llm-test",
+			name: "llmTest",
 			component: LlmTestView,
 		},
 	],

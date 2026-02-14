@@ -35,7 +35,7 @@ onMounted(() => {
 	try {
 		const cardIds = loadChosenCardIds(sessionId);
 		if (cardIds === null) {
-			void router.replace(`/${sessionId}/find-meaning`);
+			void router.replace({ name: "findMeaning", params: { sessionId } });
 			return;
 		}
 
@@ -66,7 +66,7 @@ onMounted(() => {
 			reports.value.push({ card, questions, freeformNote: freeformNotes[cardId] ?? "" });
 		}
 	} catch {
-		void router.replace(`/${sessionId}/find-meaning`);
+		void router.replace({ name: "findMeaning", params: { sessionId } });
 	}
 });
 </script>

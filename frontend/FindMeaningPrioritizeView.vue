@@ -30,18 +30,18 @@ const keptCount = computed(() => swipeHistory.value.filter((r) => r.direction ==
 onMounted(() => {
 	const saved = loadPrioritize(sessionId);
 	if (!saved) {
-		void router.replace(`/${sessionId}/find-meaning`);
+		void router.replace({ name: "findMeaning", params: { sessionId } });
 		return;
 	}
 	if (!needsPrioritization(sessionId)) {
 		saveChosenCardIds(sessionId, saved.cardIds);
 		removePrioritize(sessionId);
-		void router.replace(`/${sessionId}/explore`);
+		void router.replace({ name: "explore", params: { sessionId } });
 		return;
 	}
 	const resolved = saved.cardIds.map((id) => cardsById.get(id)).filter((c): c is MeaningCard => c !== undefined);
 	if (resolved.length === 0) {
-		void router.replace(`/${sessionId}/find-meaning`);
+		void router.replace({ name: "findMeaning", params: { sessionId } });
 		return;
 	}
 	cards.value = resolved;
@@ -85,7 +85,7 @@ watch(isComplete, (done) => {
 	const keptCardIds = swipeHistory.value.filter((r) => r.direction === "agree").map((r) => r.cardId);
 	saveChosenCardIds(sessionId, keptCardIds);
 	removePrioritize(sessionId);
-	void router.push(`/${sessionId}/explore`);
+	void router.push({ name: "explore", params: { sessionId } });
 });
 </script>
 

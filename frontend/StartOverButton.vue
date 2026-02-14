@@ -15,7 +15,7 @@ onMounted(() => {
 function startOver(): void {
 	if (!window.confirm("Start over with a new session? Your current session will be saved.")) return;
 	const newId = createSession();
-	void router.push(`/${newId}/find-meaning`);
+	void router.push({ name: "findMeaning", params: { sessionId: newId } });
 }
 </script>
 

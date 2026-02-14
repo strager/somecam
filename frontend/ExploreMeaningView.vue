@@ -246,7 +246,7 @@ function finishExploring(): void {
 		persistEntries();
 	}
 	persistFreeform();
-	void router.push(`/${sessionId}/explore`);
+	void router.push({ name: "explore", params: { sessionId } });
 }
 
 function onKeydown(event: KeyboardEvent): void {
@@ -259,19 +259,19 @@ function onKeydown(event: KeyboardEvent): void {
 onMounted(() => {
 	const foundCard = cardsById.get(cardId);
 	if (foundCard === undefined) {
-		void router.replace(`/${sessionId}/explore`);
+		void router.replace({ name: "explore", params: { sessionId } });
 		return;
 	}
 
 	try {
 		const data = loadExploreDataFull(sessionId);
 		if (data === null) {
-			void router.replace(`/${sessionId}/explore`);
+			void router.replace({ name: "explore", params: { sessionId } });
 			return;
 		}
 		const cardEntries = data[cardId];
 		if (!Array.isArray(cardEntries) || cardEntries.length === 0) {
-			void router.replace(`/${sessionId}/explore`);
+			void router.replace({ name: "explore", params: { sessionId } });
 			return;
 		}
 
@@ -301,7 +301,7 @@ onMounted(() => {
 			}
 		}
 	} catch {
-		void router.replace(`/${sessionId}/explore`);
+		void router.replace({ name: "explore", params: { sessionId } });
 	}
 });
 </script>

@@ -64,7 +64,7 @@ onMounted(() => {
 	try {
 		const cardIds = loadChosenCardIds(sessionId);
 		if (cardIds === null) {
-			void router.replace(`/${sessionId}/find-meaning`);
+			void router.replace({ name: "findMeaning", params: { sessionId } });
 			return;
 		}
 		chosenIds.value = new Set(cardIds);
@@ -78,7 +78,7 @@ onMounted(() => {
 			}
 		}
 	} catch {
-		void router.replace(`/${sessionId}/find-meaning`);
+		void router.replace({ name: "findMeaning", params: { sessionId } });
 	}
 });
 </script>
@@ -109,7 +109,7 @@ onMounted(() => {
 			</label>
 		</div>
 
-		<button class="done-btn" @click="router.push(`/${sessionId}/explore`)">Done</button>
+		<button class="done-btn" @click="router.push({ name: 'explore', params: { sessionId } })">Done</button>
 	</main>
 </template>
 

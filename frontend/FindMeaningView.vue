@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
+import type { RouteLocationRaw } from "vue-router";
 
 import type { MeaningCard, SwipeDirection } from "../shared/meaning-cards.ts";
 import { MEANING_CARDS } from "../shared/meaning-cards.ts";
@@ -20,15 +21,15 @@ const swipeCardRef = ref<InstanceType<typeof SwipeCard> | null>(null);
 
 const nextPhaseLabel = ref("Continue to Next Phase");
 
-function detectNextPhase(): { label: string; route: string } | null {
+function detectNextPhase(): { label: string; route: RouteLocationRaw } | null {
 	const phase = detectSessionPhase(sessionId);
 	switch (phase) {
 		case "explore":
-			return { label: "Explore Meaning", route: `/${sessionId}/explore` };
+			return { label: "Explore Meaning", route: { name: "explore", params: { sessionId } } };
 		case "prioritize-complete":
-			return { label: "Explore Meaning", route: `/${sessionId}/find-meaning/prioritize` };
+			return { label: "Explore Meaning", route: { name: "findMeaningPrioritize", params: { sessionId } } };
 		case "prioritize":
-			return { label: "Prioritize Meaning", route: `/${sessionId}/find-meaning/prioritize` };
+			return { label: "Prioritize Meaning", route: { name: "findMeaningPrioritize", params: { sessionId } } };
 		default:
 			return null;
 	}
@@ -112,10 +113,10 @@ function continueToNextPhase(): void {
 
 	if (needsPrioritization(sessionId)) {
 		savePrioritize(sessionId, { cardIds: cardIdsToConsider, swipeHistory: [] });
-		void router.push(`/${sessionId}/find-meaning/prioritize`);
+		void router.push({ name: "findMeaningPrioritize", params: { sessionId } });
 	} else {
 		saveChosenCardIds(sessionId, cardIdsToConsider);
-		void router.push(`/${sessionId}/explore`);
+		void router.push({ name: "explore", params: { sessionId } });
 	}
 }
 </script>

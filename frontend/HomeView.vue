@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { nextTick, onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
+import type { RouteLocationRaw } from "vue-router";
 import type { ProgressPhase, SessionMeta } from "./store.ts";
 import { createSession, deleteSession, detectSessionPhase, ensureSessionsInitialized, formatSessionDate, listSessions, loadProgressFile, renameSession, saveProgressFile } from "./store.ts";
 
@@ -26,23 +27,23 @@ onMounted(() => {
 	refreshState();
 });
 
-function phaseRoute(sessionId: string, p: ProgressPhase): string {
+function phaseRoute(sessionId: string, p: ProgressPhase): RouteLocationRaw {
 	switch (p) {
 		case "explore":
-			return `/${sessionId}/explore`;
+			return { name: "explore", params: { sessionId } };
 		case "prioritize-complete":
 		case "prioritize":
-			return `/${sessionId}/find-meaning/prioritize`;
+			return { name: "findMeaningPrioritize", params: { sessionId } };
 		case "swipe":
 		case "none":
-			return `/${sessionId}/find-meaning`;
+			return { name: "findMeaning", params: { sessionId } };
 	}
 }
 
 function onNewSession(): void {
 	const newId = createSession();
 	refreshState();
-	void router.push(`/${newId}/find-meaning`);
+	void router.push({ name: "findMeaning", params: { sessionId: newId } });
 }
 
 function onStartRename(session: SessionMeta): void {
@@ -128,7 +129,7 @@ function onLoadFile(): void {
 								<input ref="renameInputEl" v-model="renameInput" type="text" class="rename-input" @keydown="onRenameKeydown" @blur="onConfirmRename" />
 							</template>
 							<template v-else>
-								<a class="session-name" :href="phaseRoute(session.id, sessionPhases[session.id] ?? 'none')">{{ session.name }}</a>
+								<router-link class="session-name" :to="phaseRoute(session.id, sessionPhases[session.id] ?? 'none')">{{ session.name }}</router-link>
 							</template>
 							<span class="session-date">
 								Created {{ formatSessionDate(new Date(session.createdAt)) }}<template v-if="formatSessionDate(new Date(session.lastUpdatedAt)) !== formatSessionDate(new Date(session.createdAt))"> · Updated {{ formatSessionDate(new Date(session.lastUpdatedAt)) }}</template>
