@@ -132,13 +132,17 @@ function onLoadFile(): void {
 							<template v-else>
 								<router-link class="session-name" :to="phaseRoute(session.id, sessionPhases[session.id] ?? 'none')">{{ session.name }}</router-link>
 							</template>
-							<span class="session-date">
-								Created {{ formatSessionDate(new Date(session.createdAt)) }}<template v-if="formatSessionDate(new Date(session.lastUpdatedAt)) !== formatSessionDate(new Date(session.createdAt))"> · Updated {{ formatSessionDate(new Date(session.lastUpdatedAt)) }}</template>
+							<span class="session-date session-date-long">
+								Created {{ formatSessionDate(new Date(session.createdAt)) }}<template v-if="session.lastUpdatedAt !== session.createdAt"> · Updated {{ formatSessionDate(new Date(session.lastUpdatedAt)) }}</template>
 							</span>
 						</div>
 						<div class="session-actions">
 							<button type="button" class="action-btn" @click="onStartRename(session)">Rename</button>
 							<button type="button" class="action-btn delete-btn" @click="onDelete(session.id)">Delete</button>
+						</div>
+						<div class="session-dates-short">
+							<span class="session-date">Created {{ new Date(session.createdAt).toLocaleDateString() }}</span>
+							<span v-if="session.lastUpdatedAt !== session.createdAt" class="session-date">Updated {{ new Date(session.lastUpdatedAt).toLocaleDateString() }}</span>
 						</div>
 					</div>
 				</div>
@@ -220,12 +224,13 @@ section p {
 
 .session-item {
 	display: flex;
+	flex-wrap: wrap;
 	justify-content: space-between;
 	align-items: center;
 	padding: 0.75rem 1rem;
 	border: 1px solid #ddd;
 	border-radius: 6px;
-	gap: 0.75rem;
+	gap: 0.5rem 0.75rem;
 }
 
 .session-info {
@@ -255,6 +260,10 @@ section p {
 	color: #888;
 }
 
+.session-dates-short {
+	display: none;
+}
+
 .rename-input {
 	font-family: inherit;
 	font-size: 0.95rem;
@@ -271,6 +280,36 @@ section p {
 	display: flex;
 	gap: 0.35rem;
 	flex-shrink: 0;
+}
+
+@media (max-width: 480px) {
+	.session-item {
+		display: grid;
+		grid-template-columns: 1fr auto;
+		gap: 0.25rem 0.75rem;
+	}
+
+	.session-info {
+		grid-column: 1 / -1;
+	}
+
+	.session-date-long {
+		display: none;
+	}
+
+	.session-dates-short {
+		display: flex;
+		flex-direction: column;
+		grid-column: 1;
+		grid-row: 2;
+	}
+
+	.session-actions {
+		grid-column: 2;
+		grid-row: 2;
+		align-self: end;
+		flex-direction: column;
+	}
 }
 
 .action-btn {
