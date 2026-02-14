@@ -4,7 +4,6 @@ import { useRoute, useRouter } from "vue-router";
 
 import { fetchSummary } from "./api.ts";
 import { assignQuestions } from "./explore-data.ts";
-import StartOverButton from "./StartOverButton.vue";
 import type { ExploreEntry, SummaryCache } from "./store.ts";
 import { loadChosenCardIds, loadExploreData, loadSummaryCache, saveExploreData, saveSummaryCache } from "./store.ts";
 import { EXPLORE_QUESTIONS } from "../shared/explore-questions.ts";
@@ -148,8 +147,6 @@ onMounted(() => {
 		</div>
 
 		<button class="report-btn" @click="router.push({ name: 'report', params: { sessionId } })">Download Report</button>
-
-		<StartOverButton />
 	</main>
 </template>
 

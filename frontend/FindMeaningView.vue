@@ -5,7 +5,6 @@ import type { RouteLocationRaw } from "vue-router";
 
 import type { MeaningCard, SwipeDirection } from "../shared/meaning-cards.ts";
 import { MEANING_CARDS } from "../shared/meaning-cards.ts";
-import StartOverButton from "./StartOverButton.vue";
 import type { SwipeRecord } from "./store.ts";
 import { detectSessionPhase, loadSwipeProgress, needsPrioritization, saveChosenCardIds, savePrioritize, selectCandidateCards, saveSwipeProgress } from "./store.ts";
 import SwipeCard from "./SwipeCard.vue";
@@ -157,8 +156,6 @@ function continueToNextPhase(): void {
 		<div class="undo-area">
 			<button type="button" class="btn undo" :disabled="!canUndo" @click="handleUndo">Undo</button>
 		</div>
-
-		<StartOverButton />
 	</main>
 </template>
 

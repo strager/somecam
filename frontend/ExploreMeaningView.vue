@@ -4,7 +4,6 @@ import { useRoute, useRouter } from "vue-router";
 
 import { fetchAnswerDepthCheck, fetchInferredAnswers } from "./api.ts";
 import ExploreTextarea from "./ExploreTextarea.vue";
-import StartOverButton from "./StartOverButton.vue";
 import type { ExploreEntryFull } from "./store.ts";
 import { loadExploreDataFull, loadFreeformNotes, requestStoragePersistence, saveExploreData, saveFreeformNotes } from "./store.ts";
 import type { ExploreQuestion } from "../shared/explore-questions.ts";
@@ -354,8 +353,6 @@ onMounted(() => {
 				<button class="finish-btn" @click="finishExploring">Finish exploring</button>
 			</div>
 		</div>
-
-		<StartOverButton />
 	</main>
 </template>
 

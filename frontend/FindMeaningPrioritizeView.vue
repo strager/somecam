@@ -4,7 +4,6 @@ import { useRoute, useRouter } from "vue-router";
 
 import type { MeaningCard, SwipeDirection } from "../shared/meaning-cards.ts";
 import { MEANING_CARDS } from "../shared/meaning-cards.ts";
-import StartOverButton from "./StartOverButton.vue";
 import type { SwipeRecord } from "./store.ts";
 import { loadPrioritize, needsPrioritization, removePrioritize, saveChosenCardIds, savePrioritize } from "./store.ts";
 import SwipeCard from "./SwipeCard.vue";
@@ -123,8 +122,6 @@ watch(isComplete, (done) => {
 		<div class="undo-area">
 			<button type="button" class="btn undo" :disabled="!canUndo" @click="handleUndo">Undo</button>
 		</div>
-
-		<StartOverButton />
 	</main>
 </template>
 
