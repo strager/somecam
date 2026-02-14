@@ -5,6 +5,7 @@ import type { RouteLocationRaw } from "vue-router";
 
 import type { MeaningCard, SwipeDirection } from "../shared/meaning-cards.ts";
 import { MEANING_CARDS } from "../shared/meaning-cards.ts";
+import { capture } from "./analytics.ts";
 import type { SwipeRecord } from "./store.ts";
 import { detectSessionPhase, loadSwipeProgress, needsPrioritization, saveChosenCardIds, savePrioritize, selectCandidateCards, saveSwipeProgress } from "./store.ts";
 import SwipeCard from "./SwipeCard.vue";
@@ -17,6 +18,9 @@ const shuffledCards = ref<MeaningCard[]>([]);
 const currentIndex = ref(0);
 const swipeHistory = ref<SwipeRecord[]>([]);
 const swipeCardRef = ref<InstanceType<typeof SwipeCard> | null>(null);
+const lastSwipeMethod = ref<"drag" | "button">("drag");
+const cardShownAtMs = ref(performance.now());
+const phaseStartedAtMs = ref(performance.now());
 
 const nextPhaseLabel = ref("Continue to Next Phase");
 
@@ -53,6 +57,7 @@ function shuffle<T>(array: readonly T[]): T[] {
 const cardsById = new Map(MEANING_CARDS.map((c) => [c.id, c]));
 
 onMounted(() => {
+	phaseStartedAtMs.value = performance.now();
 	const saved = loadSwipeProgress(sessionId);
 	if (saved) {
 		const cards = saved.shuffledCardIds.map((id) => cardsById.get(id)).filter((c): c is MeaningCard => c !== undefined);
@@ -60,6 +65,7 @@ onMounted(() => {
 			shuffledCards.value = cards;
 			swipeHistory.value = saved.swipeHistory;
 			currentIndex.value = saved.swipeHistory.length;
+			cardShownAtMs.value = performance.now();
 			const detected = detectNextPhase();
 			if (detected) {
 				nextPhaseLabel.value = detected.label;
@@ -68,11 +74,19 @@ onMounted(() => {
 		}
 	}
 	shuffledCards.value = shuffle(MEANING_CARDS);
+	cardShownAtMs.value = performance.now();
 });
 
 function handleSwipe(direction: SwipeDirection): void {
+	const cardId = currentCard.value.id;
+	const now = performance.now();
+	capture("card_swiped", {
+		session_id: sessionId,
+		method: lastSwipeMethod.value,
+		time_on_card_ms: Math.round(now - cardShownAtMs.value),
+	});
 	swipeHistory.value.push({
-		cardId: currentCard.value.id,
+		cardId,
 		direction,
 	});
 	currentIndex.value++;
@@ -80,10 +94,13 @@ function handleSwipe(direction: SwipeDirection): void {
 		shuffledCardIds: shuffledCards.value.map((c) => c.id),
 		swipeHistory: swipeHistory.value,
 	});
+	cardShownAtMs.value = performance.now();
+	lastSwipeMethod.value = "drag";
 }
 
 function handleButtonSwipe(direction: SwipeDirection): void {
 	if (isComplete.value) return;
+	lastSwipeMethod.value = "button";
 	if (swipeCardRef.value) {
 		swipeCardRef.value.flyAway(direction);
 	} else {
@@ -95,10 +112,13 @@ function handleUndo(): void {
 	if (swipeHistory.value.length === 0) return;
 	swipeHistory.value.pop();
 	currentIndex.value = swipeHistory.value.length;
+	capture("swipe_undone", { session_id: sessionId });
 	saveSwipeProgress(sessionId, {
 		shuffledCardIds: shuffledCards.value.map((c) => c.id),
 		swipeHistory: swipeHistory.value,
 	});
+	cardShownAtMs.value = performance.now();
+	lastSwipeMethod.value = "drag";
 }
 
 function continueToNextPhase(): void {
@@ -107,6 +127,17 @@ function continueToNextPhase(): void {
 		void router.push(detected.route);
 		return;
 	}
+
+	const agreedCount = swipeHistory.value.filter((record) => record.direction === "agree").length;
+	const disagreedCount = swipeHistory.value.filter((record) => record.direction === "disagree").length;
+	const unsureCount = swipeHistory.value.filter((record) => record.direction === "unsure").length;
+	capture("swiping_phase_completed", {
+		session_id: sessionId,
+		agreed_count: agreedCount,
+		disagreed_count: disagreedCount,
+		unsure_count: unsureCount,
+		total_time_ms: Math.round(performance.now() - phaseStartedAtMs.value),
+	});
 
 	const cardIdsToConsider = selectCandidateCards(sessionId);
 

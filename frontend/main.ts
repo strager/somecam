@@ -2,6 +2,7 @@ import { createApp } from "vue";
 import { createRouter, createWebHistory } from "vue-router";
 
 import App from "./App.vue";
+import { initAnalytics } from "./analytics.ts";
 import "./global.css";
 import ExploreMeaningView from "./ExploreMeaningView.vue";
 import ExploreView from "./ExploreView.vue";
@@ -61,4 +62,5 @@ const router = createRouter({
 	],
 });
 
+initAnalytics(router);
 createApp(App).use(router).mount("#app");

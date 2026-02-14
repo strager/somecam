@@ -3,6 +3,7 @@ import express, { type Express, type NextFunction, type Request, type Response }
 import { createApiMiddleware } from "./api.ts";
 import type { AppConfig } from "./config.ts";
 import { loadConfig } from "./config.ts";
+import { createAnalyticsHandler } from "./posthog-proxy.ts";
 
 function internalErrorBody(): string {
 	return JSON.stringify({
@@ -23,6 +24,7 @@ export async function createApp(): Promise<Express> {
 		console.warn("XAI_API_KEY is not set; AI summarization will be disabled.");
 	}
 
+	app.use("/api/a", createAnalyticsHandler());
 	app.use(express.json());
 	app.use(express.urlencoded({ extended: true }));
 	app.use("/api", await createApiMiddleware(config));

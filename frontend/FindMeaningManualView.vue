@@ -3,6 +3,7 @@ import { computed, onMounted, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
 
 import { assignQuestions } from "./explore-data.ts";
+import { capture } from "./analytics.ts";
 import { loadChosenCardIds, loadExploreData, saveChosenCardIds, saveExploreData } from "./store.ts";
 import { MEANING_CARDS } from "../shared/meaning-cards.ts";
 
@@ -30,7 +31,7 @@ function toggleCard(cardId: string): void {
 			confirmingRemove.value = cardId;
 			return;
 		}
-		removeCard(cardId);
+		removeCard(cardId, false);
 	} else {
 		addCard(cardId);
 	}
@@ -40,6 +41,7 @@ function addCard(cardId: string): void {
 	chosenIds.value.add(cardId);
 	chosenIds.value = new Set(chosenIds.value);
 	saveChosenIds();
+	capture("card_toggled", { session_id: sessionId });
 
 	const exploreData = loadExploreData(sessionId);
 	if (exploreData !== null && !(cardId in exploreData)) {
@@ -49,15 +51,32 @@ function addCard(cardId: string): void {
 	}
 }
 
-function removeCard(cardId: string): void {
+function removeCard(cardId: string, hadData: boolean): void {
 	chosenIds.value.delete(cardId);
 	chosenIds.value = new Set(chosenIds.value);
 	confirmingRemove.value = null;
 	saveChosenIds();
+	capture("card_toggled", { session_id: sessionId });
+	if (hadData) {
+		capture("card_with_data_removed", { session_id: sessionId });
+	}
 }
 
 function cancelRemove(): void {
+	if (confirmingRemove.value !== null) {
+		capture("manual_remove_with_data_cancelled", {
+			session_id: sessionId,
+		});
+	}
 	confirmingRemove.value = null;
+}
+
+function onDone(): void {
+	capture("manual_selection_completed", {
+		session_id: sessionId,
+		card_count: selectedCount.value,
+	});
+	void router.push({ name: "explore", params: { sessionId } });
 }
 
 onMounted(() => {
@@ -77,6 +96,7 @@ onMounted(() => {
 				}
 			}
 		}
+		capture("manual_selection_visited", { session_id: sessionId });
 	} catch {
 		void router.replace({ name: "findMeaning", params: { sessionId } });
 	}
@@ -108,14 +128,14 @@ onMounted(() => {
 				<div v-if="confirmingRemove === card.id" class="confirm-overlay" @click.stop>
 					<p>This card has exploration answers. Remove it?</p>
 					<div class="confirm-actions">
-						<button class="confirm-remove" @click="removeCard(card.id)">Remove</button>
+						<button class="confirm-remove" @click="removeCard(card.id, true)">Remove</button>
 						<button class="confirm-cancel" @click="cancelRemove">Cancel</button>
 					</div>
 				</div>
 			</label>
 		</div>
 
-		<button class="done-btn" @click="router.push({ name: 'explore', params: { sessionId } })">Done</button>
+		<button class="done-btn" @click="onDone">Done</button>
 	</main>
 </template>
 

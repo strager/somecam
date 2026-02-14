@@ -3,6 +3,7 @@ import { computed, onMounted, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
 
 import { fetchSummary } from "./api.ts";
+import { capture } from "./analytics.ts";
 import { assignQuestions } from "./explore-data.ts";
 import type { ExploreEntry, SummaryCache } from "./store.ts";
 import { loadChosenCardIds, loadExploreData, loadSummaryCache, saveExploreData, saveSummaryCache } from "./store.ts";
@@ -54,6 +55,29 @@ function exploreButtonLabel(cardId: string): string {
 	if (status === "complete") return "Review";
 	if (status === "partial") return "Continue";
 	return "Explore";
+}
+
+function onExploreCard(cardId: string): void {
+	const answered = cardAnswerCounts.value[cardId] ?? 0;
+	capture("card_exploration_started", {
+		session_id: sessionId,
+		card_id: cardId,
+		question_number: Math.min(answered + 1, EXPLORE_QUESTIONS.length),
+	});
+	void router.push({ name: "exploreMeaning", params: { sessionId, meaningId: cardId } });
+}
+
+function onEditSelection(): void {
+	capture("edit_selection_clicked", { session_id: sessionId });
+	void router.push({ name: "findMeaningManual", params: { sessionId } });
+}
+
+function onOpenReport(source: string): void {
+	capture("report_opened", {
+		session_id: sessionId,
+		source,
+	});
+	void router.push({ name: "report", params: { sessionId } });
 }
 
 interface SummaryEntry {
@@ -164,6 +188,7 @@ onMounted(() => {
 		if (promises.length > 0) {
 			void Promise.all(promises);
 		}
+		capture("explore_overview_visited", { session_id: sessionId });
 	} catch {
 		void router.replace({ name: "findMeaning", params: { sessionId } });
 	}
@@ -186,9 +211,9 @@ onMounted(() => {
 			<span class="progress-label">{{ totalAnswered }} of {{ totalQuestions }} questions answered</span>
 		</div>
 
-		<button v-if="allComplete" class="report-btn primary" @click="router.push({ name: 'report', params: { sessionId } })">Download Report</button>
+		<button v-if="allComplete" class="report-btn primary" @click="onOpenReport('explore_overview_primary')">Download Report</button>
 
-		<button class="edit-cards-btn" @click="router.push({ name: 'findMeaningManual', params: { sessionId } })">Edit selection</button>
+		<button class="edit-cards-btn" @click="onEditSelection">Edit selection</button>
 
 		<div class="card-list">
 			<div v-for="card in sortedCards" :key="card.id" :class="['card-surface', 'chosen-card', 'status-' + cardStatus(card.id)]">
@@ -209,11 +234,11 @@ onMounted(() => {
 						>
 					</li>
 				</ul>
-				<button :class="['explore-btn', { prominent: cardStatus(card.id) !== 'complete' }]" @click="router.push({ name: 'exploreMeaning', params: { sessionId, meaningId: card.id } })">{{ exploreButtonLabel(card.id) }}</button>
+				<button :class="['explore-btn', { prominent: cardStatus(card.id) !== 'complete' }]" @click="onExploreCard(card.id)">{{ exploreButtonLabel(card.id) }}</button>
 			</div>
 		</div>
 
-		<button :class="['report-btn', { primary: allComplete }]" @click="router.push({ name: 'report', params: { sessionId } })">Download Report</button>
+		<button :class="['report-btn', { primary: allComplete }]" @click="onOpenReport('explore_overview_secondary')">Download Report</button>
 	</main>
 </template>
 

@@ -2,6 +2,7 @@
 import { nextTick, onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
 import type { RouteLocationRaw } from "vue-router";
+import { capture } from "./analytics.ts";
 import type { ProgressPhase, SessionMeta } from "./store.ts";
 import { createSession, deleteSession, detectSessionPhase, ensureSessionsInitialized, formatSessionDate, listSessions, loadProgressFile, renameSession, saveProgressFile } from "./store.ts";
 
@@ -41,7 +42,9 @@ function phaseRoute(sessionId: string, p: ProgressPhase): RouteLocationRaw {
 }
 
 function onNewSession(): void {
+	const isFirst = sessions.value.length === 0;
 	const newId = createSession();
+	capture("session_created", { session_id: newId, is_first: isFirst });
 	refreshState();
 	void router.push({ name: "findMeaning", params: { sessionId: newId } });
 }
@@ -58,9 +61,11 @@ function onStartRename(session: SessionMeta): void {
 
 function onConfirmRename(): void {
 	if (renamingId.value === null) return;
+	const id = renamingId.value;
 	const trimmed = renameInput.value.trim();
 	if (trimmed.length > 0) {
-		renameSession(renamingId.value, trimmed);
+		renameSession(id, trimmed);
+		capture("session_renamed", { session_id: id });
 	}
 	renamingId.value = null;
 	refreshState();
@@ -81,7 +86,14 @@ function onRenameKeydown(event: KeyboardEvent): void {
 function onDelete(id: string): void {
 	if (!window.confirm("Delete this session? This cannot be undone.")) return;
 	deleteSession(id);
+	capture("session_deleted", { session_id: id });
 	refreshState();
+}
+
+function onOpenSession(session: SessionMeta): void {
+	const phase = sessionPhases.value[session.id] ?? detectSessionPhase(session.id);
+	capture("session_resumed", { session_id: session.id, phase });
+	void router.push(phaseRoute(session.id, phase));
 }
 
 function onExport(): void {
@@ -130,7 +142,7 @@ function onLoadFile(): void {
 								<input ref="renameInputEl" v-model="renameInput" type="text" class="rename-input" @keydown="onRenameKeydown" @blur="onConfirmRename" />
 							</template>
 							<template v-else>
-								<router-link class="session-name" :to="phaseRoute(session.id, sessionPhases[session.id] ?? 'none')">{{ session.name }}</router-link>
+								<button type="button" class="session-name session-link-btn" @click="onOpenSession(session)">{{ session.name }}</button>
 							</template>
 							<span class="session-date session-date-long">
 								Created {{ formatSessionDate(new Date(session.createdAt)) }}<template v-if="session.lastUpdatedAt !== session.createdAt"> · Updated {{ formatSessionDate(new Date(session.lastUpdatedAt)) }}</template>
@@ -253,6 +265,15 @@ section p {
 
 .session-name:hover {
 	text-decoration: underline;
+}
+
+.session-link-btn {
+	background: transparent;
+	border: none;
+	padding: 0;
+	cursor: pointer;
+	font-family: inherit;
+	text-align: left;
 }
 
 .session-date {

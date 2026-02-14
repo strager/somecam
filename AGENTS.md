@@ -59,3 +59,4 @@ Vite runs in middleware mode and is attached by `backend/main.ts`.
 ## Notes for Future Changes
 
 - If API response schemas change, update both `openapi.yaml` and tests together.
+- When making to changes to analytics, always review `docs/privacy.md` first.

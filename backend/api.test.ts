@@ -55,6 +55,16 @@ describe("API", () => {
 		expect(await response.json()).toEqual({ status: "ok" });
 	});
 
+	it("returns 200 for analytics proxy when POSTHOG_KEY is not set", async () => {
+		const response = await fetch(`${baseUrl}/api/a/capture`, {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({ event: "test_event" }),
+		});
+		expect(response.status).toBe(200);
+		expect(await response.text()).toBe("");
+	});
+
 	it("returns 400 for POST /api/summarize with missing fields", async () => {
 		const response = await fetch(`${baseUrl}/api/summarize`, {
 			method: "POST",

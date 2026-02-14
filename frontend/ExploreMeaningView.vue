@@ -3,9 +3,10 @@ import { computed, nextTick, onMounted, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
 
 import { fetchAnswerDepthCheck, fetchInferredAnswers } from "./api.ts";
+import { capture } from "./analytics.ts";
 import ExploreTextarea from "./ExploreTextarea.vue";
 import type { ExploreEntryFull } from "./store.ts";
-import { loadExploreDataFull, loadFreeformNotes, requestStoragePersistence, saveExploreData, saveFreeformNotes } from "./store.ts";
+import { loadChosenCardIds, loadExploreDataFull, loadFreeformNotes, requestStoragePersistence, saveExploreData, saveFreeformNotes } from "./store.ts";
 import type { ExploreQuestion } from "../shared/explore-questions.ts";
 import { EXPLORE_QUESTIONS } from "../shared/explore-questions.ts";
 import type { MeaningCard } from "../shared/meaning-cards.ts";
@@ -29,6 +30,11 @@ const depthCheckShown = ref(false);
 const pendingInferResult = ref<Map<string, string> | null>(null);
 const activeTextarea = ref<InstanceType<typeof ExploreTextarea> | null>(null);
 const freeformNote = ref("");
+const questionStartTimeMs = ref(performance.now());
+const submittedAnswerSnapshots = ref<Map<string, string>>(new Map());
+const editedAfterSubmit = ref<Set<string>>(new Set());
+
+const EXPLORE_PHASE_TRACK_KEY_PREFIX = "somecam-explore-phase-complete";
 
 const activeIndex = computed(() => {
 	const idx = entries.value.findIndex((e) => !e.submitted);
@@ -69,6 +75,22 @@ const allAnswered = computed(() => {
 
 const submittedCount = computed(() => entries.value.filter((e) => e.submitted).length);
 
+function markQuestionStartNow(): void {
+	questionStartTimeMs.value = performance.now();
+}
+
+function answerSource(entry: ExploreEntryFull, answer: string): "original" | "inferred-accepted" | "inferred-edited" {
+	if (entry.prefilledAnswer === "") {
+		return "original";
+	}
+	return answer === entry.prefilledAnswer ? "inferred-accepted" : "inferred-edited";
+}
+
+function trackSubmittedSnapshot(questionId: string, answer: string): void {
+	submittedAnswerSnapshots.value.set(questionId, answer);
+	editedAfterSubmit.value.delete(questionId);
+}
+
 function persistEntries(): void {
 	const data = loadExploreDataFull(sessionId);
 	if (data === null) return;
@@ -84,6 +106,28 @@ function debouncedPersist(): void {
 		persistTimer = undefined;
 		persistEntries();
 	}, 300);
+}
+
+function onAnsweredEntryInput(entry: ExploreEntryFull): void {
+	const snapshot = submittedAnswerSnapshots.value.get(entry.questionId);
+	if (snapshot !== undefined && snapshot !== entry.userAnswer) {
+		editedAfterSubmit.value.add(entry.questionId);
+	}
+	debouncedPersist();
+}
+
+function onAnsweredEntryBlur(entry: ExploreEntryFull): void {
+	persistEntries();
+	if (!editedAfterSubmit.value.has(entry.questionId)) {
+		return;
+	}
+	capture("answer_edited_after_submit", {
+		session_id: sessionId,
+		card_id: cardId,
+		question_id: entry.questionId,
+		answer_length: entry.userAnswer.trim().length,
+	});
+	trackSubmittedSnapshot(entry.questionId, entry.userAnswer);
 }
 
 function persistFreeform(): void {
@@ -102,6 +146,31 @@ function debouncedFreeformPersist(): void {
 	}, 300);
 }
 
+function maybeTrackExplorePhaseCompleted(): void {
+	const trackedKey = `${EXPLORE_PHASE_TRACK_KEY_PREFIX}:${sessionId}`;
+	if (sessionStorage.getItem(trackedKey) === "1") {
+		return;
+	}
+
+	const chosenCardIds = loadChosenCardIds(sessionId);
+	const data = loadExploreDataFull(sessionId);
+	if (chosenCardIds === null || data === null) {
+		return;
+	}
+
+	const allCardsComplete = chosenCardIds.every((chosenId) => {
+		const cardEntries = data[chosenId];
+		return Array.isArray(cardEntries) && cardEntries.length === EXPLORE_QUESTIONS.length && cardEntries.every((entry) => entry.submitted);
+	});
+
+	if (!allCardsComplete) {
+		return;
+	}
+
+	capture("explore_phase_completed", { session_id: sessionId });
+	sessionStorage.setItem(trackedKey, "1");
+}
+
 function answeredQuestionIds(): Set<string> {
 	return new Set(entries.value.filter((e) => e.submitted).map((e) => e.questionId));
 }
@@ -117,9 +186,16 @@ async function submitAnswer(): Promise<void> {
 		// User pressing Next to skip the guardrail
 		const idx = entries.value.length - 1;
 		if (idx >= 0 && entries.value[idx].submitted) {
+			const questionId = entries.value[idx].questionId;
 			entries.value[idx].userAnswer = currentAnswer.value.trim();
 			entries.value[idx].submittedAfterGuardrail = true;
 			persistEntries();
+			trackSubmittedSnapshot(questionId, entries.value[idx].userAnswer);
+			capture("answer_submitted_after_guardrail", {
+				session_id: sessionId,
+				card_id: cardId,
+				question_id: questionId,
+			});
 		}
 		depthCheckShown.value = false;
 		depthCheckFollowUp.value = "";
@@ -134,11 +210,36 @@ async function submitAnswer(): Promise<void> {
 	const answerText = currentAnswer.value.trim();
 	if (answerText === "") return;
 
+	const questionId = entries.value[idx].questionId;
+	const source = answerSource(entries.value[idx], answerText);
+	capture("question_answered", {
+		session_id: sessionId,
+		card_id: cardId,
+		question_id: questionId,
+		answer_length: answerText.length,
+		time_spent_ms: Math.round(performance.now() - questionStartTimeMs.value),
+		source,
+	});
+	if (source === "inferred-accepted") {
+		capture("inferred_answer_accepted", {
+			session_id: sessionId,
+			card_id: cardId,
+			question_id: questionId,
+		});
+	} else if (source === "inferred-edited") {
+		capture("inferred_answer_edited", {
+			session_id: sessionId,
+			card_id: cardId,
+			question_id: questionId,
+		});
+	}
+
 	entries.value[idx].userAnswer = answerText;
 	entries.value[idx].submitted = true;
+	trackSubmittedSnapshot(questionId, answerText);
 	persistEntries();
 
-	requestStoragePersistence();
+	requestStoragePersistence(sessionId);
 
 	const remaining = remainingQuestionIds();
 
@@ -155,9 +256,15 @@ async function submitAnswer(): Promise<void> {
 
 	const depthResult = await fetchAnswerDepthCheck({
 		cardId,
-		questionId: entries.value[idx].questionId,
+		questionId,
 		answer: answerText,
 	}).catch(() => ({ sufficient: true, followUpQuestion: "" }));
+	capture("depth_check_triggered", {
+		session_id: sessionId,
+		card_id: cardId,
+		question_id: questionId,
+		sufficient: depthResult.sufficient,
+	});
 
 	if (!depthResult.sufficient && depthResult.followUpQuestion) {
 		// Depth check failed fast — cache the still-pending infer promise
@@ -165,6 +272,11 @@ async function submitAnswer(): Promise<void> {
 		pendingInferResult.value = null;
 		entries.value[idx].guardrailText = depthResult.followUpQuestion;
 		persistEntries();
+		capture("depth_check_followup_shown", {
+			session_id: sessionId,
+			card_id: cardId,
+			question_id: questionId,
+		});
 		depthCheckFollowUp.value = depthResult.followUpQuestion;
 		depthCheckShown.value = true;
 		void nextTick(() => {
@@ -216,6 +328,7 @@ function applyInferAndAdvance(inferredMap: Map<string, string>, remaining: strin
 	});
 	persistEntries();
 	currentAnswer.value = nextPrefill;
+	markQuestionStartNow();
 }
 
 async function inferAndAdvance(): Promise<void> {
@@ -247,6 +360,23 @@ function finishExploring(): void {
 		persistEntries();
 	}
 	persistFreeform();
+	const noteLength = freeformNote.value.trim().length;
+	if (noteLength > 0) {
+		capture("freeform_notes_added", {
+			session_id: sessionId,
+			card_id: cardId,
+			note_length: noteLength,
+		});
+	}
+	const answeredCount = entries.value.filter((entry) => entry.submitted).length;
+	capture("card_exploration_finished", {
+		session_id: sessionId,
+		card_id: cardId,
+		answered_count: answeredCount,
+		total_questions: EXPLORE_QUESTIONS.length,
+		completed_all_questions: answeredCount === EXPLORE_QUESTIONS.length,
+	});
+	maybeTrackExplorePhaseCompleted();
 	void router.push({ name: "explore", params: { sessionId } });
 }
 
@@ -279,6 +409,7 @@ onMounted(() => {
 		card.value = foundCard;
 		entries.value = cardEntries;
 		freeformNote.value = loadFreeformNotes(sessionId)[cardId] ?? "";
+		submittedAnswerSnapshots.value = new Map(entries.value.filter((entry) => entry.submitted).map((entry) => [entry.questionId, entry.userAnswer]));
 
 		const lastEntry = entries.value[entries.value.length - 1];
 		if (lastEntry.submitted) {
@@ -299,6 +430,7 @@ onMounted(() => {
 			if (idx < entries.value.length) {
 				const entry = entries.value[idx];
 				currentAnswer.value = entry.userAnswer || entry.prefilledAnswer;
+				markQuestionStartNow();
 			}
 		}
 	} catch {
@@ -325,7 +457,7 @@ onMounted(() => {
 
 				<div v-for="entry in answeredEntries" :key="entry.questionId" class="answered-question">
 					<p class="question">{{ questionsById.get(entry.questionId)?.text }}</p>
-					<ExploreTextarea v-model="entry.userAnswer" variant="answered" :rows="3" @update:model-value="debouncedPersist" @blur="persistEntries()" />
+					<ExploreTextarea v-model="entry.userAnswer" variant="answered" :rows="3" @update:model-value="onAnsweredEntryInput(entry)" @blur="onAnsweredEntryBlur(entry)" />
 				</div>
 
 				<div v-if="inferring" class="inferring-indicator">

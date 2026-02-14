@@ -2,6 +2,7 @@
 import { onMounted, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
 
+import { capture } from "./analytics.ts";
 import { loadChosenCardIds, loadExploreData, loadFreeformNotes, loadSummaryCache } from "./store.ts";
 import { EXPLORE_QUESTIONS } from "../shared/explore-questions.ts";
 import type { MeaningCard } from "../shared/meaning-cards.ts";
@@ -28,6 +29,7 @@ const cardsById = new Map(MEANING_CARDS.map((c) => [c.id, c]));
 const reports = ref<CardReport[]>([]);
 
 function downloadPdf(): void {
+	capture("pdf_download_initiated", { session_id: sessionId });
 	window.print();
 }
 
@@ -65,6 +67,7 @@ onMounted(() => {
 
 			reports.value.push({ card, questions, freeformNote: freeformNotes[cardId] ?? "" });
 		}
+		capture("report_viewed", { session_id: sessionId });
 	} catch {
 		void router.replace({ name: "findMeaning", params: { sessionId } });
 	}

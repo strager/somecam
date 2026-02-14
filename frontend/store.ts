@@ -11,6 +11,32 @@ const SESSION_DATA_SUFFIXES = ["progress", "narrowdown", "chosen", "explore", "s
 
 const DEFAULT_QUESTION_ID = EXPLORE_QUESTIONS[0]?.id ?? "";
 
+export interface ImportProgressStats {
+	sessions: number;
+	finalSessionsAdded: number;
+	sessionsOverridden: number;
+}
+
+function captureAnalyticsEvent(event: string, properties?: Record<string, unknown>): void {
+	void import("./analytics.ts")
+		.then(({ capture }) => {
+			capture(event, properties);
+		})
+		.catch(() => {
+			// no-op: analytics should never break app behavior
+		});
+}
+
+function importErrorType(error: unknown): string {
+	if (error instanceof SyntaxError) {
+		return "invalid_json";
+	}
+	if (error instanceof Error) {
+		return error.name || "import_error";
+	}
+	return "import_error";
+}
+
 export interface SessionMeta {
 	id: string;
 	name: string;
@@ -606,7 +632,7 @@ export function exportProgressData(): string {
 	return JSON.stringify({ version: EXPORT_VERSION_V2, sessions: exported });
 }
 
-export function importProgressData(json: string): void {
+export function importProgressData(json: string): ImportProgressStats {
 	const parsed: unknown = JSON.parse(json);
 	if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
 		throw new Error("Invalid progress data: expected an object");
@@ -614,8 +640,7 @@ export function importProgressData(json: string): void {
 	const obj = parsed as Record<string, unknown>;
 
 	if (obj.version === EXPORT_VERSION_V1) {
-		importV1Data(obj);
-		return;
+		return importV1Data(obj);
 	}
 
 	if (obj.version !== EXPORT_VERSION_V2) {
@@ -628,6 +653,11 @@ export function importProgressData(json: string): void {
 
 	ensureSessionsInitialized();
 	const existingSessions = loadSessionsMeta();
+	const stats: ImportProgressStats = {
+		sessions: obj.sessions.length,
+		finalSessionsAdded: 0,
+		sessionsOverridden: 0,
+	};
 
 	for (const entry of obj.sessions) {
 		if (!isObjectRecord(entry) || typeof entry.id !== "string" || typeof entry.name !== "string" || typeof entry.createdAt !== "string") {
@@ -655,15 +685,18 @@ export function importProgressData(json: string): void {
 		};
 		if (existingIndex !== -1) {
 			existingSessions[existingIndex] = meta;
+			stats.sessionsOverridden++;
 		} else {
 			existingSessions.push(meta);
+			stats.finalSessionsAdded++;
 		}
 	}
 
 	saveSessionsMeta(existingSessions);
+	return stats;
 }
 
-function importV1Data(obj: Record<string, unknown>): void {
+function importV1Data(obj: Record<string, unknown>): ImportProgressStats {
 	ensureSessionsInitialized();
 	const id = generateUUID();
 
@@ -690,10 +723,17 @@ function importV1Data(obj: Record<string, unknown>): void {
 	sessions.push(meta);
 	saveSessionsMeta(sessions);
 	localStorage.setItem(ACTIVE_SESSION_KEY, id);
+	return {
+		sessions: 1,
+		finalSessionsAdded: 1,
+		sessionsOverridden: 0,
+	};
 }
 
 export function saveProgressFile(): void {
+	const sessions = loadSessionsMeta().length;
 	const json = exportProgressData();
+	captureAnalyticsEvent("sessions_exported", { sessions });
 	const blob = new Blob([json], { type: "application/json" });
 	const url = URL.createObjectURL(blob);
 	const a = document.createElement("a");
@@ -703,10 +743,23 @@ export function saveProgressFile(): void {
 	URL.revokeObjectURL(url);
 }
 
-export function requestStoragePersistence(): void {
+export function requestStoragePersistence(sessionId: string): void {
 	if (!sessionStorage.getItem(PERSIST_REQUESTED_KEY)) {
 		sessionStorage.setItem(PERSIST_REQUESTED_KEY, "1");
-		void navigator.storage.persist();
+		void navigator.storage.persist().then(
+			(granted) => {
+				captureAnalyticsEvent("storage_persistence_result", {
+					session_id: sessionId,
+					granted,
+				});
+			},
+			() => {
+				captureAnalyticsEvent("storage_persistence_result", {
+					session_id: sessionId,
+					granted: false,
+				});
+			},
+		);
 	}
 }
 
@@ -718,13 +771,30 @@ export function loadProgressFile(): Promise<void> {
 		input.addEventListener("change", () => {
 			const file = input.files?.[0];
 			if (!file) {
-				reject(new Error("No file selected"));
+				captureAnalyticsEvent("sessions_import_cancelled");
+				resolve();
 				return;
 			}
-			file.text().then((text) => {
-				importProgressData(text);
-				resolve();
-			}, reject);
+			file.text().then(
+				(text) => {
+					try {
+						const stats = importProgressData(text);
+						captureAnalyticsEvent("sessions_imported", {
+							sessions: stats.sessions,
+							final_sessions_added: stats.finalSessionsAdded,
+							sessions_overridden: stats.sessionsOverridden,
+						});
+						resolve();
+					} catch (error) {
+						captureAnalyticsEvent("sessions_import_failed", { error_type: importErrorType(error) });
+						reject(error instanceof Error ? error : new Error(String(error)));
+					}
+				},
+				(error: unknown) => {
+					captureAnalyticsEvent("sessions_import_failed", { error_type: "file_read_error" });
+					reject(error instanceof Error ? error : new Error(String(error)));
+				},
+			);
 		});
 		input.click();
 	});
