@@ -23,7 +23,6 @@ const cardId = route.params.meaningId as string;
 
 const card = ref<MeaningCard | undefined>(undefined);
 const entries = ref<ExploreEntryFull[]>([]);
-const currentAnswer = ref("");
 const inferring = ref(false);
 const depthCheckFollowUp = ref("");
 const depthCheckShown = ref(false);
@@ -39,6 +38,28 @@ const EXPLORE_PHASE_TRACK_KEY_PREFIX = "somecam-explore-phase-complete";
 const activeIndex = computed(() => {
 	const idx = entries.value.findIndex((e) => !e.submitted);
 	return idx === -1 ? entries.value.length : idx;
+});
+
+const editingEntryIndex = computed(() => {
+	if (depthCheckShown.value) {
+		const lastIdx = entries.value.length - 1;
+		return lastIdx >= 0 && entries.value[lastIdx].submitted ? lastIdx : -1;
+	}
+	const idx = activeIndex.value;
+	return idx < entries.value.length ? idx : -1;
+});
+
+const currentAnswer = computed({
+	get: () => {
+		const idx = editingEntryIndex.value;
+		return idx >= 0 ? entries.value[idx].userAnswer : "";
+	},
+	set: (val: string) => {
+		const idx = editingEntryIndex.value;
+		if (idx >= 0) {
+			entries.value[idx].userAnswer = val;
+		}
+	},
 });
 
 const activeQuestion = computed<ExploreQuestion | undefined>(() => {
@@ -181,22 +202,24 @@ function remainingQuestionIds(): string[] {
 	return EXPLORE_QUESTIONS.filter((q) => !answered.has(q.id) && !inEntries.has(q.id)).map((q) => q.id);
 }
 
+function acceptGuardrail(): void {
+	const lastIdx = entries.value.length - 1;
+	if (lastIdx < 0 || !entries.value[lastIdx].submitted) return;
+	const entry = entries.value[lastIdx];
+	entry.userAnswer = entry.userAnswer.trim();
+	entry.submittedAfterGuardrail = true;
+	trackSubmittedSnapshot(entry.questionId, entry.userAnswer);
+	capture("answer_submitted_after_guardrail", {
+		session_id: sessionId,
+		card_id: cardId,
+		question_id: entry.questionId,
+	});
+}
+
 async function submitAnswer(): Promise<void> {
 	if (depthCheckShown.value) {
-		// User pressing Next to skip the guardrail
-		const idx = entries.value.length - 1;
-		if (idx >= 0 && entries.value[idx].submitted) {
-			const questionId = entries.value[idx].questionId;
-			entries.value[idx].userAnswer = currentAnswer.value.trim();
-			entries.value[idx].submittedAfterGuardrail = true;
-			persistEntries();
-			trackSubmittedSnapshot(questionId, entries.value[idx].userAnswer);
-			capture("answer_submitted_after_guardrail", {
-				session_id: sessionId,
-				card_id: cardId,
-				question_id: questionId,
-			});
-		}
+		acceptGuardrail();
+		persistEntries();
 		depthCheckShown.value = false;
 		depthCheckFollowUp.value = "";
 		applyInferAndAdvance(pendingInferResult.value ?? new Map<string, string>(), remainingQuestionIds());
@@ -320,14 +343,13 @@ function applyInferAndAdvance(inferredMap: Map<string, string>, remaining: strin
 
 	entries.value.push({
 		questionId: nextQuestionId,
-		userAnswer: "",
+		userAnswer: nextPrefill,
 		prefilledAnswer: nextPrefill,
 		submitted: false,
 		guardrailText: "",
 		submittedAfterGuardrail: false,
 	});
 	persistEntries();
-	currentAnswer.value = nextPrefill;
 	markQuestionStartNow();
 }
 
@@ -354,11 +376,10 @@ async function inferAndAdvance(): Promise<void> {
 }
 
 function finishExploring(): void {
-	const idx = activeIndex.value;
-	if (idx < entries.value.length && currentAnswer.value.trim() !== "") {
-		entries.value[idx].userAnswer = currentAnswer.value.trim();
-		persistEntries();
+	if (depthCheckShown.value) {
+		acceptGuardrail();
 	}
+	persistEntries();
 	persistFreeform();
 	const noteLength = freeformNote.value.trim().length;
 	if (noteLength > 0) {
@@ -417,7 +438,6 @@ onMounted(() => {
 				// Refreshed during guardrail — restore it
 				depthCheckFollowUp.value = lastEntry.guardrailText;
 				depthCheckShown.value = true;
-				currentAnswer.value = lastEntry.userAnswer;
 				return;
 			}
 			if (entries.value.length < EXPLORE_QUESTIONS.length) {
@@ -425,11 +445,12 @@ onMounted(() => {
 				void inferAndAdvance();
 			}
 		} else {
-			// Initialize currentAnswer from the active entry's prefill (or existing user answer)
 			const idx = activeIndex.value;
 			if (idx < entries.value.length) {
 				const entry = entries.value[idx];
-				currentAnswer.value = entry.userAnswer || entry.prefilledAnswer;
+				if (!entry.userAnswer && entry.prefilledAnswer) {
+					entry.userAnswer = entry.prefilledAnswer;
+				}
 				markQuestionStartNow();
 			}
 		}
