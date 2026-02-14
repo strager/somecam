@@ -6,7 +6,7 @@ import { fetchSummary } from "./api.ts";
 import { capture } from "./analytics.ts";
 import { assignQuestions } from "./explore-data.ts";
 import type { ExploreEntry, SummaryCache } from "./store.ts";
-import { loadChosenCardIds, loadExploreData, loadSummaryCache, saveExploreData, saveSummaryCache } from "./store.ts";
+import { loadChosenCardIds, loadExploreData, loadFreeformNotes, loadSummaryCache, saveExploreData, saveSummaryCache } from "./store.ts";
 import { EXPLORE_QUESTIONS } from "../shared/explore-questions.ts";
 import type { MeaningCard } from "../shared/meaning-cards.ts";
 import { MEANING_CARDS } from "../shared/meaning-cards.ts";
@@ -91,7 +91,15 @@ interface SummaryEntry {
 
 const cardSummaryEntries = ref<Partial<Record<string, SummaryEntry[]>>>({});
 
-async function loadSummary(cardId: string, questionId: string, answer: string, cache: SummaryCache): Promise<void> {
+interface FreeformSummary {
+	summary: string;
+	loading: boolean;
+	error: string;
+}
+
+const cardFreeformSummary = ref<Partial<Record<string, FreeformSummary>>>({});
+
+async function loadSummary(cardId: string, questionId: string, answer: string, cache: SummaryCache, requestQuestionId?: string): Promise<void> {
 	const cacheKey = `${cardId}:${questionId}`;
 	const entry = cardSummaryEntries.value[cardId]?.find((e) => e.questionId === questionId);
 	if (entry === undefined) return;
@@ -105,11 +113,32 @@ async function loadSummary(cardId: string, questionId: string, answer: string, c
 	try {
 		const result = await fetchSummary({
 			cardId,
-			questionId,
+			...(requestQuestionId !== undefined ? { questionId: requestQuestionId } : {}),
 			answer,
 		});
 		entry.summary = result.summary;
 		cache[cacheKey] = { answer, summary: result.summary };
+		saveSummaryCache(sessionId, cache);
+	} catch (error) {
+		entry.error = error instanceof Error ? error.message : "Failed to load summary.";
+	} finally {
+		entry.loading = false;
+	}
+}
+
+async function loadFreeformSummary(cardId: string, noteText: string, cache: SummaryCache, entry: FreeformSummary): Promise<void> {
+	const cacheKey = `${cardId}:freeform`;
+
+	if (cacheKey in cache && cache[cacheKey].answer === noteText) {
+		entry.summary = cache[cacheKey].summary;
+		return;
+	}
+
+	entry.loading = true;
+	try {
+		const result = await fetchSummary({ cardId, answer: noteText });
+		entry.summary = result.summary;
+		cache[cacheKey] = { answer: noteText, summary: result.summary };
 		saveSummaryCache(sessionId, cache);
 	} catch (error) {
 		entry.error = error instanceof Error ? error.message : "Failed to load summary.";
@@ -181,8 +210,19 @@ onMounted(() => {
 			cardSummaryEntries.value[cardId] = summaryRows;
 
 			for (const v of validEntries) {
-				promises.push(loadSummary(cardId, v.entry.questionId, v.entry.userAnswer, cache));
+				promises.push(loadSummary(cardId, v.entry.questionId, v.entry.userAnswer, cache, v.entry.questionId));
 			}
+		}
+
+		const freeformNotes = loadFreeformNotes(sessionId);
+		for (const cardId of Object.keys(exploreData)) {
+			const noteText = freeformNotes[cardId] as string | undefined;
+			if (noteText === undefined || noteText === "") continue;
+
+			const freeformEntry: FreeformSummary = { summary: "", loading: false, error: "" };
+			cardFreeformSummary.value[cardId] = freeformEntry;
+
+			promises.push(loadFreeformSummary(cardId, noteText, cache, freeformEntry));
 		}
 
 		if (promises.length > 0) {
@@ -222,18 +262,22 @@ onMounted(() => {
 				</h3>
 				<span v-if="cardStatus(card.id) === 'complete'" class="status-badge complete">Complete</span>
 				<span v-else-if="cardStatus(card.id) === 'partial'" class="status-badge partial">In progress</span>
-				<div v-if="cardSummaryEntries[card.id]?.some((e) => e.loading)" class="summary-loading">Generating summary...</div>
-				<ul v-else-if="cardSummaryEntries[card.id]" class="summary-block">
-					<li v-for="entry in cardSummaryEntries[card.id]" :key="entry.questionId" :class="['summary-item', { unanswered: entry.unanswered }]">
-						<span v-if="entry.unanswered" class="summary-unanswered"
-							><strong>{{ entry.topic }}:</strong> <em>Not yet answered.</em></span
-						>
-						<span v-else-if="entry.error" class="summary-error">Could not load summary.</span>
-						<span v-else-if="entry.summary"
-							><strong>{{ entry.topic }}:</strong> {{ entry.summary }}</span
-						>
-					</li>
-				</ul>
+				<div v-if="cardSummaryEntries[card.id]?.some((e) => e.loading) || cardFreeformSummary[card.id]?.loading" class="summary-loading">Generating summary...</div>
+				<template v-else-if="cardSummaryEntries[card.id]">
+					<p v-if="cardFreeformSummary[card.id]?.summary" class="freeform-summary">{{ cardFreeformSummary[card.id]!.summary }}</p>
+					<p v-else-if="cardFreeformSummary[card.id]?.error" class="summary-error">Could not load notes summary.</p>
+					<ul class="summary-block">
+						<li v-for="entry in cardSummaryEntries[card.id]" :key="entry.questionId" :class="['summary-item', { unanswered: entry.unanswered }]">
+							<span v-if="entry.unanswered" class="summary-unanswered"
+								><strong>{{ entry.topic }}:</strong> <em>Not yet answered.</em></span
+							>
+							<span v-else-if="entry.error" class="summary-error">Could not load summary.</span>
+							<span v-else-if="entry.summary"
+								><strong>{{ entry.topic }}:</strong> {{ entry.summary }}</span
+							>
+						</li>
+					</ul>
+				</template>
 				<button :class="['explore-btn', { prominent: cardStatus(card.id) !== 'complete' }]" @click="onExploreCard(card.id)">{{ exploreButtonLabel(card.id) }}</button>
 			</div>
 		</div>
@@ -378,6 +422,13 @@ h1 {
 
 .explore-btn.prominent:hover {
 	background: #225d40;
+}
+
+.freeform-summary {
+	margin: 0.75rem 0 0;
+	font-size: 0.95rem;
+	color: #333;
+	line-height: 1.5;
 }
 
 .summary-loading {

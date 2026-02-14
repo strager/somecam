@@ -119,6 +119,34 @@ describe("API", () => {
 		);
 	});
 
+	it("returns 500 for POST /api/summarize without questionId when config is not set", async () => {
+		const response = await fetch(`${baseUrl}/api/summarize`, {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({
+				cardId: "self-knowledge",
+				answer: "These are my personal reflections on self-knowledge.",
+			}),
+		});
+		expect(response.status).toBe(500);
+		expect(response.headers.get("content-type")).toContain("application/problem+json");
+
+		const body = (await response.json()) as {
+			type?: unknown;
+			title?: unknown;
+			status?: unknown;
+			detail?: unknown;
+		};
+		expect(body).toEqual(
+			expect.objectContaining({
+				type: "about:blank",
+				title: "Internal Server Error",
+				status: 500,
+				detail: "AI summarization is not configured.",
+			}),
+		);
+	});
+
 	it("returns 400 for POST /api/infer-answers with missing fields", async () => {
 		const response = await fetch(`${baseUrl}/api/infer-answers`, {
 			method: "POST",

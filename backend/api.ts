@@ -182,12 +182,11 @@ api.register({
 
 		const { cardId, questionId, answer } = context.request.requestBody as {
 			cardId: string;
-			questionId: string;
+			questionId?: string;
 			answer: string;
 		};
 
 		const cardsById = new Map(MEANING_CARDS.map((c) => [c.id, c]));
-		const questionsById = new Map(EXPLORE_QUESTIONS.map((q) => [q.id, q]));
 
 		const card = cardsById.get(cardId);
 		if (card === undefined) {
@@ -198,13 +197,20 @@ api.register({
 			};
 		}
 
-		const question = questionsById.get(questionId);
-		if (question === undefined) {
-			return {
-				statusCode: 400,
-				headers: problemJsonHeader,
-				body: createProblemDetails(400, "Bad Request", `Unknown question ID: ${questionId}`),
-			};
+		let systemContent: string;
+		if (questionId !== undefined && questionId !== "") {
+			const questionsById = new Map(EXPLORE_QUESTIONS.map((q) => [q.id, q]));
+			const question = questionsById.get(questionId);
+			if (question === undefined) {
+				return {
+					statusCode: 400,
+					headers: problemJsonHeader,
+					body: createProblemDetails(400, "Bad Request", `Unknown question ID: ${questionId}`),
+				};
+			}
+			systemContent = `You are a reflective coach helping someone explore their sources of meaning. Summarize their answer.\n\n- 4 to 10 words\n- Do not ask questions\n- Match the vocabulary of the user's answer\n- Do not use the word '${question.topic}' in any form\n\nTopic: ${card.source} — ${card.description}\n\nQuestion given to user: ${question.text}`;
+		} else {
+			systemContent = `You are a reflective coach helping someone explore their sources of meaning. Summarize their personal notes.\n\n- 4 to 10 words\n- Do not ask questions\n- Match the vocabulary of the user's notes\n\nTopic: ${card.source} — ${card.description}\n\nThese are the user's personal notes about this source of meaning.`;
 		}
 
 		try {
@@ -214,7 +220,7 @@ api.register({
 				messages: [
 					{
 						role: "system",
-						content: `You are a reflective coach helping someone explore their sources of meaning. Summarize their answer.\n\n- 4 to 10 words\n- Do not ask questions\n- Match the vocabulary of the user's answer\n- Do not use the word '${question.topic}' in any form\n\nTopic: ${card.source} — ${card.description}\n\nQuestion given to user: ${question.text}`,
+						content: systemContent,
 					},
 					{
 						role: "user",

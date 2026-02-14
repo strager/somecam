@@ -203,7 +203,6 @@ components:
       additionalProperties: false
       required:
         - cardId
-        - questionId
         - answer
       properties:
         cardId:

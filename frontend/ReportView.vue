@@ -19,6 +19,7 @@ interface CardReport {
 	card: MeaningCard;
 	questions: QuestionReport[];
 	freeformNote: string;
+	freeformSummary: string;
 }
 
 const route = useRoute();
@@ -65,7 +66,10 @@ onMounted(() => {
 				});
 			}
 
-			reports.value.push({ card, questions, freeformNote: freeformNotes[cardId] ?? "" });
+			const freeformCacheKey = `${cardId}:freeform`;
+			const freeformSummary = freeformCacheKey in summaryCache ? summaryCache[freeformCacheKey].summary : "";
+
+			reports.value.push({ card, questions, freeformNote: freeformNotes[cardId] ?? "", freeformSummary });
 		}
 		capture("report_viewed", { session_id: sessionId });
 	} catch {
@@ -88,12 +92,13 @@ onMounted(() => {
 			<h2>What is meaningful to me?</h2>
 			<div v-for="report in reports" :key="report.card.id" class="report-card">
 				<h3>{{ report.card.description }}</h3>
+				<p v-if="report.freeformSummary" class="freeform-summary">{{ report.freeformSummary }}</p>
 				<ul class="summary-list">
 					<template v-for="q in report.questions" :key="q.topic">
 						<li v-if="q.summary">{{ q.summary }}</li>
 					</template>
 				</ul>
-				<p v-if="report.questions.every((q) => !q.summary)" class="qa-unanswered">No self reflections</p>
+				<p v-if="!report.freeformSummary && report.questions.every((q) => !q.summary)" class="qa-unanswered">No self reflections</p>
 			</div>
 		</section>
 
@@ -229,6 +234,13 @@ h2 + .report-card {
 
 .summary-list li.qa-unanswered {
 	color: #888;
+}
+
+.freeform-summary {
+	margin: 0.5rem 0 0;
+	font-size: 0.95rem;
+	color: #333;
+	line-height: 1.5;
 }
 
 .qa-block {

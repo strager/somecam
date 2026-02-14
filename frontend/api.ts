@@ -2,7 +2,7 @@ import { capture } from "./analytics.ts";
 
 interface SummarizeRequest {
 	cardId: string;
-	questionId: string;
+	questionId?: string;
 	answer: string;
 }
 
