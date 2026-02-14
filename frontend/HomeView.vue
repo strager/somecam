@@ -142,6 +142,9 @@ function onLoadFile(): void {
 						</div>
 					</div>
 				</div>
+				<div class="cta">
+					<button type="button" class="new-session-btn" @click="onNewSession">Start New Session</button>
+				</div>
 			</template>
 		</section>
 
@@ -319,7 +322,7 @@ section p {
 	margin: 2.5rem 0;
 }
 
-.cta button {
+.cta button:not(.new-session-btn) {
 	font-size: 1.1rem;
 	padding: 0.75rem 2rem;
 	border: none;
@@ -331,7 +334,7 @@ section p {
 	transition: background 0.15s ease;
 }
 
-.cta button:hover {
+.cta button:not(.new-session-btn):hover {
 	background: #1f5a3e;
 }
 
