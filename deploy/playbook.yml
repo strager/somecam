@@ -77,7 +77,7 @@
 
     - name: Deploy .env
       ansible.builtin.copy:
-        src: "{{ playbook_dir }}/../.env"
+        src: "{{ lookup('first_found', [playbook_dir + '/../.env.prod', playbook_dir + '/../.env']) }}"
         dest: /home/somecam/app/.env
         mode: "0600"
       become: true
