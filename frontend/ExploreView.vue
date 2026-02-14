@@ -17,16 +17,35 @@ const cardsById = new Map(MEANING_CARDS.map((c) => [c.id, c]));
 const questionsById = new Map(EXPLORE_QUESTIONS.map((q) => [q.id, q]));
 const chosenCards = ref<MeaningCard[]>([]);
 const answeredCards = ref<Set<string>>(new Set());
+const cardAnswerCounts = ref<Record<string, number>>({});
+
+const totalQuestions = computed(() => chosenCards.value.length * EXPLORE_QUESTIONS.length);
+const totalAnswered = computed(() => Object.values(cardAnswerCounts.value).reduce((sum, n) => sum + n, 0));
+const overallPercent = computed(() => (totalQuestions.value === 0 ? 0 : Math.round((totalAnswered.value / totalQuestions.value) * 100)));
 
 const instructionText = computed(() => {
-	if (answeredCards.value.size === 0) {
+	if (totalAnswered.value === 0) {
 		return "Tap a card below to begin exploring what it means to you.";
 	}
-	if (answeredCards.value.size >= chosenCards.value.length) {
+	if (totalAnswered.value >= totalQuestions.value) {
 		return "You've explored all your cards! Review your reflections or download your report.";
 	}
-	return `You've explored ${String(answeredCards.value.size)} of ${String(chosenCards.value.length)} cards. Tap another to continue, or download your report.`;
+	return `You've answered ${String(totalAnswered.value)} of ${String(totalQuestions.value)} questions across your cards. Tap a card to continue.`;
 });
+
+function cardStatus(cardId: string): string {
+	const count = cardAnswerCounts.value[cardId] ?? 0;
+	if (count === 0) return "untouched";
+	if (count >= EXPLORE_QUESTIONS.length) return "complete";
+	return "partial";
+}
+
+function exploreButtonLabel(cardId: string): string {
+	const status = cardStatus(cardId);
+	if (status === "complete") return "Review";
+	if (status === "partial") return "Continue";
+	return "Explore";
+}
 
 interface SummaryEntry {
 	questionId: string;
@@ -85,6 +104,7 @@ onMounted(() => {
 
 		for (const [cardId, entries] of Object.entries(exploreData)) {
 			const answered = entries.filter((e) => e.userAnswer !== "");
+			cardAnswerCounts.value[cardId] = answered.length;
 			if (answered.length === 0) continue;
 
 			answeredCards.value.add(cardId);
@@ -127,13 +147,21 @@ onMounted(() => {
 			</div>
 		</header>
 
+		<div v-if="chosenCards.length > 0" class="overall-progress">
+			<div class="progress-bar">
+				<div class="progress-fill" :style="{ width: `${String(overallPercent)}%` }" />
+			</div>
+			<span class="progress-label">{{ totalAnswered }} of {{ totalQuestions }} questions answered</span>
+		</div>
+
 		<button class="edit-cards-btn" @click="router.push({ name: 'findMeaningManual', params: { sessionId } })">Edit selection</button>
 
 		<div class="card-list">
-			<div v-for="card in chosenCards" :key="card.id" class="card-surface chosen-card">
+			<div v-for="card in chosenCards" :key="card.id" :class="['card-surface', 'chosen-card', 'status-' + cardStatus(card.id)]">
 				<h3>{{ card.source }}</h3>
+				<span v-if="cardStatus(card.id) === 'complete'" class="status-badge complete">Complete</span>
+				<span v-else-if="cardStatus(card.id) === 'partial'" class="status-badge partial">In progress</span>
 				<p>{{ card.description }}</p>
-				<button :class="['explore-btn', { answered: answeredCards.has(card.id) }]" @click="router.push({ name: 'exploreMeaning', params: { sessionId, meaningId: card.id } })">Explore</button>
 				<div v-if="cardSummaryEntries[card.id]?.some((e) => e.loading)" class="summary-loading">Generating summary...</div>
 				<div v-else-if="cardSummaryEntries[card.id]" class="summary-block">
 					<div v-for="entry in cardSummaryEntries[card.id]" :key="entry.questionId" class="summary-item">
@@ -143,6 +171,8 @@ onMounted(() => {
 						</p>
 					</div>
 				</div>
+				<p v-if="cardStatus(card.id) !== 'complete'" class="card-progress">{{ cardAnswerCounts[card.id] ?? 0 }} of {{ EXPLORE_QUESTIONS.length }} questions answered</p>
+				<button :class="['explore-btn', { prominent: cardStatus(card.id) !== 'complete' }]" @click="router.push({ name: 'exploreMeaning', params: { sessionId, meaningId: card.id } })">{{ exploreButtonLabel(card.id) }}</button>
 			</div>
 		</div>
 
@@ -170,6 +200,35 @@ h1 {
 	letter-spacing: 0.02em;
 }
 
+.overall-progress {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 0.4rem;
+	margin-bottom: 1.5rem;
+}
+
+.progress-bar {
+	width: 100%;
+	max-width: 16rem;
+	height: 6px;
+	background: #e5e7eb;
+	border-radius: 3px;
+	overflow: hidden;
+}
+
+.progress-fill {
+	height: 100%;
+	background: #2a6e4e;
+	border-radius: 3px;
+	transition: width 0.3s ease;
+}
+
+.progress-label {
+	font-size: 0.85rem;
+	color: #666;
+}
+
 .card-list {
 	display: flex;
 	flex-direction: column;
@@ -178,7 +237,51 @@ h1 {
 }
 
 .chosen-card {
+	position: relative;
 	text-align: left;
+}
+
+.chosen-card.status-untouched {
+	border-left: 4px solid #ccc;
+}
+
+.chosen-card.status-partial {
+	border-left: 4px solid #b8860b;
+}
+
+.chosen-card.status-complete {
+	border-left: 4px solid #2a6e4e;
+}
+
+.status-badge {
+	position: absolute;
+	top: 0.75rem;
+	right: 0.75rem;
+	padding: 0.15rem 0.5rem;
+	font-size: 0.75rem;
+	font-weight: 600;
+	border-radius: 999px;
+}
+
+.status-badge.complete {
+	color: #2a6e4e;
+	background: #d4edda;
+}
+
+.status-badge.partial {
+	color: #856404;
+	background: #fff3cd;
+}
+
+.card-progress {
+	font-size: 0.85rem;
+	color: #888;
+	margin: 0.5rem 0 0;
+}
+
+.card-progress.complete {
+	color: #2a6e4e;
+	font-weight: 600;
 }
 
 .chosen-card h3 {
@@ -199,25 +302,30 @@ h1 {
 	padding: 0.5rem 1.25rem;
 	font-size: 0.95rem;
 	font-weight: 600;
-	color: #fff;
-	background: #2a6e4e;
-	border: none;
+	background: transparent;
+	color: #2a6e4e;
+	border: 1.5px solid #2a6e4e;
 	border-radius: 6px;
 	cursor: pointer;
 }
 
 .explore-btn:hover {
-	background: #225d40;
-}
-
-.explore-btn.answered {
-	background: transparent;
-	color: #2a6e4e;
-	border: 1.5px solid #2a6e4e;
-}
-
-.explore-btn.answered:hover {
 	background: #eaf5ef;
+}
+
+.explore-btn.prominent {
+	display: block;
+	margin-left: auto;
+	margin-right: auto;
+	padding: 0.75rem 2rem;
+	font-size: 1rem;
+	color: #fff;
+	background: #2a6e4e;
+	border: none;
+}
+
+.explore-btn.prominent:hover {
+	background: #225d40;
 }
 
 .summary-loading {
