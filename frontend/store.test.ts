@@ -3,7 +3,7 @@
 import { JSDOM } from "jsdom";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { clearAllProgress, loadChosenCardIds, loadExploreData, loadExploreDataFull, loadFreeformNotes, loadLlmTestState, loadNarrowDown, loadSummaryCache, loadSwipeProgress, removeNarrowDown, saveChosenCardIds, saveExploreData, saveFreeformNotes, saveLlmTestState, saveNarrowDown, saveSummaryCache, saveSwipeProgress } from "./store.ts";
+import { clearAllProgress, exportProgressData, hasProgressData, importProgressData, loadChosenCardIds, loadExploreData, loadExploreDataFull, loadFreeformNotes, loadLlmTestState, loadNarrowDown, loadSummaryCache, loadSwipeProgress, removeNarrowDown, saveChosenCardIds, saveExploreData, saveFreeformNotes, saveLlmTestState, saveNarrowDown, saveSummaryCache, saveSwipeProgress } from "./store.ts";
 import { EXPLORE_QUESTIONS } from "../shared/explore-questions.ts";
 
 const STORAGE_PREFIX = "somecam";
@@ -592,5 +592,199 @@ describe("clearAllProgress", () => {
 		expect(loadSummaryCache()).toEqual({});
 		expect(loadFreeformNotes()).toEqual({});
 		expect(loadLlmTestState()).toEqual(llmTestState);
+	});
+});
+
+describe("exportProgressData/importProgressData", () => {
+	it("exportProgressData includes only version when localStorage is empty", () => {
+		const result: unknown = JSON.parse(exportProgressData());
+		expect(result).toEqual({ version: "somecam-v1" });
+	});
+
+	it("exportProgressData returns parsed (not double-encoded) values", () => {
+		saveChosenCardIds(["self-knowledge", "community"]);
+		const result = JSON.parse(exportProgressData()) as Record<string, unknown>;
+		expect(result["somecam-chosen"]).toEqual(["self-knowledge", "community"]);
+		expect(typeof result["somecam-chosen"]).not.toBe("string");
+	});
+
+	it("importProgressData round-trips: export → clear → import → values restored", () => {
+		saveChosenCardIds(["self-knowledge", "community"]);
+		saveFreeformNotes({ "self-knowledge": "notes" });
+
+		const exported = exportProgressData();
+
+		localStorage.removeItem(CHOSEN_STORAGE_KEY);
+		localStorage.removeItem(FREEFORM_STORAGE_KEY);
+
+		importProgressData(exported);
+
+		expect(loadChosenCardIds()).toEqual(["self-knowledge", "community"]);
+		expect(loadFreeformNotes()).toEqual({ "self-knowledge": "notes" });
+	});
+
+	it("importProgressData clears keys not present in the imported data", () => {
+		saveChosenCardIds(["self-knowledge"]);
+		saveFreeformNotes({ "self-knowledge": "notes" });
+
+		const dataWithOnlyChosen = JSON.stringify({
+			version: "somecam-v1",
+			"somecam-chosen": ["community"],
+		});
+
+		importProgressData(dataWithOnlyChosen);
+
+		expect(loadChosenCardIds()).toEqual(["community"]);
+		expect(loadFreeformNotes()).toEqual({});
+	});
+
+	it("importProgressData throws on invalid JSON", () => {
+		expect(() => {
+			importProgressData("{");
+		}).toThrow();
+	});
+
+	it("importProgressData restores all data types from a complete input", () => {
+		const input = JSON.stringify({
+			version: "somecam-v1",
+			"somecam-progress": {
+				shuffledCardIds: ["self-knowledge", "community", "challenge"],
+				swipeHistory: [
+					{ cardId: "self-knowledge", direction: "agree" },
+					{ cardId: "community", direction: "disagree" },
+				],
+			},
+			"somecam-narrowdown": {
+				cardIds: ["self-knowledge", "challenge"],
+				swipeHistory: [{ cardId: "challenge", direction: "unsure" }],
+			},
+			"somecam-chosen": ["self-knowledge", "challenge"],
+			"somecam-explore": {
+				"self-knowledge": [
+					{
+						questionId: "interpretation",
+						userAnswer: "It means knowing yourself",
+						prefilledAnswer: "",
+						submitted: true,
+						guardrailText: "Can you elaborate?",
+						submittedAfterGuardrail: true,
+					},
+					{
+						questionId: "importance",
+						userAnswer: "Very important to me",
+						prefilledAnswer: "AI suggestion",
+						submitted: true,
+					},
+				],
+				challenge: [
+					{
+						questionId: "interpretation",
+						userAnswer: "",
+						prefilledAnswer: "",
+						submitted: false,
+					},
+				],
+			},
+			"somecam-summaries": {
+				"self-knowledge:interpretation": {
+					answer: "It means knowing yourself",
+					summary: "Self-awareness and introspection",
+				},
+			},
+			"somecam-freeform": {
+				"self-knowledge": "Extra thoughts about self-knowledge",
+			},
+			"somecam-llm-test": {
+				cardId: "self-knowledge",
+				rows: [
+					{ questionId: "interpretation", answer: "test answer" },
+					{ questionId: "importance", answer: "test answer 2" },
+				],
+			},
+		});
+
+		importProgressData(input);
+
+		expect(loadSwipeProgress()).toEqual({
+			shuffledCardIds: ["self-knowledge", "community", "challenge"],
+			swipeHistory: [
+				{ cardId: "self-knowledge", direction: "agree" },
+				{ cardId: "community", direction: "disagree" },
+			],
+		});
+		expect(loadNarrowDown()).toEqual({
+			cardIds: ["self-knowledge", "challenge"],
+			swipeHistory: [{ cardId: "challenge", direction: "unsure" }],
+		});
+		expect(loadChosenCardIds()).toEqual(["self-knowledge", "challenge"]);
+		expect(loadExploreDataFull()).toEqual({
+			"self-knowledge": [
+				{
+					questionId: "interpretation",
+					userAnswer: "It means knowing yourself",
+					prefilledAnswer: "",
+					submitted: true,
+					guardrailText: "Can you elaborate?",
+					submittedAfterGuardrail: true,
+				},
+				{
+					questionId: "importance",
+					userAnswer: "Very important to me",
+					prefilledAnswer: "AI suggestion",
+					submitted: true,
+					guardrailText: "",
+					submittedAfterGuardrail: false,
+				},
+			],
+			challenge: [
+				{
+					questionId: "interpretation",
+					userAnswer: "",
+					prefilledAnswer: "",
+					submitted: false,
+					guardrailText: "",
+					submittedAfterGuardrail: false,
+				},
+			],
+		});
+		expect(loadSummaryCache()).toEqual({
+			"self-knowledge:interpretation": {
+				answer: "It means knowing yourself",
+				summary: "Self-awareness and introspection",
+			},
+		});
+		expect(loadFreeformNotes()).toEqual({
+			"self-knowledge": "Extra thoughts about self-knowledge",
+		});
+		expect(loadLlmTestState()).toEqual({
+			cardId: "self-knowledge",
+			rows: [
+				{ questionId: "interpretation", answer: "test answer" },
+				{ questionId: "importance", answer: "test answer 2" },
+			],
+		});
+	});
+
+	it("importProgressData throws when version field is missing", () => {
+		expect(() => {
+			importProgressData(JSON.stringify({ "somecam-chosen": [] }));
+		}).toThrow(/version/);
+	});
+
+	it("importProgressData throws when version field is wrong", () => {
+		expect(() => {
+			importProgressData(JSON.stringify({ version: "somecam-v2" }));
+		}).toThrow(/version/);
+	});
+});
+
+describe("hasProgressData", () => {
+	it("returns false when empty", () => {
+		expect(hasProgressData()).toBe(false);
+	});
+
+	it("returns true when any somecam key exists", () => {
+		saveChosenCardIds(["self-knowledge"]);
+		expect(hasProgressData()).toBe(true);
 	});
 });

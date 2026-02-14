@@ -1,10 +1,22 @@
 <script setup lang="ts">
 import { useRouter } from "vue-router";
+import { loadProgressFile } from "./store.ts";
 
 const router = useRouter();
 
 function startFindingMeaning(): void {
 	void router.push("/cards");
+}
+
+function onLoadFile(): void {
+	loadProgressFile().then(
+		() => {
+			void router.push("/cards");
+		},
+		(err: unknown) => {
+			window.alert(err instanceof Error ? err.message : "Failed to load progress file");
+		},
+	);
 }
 </script>
 
@@ -27,6 +39,10 @@ function startFindingMeaning(): void {
 
 		<div class="cta">
 			<button type="button" @click="startFindingMeaning">Start Finding Meaning</button>
+		</div>
+
+		<div class="load-file">
+			<button type="button" class="load-file-btn" @click="onLoadFile">Load progress file</button>
 		</div>
 
 		<footer>
@@ -98,6 +114,25 @@ section p {
 
 .cta button:hover {
 	background: #1f5a3e;
+}
+
+.load-file {
+	text-align: center;
+}
+
+.load-file-btn {
+	background: none;
+	border: none;
+	color: #999;
+	font-size: 0.85rem;
+	cursor: pointer;
+	font-family: inherit;
+	text-decoration: underline;
+	padding: 0.25rem 0.5rem;
+}
+
+.load-file-btn:hover {
+	color: #666;
 }
 
 footer {

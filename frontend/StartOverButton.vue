@@ -1,8 +1,14 @@
 <script setup lang="ts">
+import { onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
-import { clearAllProgress } from "./store";
+import { clearAllProgress, hasProgressData, saveProgressFile } from "./store.ts";
 
 const router = useRouter();
+const hasData = ref(false);
+
+onMounted(() => {
+	hasData.value = hasProgressData();
+});
 
 function startOver(): void {
 	if (!window.confirm("Start over? This will clear all your progress.")) return;
@@ -13,6 +19,7 @@ function startOver(): void {
 
 <template>
 	<div class="start-over">
+		<button v-if="hasData" type="button" class="start-over-btn" @click="saveProgressFile">Save progress file</button>
 		<button type="button" class="start-over-btn" @click="startOver">Start over</button>
 	</div>
 </template>

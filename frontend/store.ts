@@ -304,3 +304,72 @@ export function clearAllProgress(): void {
 	localStorage.removeItem(SUMMARIES_KEY);
 	localStorage.removeItem(FREEFORM_KEY);
 }
+
+const ALL_SOMECAM_KEYS = [PROGRESS_KEY, NARROWDOWN_KEY, CHOSEN_KEY, EXPLORE_KEY, SUMMARIES_KEY, FREEFORM_KEY, LLM_TEST_KEY];
+
+const EXPORT_VERSION = "somecam-v1";
+
+export function exportProgressData(): string {
+	const result: Record<string, unknown> = { version: EXPORT_VERSION };
+	for (const key of ALL_SOMECAM_KEYS) {
+		const raw = localStorage.getItem(key);
+		if (raw !== null) {
+			result[key] = JSON.parse(raw) as unknown;
+		}
+	}
+	return JSON.stringify(result);
+}
+
+export function importProgressData(json: string): void {
+	const parsed: unknown = JSON.parse(json);
+	if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
+		throw new Error("Invalid progress data: expected an object");
+	}
+	const obj = parsed as Record<string, unknown>;
+	if (obj.version !== EXPORT_VERSION) {
+		throw new Error(`Invalid progress data: expected version "${EXPORT_VERSION}", got "${String(obj.version)}"`);
+	}
+	for (const key of ALL_SOMECAM_KEYS) {
+		localStorage.removeItem(key);
+	}
+	for (const key of ALL_SOMECAM_KEYS) {
+		if (key in obj) {
+			localStorage.setItem(key, JSON.stringify(obj[key]));
+		}
+	}
+}
+
+export function hasProgressData(): boolean {
+	return ALL_SOMECAM_KEYS.some((key) => localStorage.getItem(key) !== null);
+}
+
+export function saveProgressFile(): void {
+	const json = exportProgressData();
+	const blob = new Blob([json], { type: "application/json" });
+	const url = URL.createObjectURL(blob);
+	const a = document.createElement("a");
+	a.href = url;
+	a.download = "somecam-progress.json";
+	a.click();
+	URL.revokeObjectURL(url);
+}
+
+export function loadProgressFile(): Promise<void> {
+	return new Promise((resolve, reject) => {
+		const input = document.createElement("input");
+		input.type = "file";
+		input.accept = ".json";
+		input.addEventListener("change", () => {
+			const file = input.files?.[0];
+			if (!file) {
+				reject(new Error("No file selected"));
+				return;
+			}
+			file.text().then((text) => {
+				importProgressData(text);
+				resolve();
+			}, reject);
+		});
+		input.click();
+	});
+}
