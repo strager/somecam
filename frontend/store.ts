@@ -492,7 +492,8 @@ export function loadExploreDataFull(sessionId: string): ExploreDataFull | null {
 			}
 			fullEntries.push(fullEntry);
 		}
-		result[cardId] = fullEntries;
+		const nonBlank = fullEntries.filter((e) => !e.submitted || e.userAnswer.trim() !== "");
+		result[cardId] = nonBlank.length > 0 ? nonBlank : fullEntries.slice(0, 1);
 	}
 
 	return result;
