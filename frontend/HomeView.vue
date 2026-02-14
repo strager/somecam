@@ -1,17 +1,51 @@
 <script setup lang="ts">
+import { computed, ref } from "vue";
 import { useRouter } from "vue-router";
-import { loadProgressFile } from "./store.ts";
+import type { ProgressPhase } from "./store.ts";
+import { detectProgressPhase, loadProgressFile } from "./store.ts";
 
 const router = useRouter();
 
-function startFindingMeaning(): void {
-	void router.push("/find-meaning");
+const phase = ref<ProgressPhase>(detectProgressPhase());
+
+function phaseLabel(p: ProgressPhase): string {
+	switch (p) {
+		case "explore":
+		case "narrow-complete":
+			return "Explore Meaning";
+		case "narrow":
+		case "swipe":
+			return "Continue Finding Meaning";
+		case "none":
+			return "Start Finding Meaning";
+	}
+}
+
+function phaseRoute(p: ProgressPhase): string {
+	switch (p) {
+		case "explore":
+			return "/explore";
+		case "narrow-complete":
+		case "narrow":
+			return "/find-meaning/narrow";
+		case "swipe":
+		case "none":
+			return "/find-meaning";
+	}
+}
+
+const ctaLabel = computed(() => phaseLabel(phase.value));
+const ctaRoute = computed(() => phaseRoute(phase.value));
+
+function onCtaClick(): void {
+	void router.push(ctaRoute.value);
 }
 
 function onLoadFile(): void {
 	loadProgressFile().then(
 		() => {
-			void router.push("/find-meaning");
+			phase.value = detectProgressPhase();
+			void router.push(ctaRoute.value);
 		},
 		(err: unknown) => {
 			window.alert(err instanceof Error ? err.message : "Failed to load progress file");
@@ -38,7 +72,7 @@ function onLoadFile(): void {
 		</section>
 
 		<div class="cta">
-			<button type="button" @click="startFindingMeaning">Start Finding Meaning</button>
+			<button type="button" @click="onCtaClick">{{ ctaLabel }}</button>
 		</div>
 
 		<div class="load-file">

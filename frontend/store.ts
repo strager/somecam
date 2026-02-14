@@ -297,6 +297,26 @@ export function saveLlmTestState(data: LlmTestState): void {
 	localStorage.setItem(LLM_TEST_KEY, JSON.stringify(data));
 }
 
+export type ProgressPhase = "explore" | "narrow-complete" | "narrow" | "swipe" | "none";
+
+export function detectProgressPhase(): ProgressPhase {
+	if (loadChosenCardIds() !== null) {
+		return "explore";
+	}
+	const narrow = loadNarrowDown();
+	if (narrow !== null) {
+		if (narrow.swipeHistory.length >= narrow.cardIds.length) {
+			return "narrow-complete";
+		}
+		return "narrow";
+	}
+	const swipe = loadSwipeProgress();
+	if (swipe !== null && swipe.swipeHistory.length > 0) {
+		return "swipe";
+	}
+	return "none";
+}
+
 export function clearAllProgress(): void {
 	localStorage.removeItem(PROGRESS_KEY);
 	localStorage.removeItem(NARROWDOWN_KEY);

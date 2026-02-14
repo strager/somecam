@@ -6,7 +6,7 @@ import type { MeaningCard, SwipeDirection } from "../shared/meaning-cards.ts";
 import { MEANING_CARDS } from "../shared/meaning-cards.ts";
 import StartOverButton from "./StartOverButton.vue";
 import type { SwipeRecord } from "./store.ts";
-import { loadSwipeProgress, saveChosenCardIds, saveNarrowDown, saveSwipeProgress } from "./store.ts";
+import { detectProgressPhase, loadSwipeProgress, saveChosenCardIds, saveNarrowDown, saveSwipeProgress } from "./store.ts";
 import SwipeCard from "./SwipeCard.vue";
 
 const router = useRouter();
@@ -15,6 +15,22 @@ const shuffledCards = ref<MeaningCard[]>([]);
 const currentIndex = ref(0);
 const swipeHistory = ref<SwipeRecord[]>([]);
 const swipeCardRef = ref<InstanceType<typeof SwipeCard> | null>(null);
+
+const nextPhaseLabel = ref("Continue to Next Phase");
+
+function detectNextPhase(): { label: string; route: string } | null {
+	const phase = detectProgressPhase();
+	switch (phase) {
+		case "explore":
+			return { label: "Explore Meaning", route: "/explore" };
+		case "narrow-complete":
+			return { label: "Explore Meaning", route: "/find-meaning/narrow" };
+		case "narrow":
+			return { label: "Prioritize Meaning", route: "/find-meaning/narrow" };
+		default:
+			return null;
+	}
+}
 
 const currentCard = computed(() => shuffledCards.value[currentIndex.value] ?? null);
 const totalCards = computed(() => shuffledCards.value.length);
@@ -42,6 +58,10 @@ onMounted(() => {
 			shuffledCards.value = cards;
 			swipeHistory.value = saved.swipeHistory;
 			currentIndex.value = saved.swipeHistory.length;
+			const detected = detectNextPhase();
+			if (detected) {
+				nextPhaseLabel.value = detected.label;
+			}
 			return;
 		}
 	}
@@ -80,6 +100,12 @@ function handleUndo(): void {
 }
 
 function continueToNextPhase(): void {
+	const detected = detectNextPhase();
+	if (detected) {
+		void router.push(detected.route);
+		return;
+	}
+
 	const agreeCardIds = swipeHistory.value.filter((r) => r.direction === "agree").map((r) => r.cardId);
 	const unsureCardIds = swipeHistory.value.filter((r) => r.direction === "unsure").map((r) => r.cardId);
 	const cardIdsToConsider = agreeCardIds.length < 3 ? agreeCardIds.concat(unsureCardIds) : agreeCardIds;
@@ -114,7 +140,7 @@ function continueToNextPhase(): void {
 		<div v-else class="end-state">
 			<h2>All cards reviewed!</h2>
 			<p>You have reviewed all {{ totalCards }} sources of meaning.</p>
-			<button type="button" class="btn primary" @click="continueToNextPhase">Continue to Next Phase</button>
+			<button type="button" class="btn primary" @click="continueToNextPhase">{{ nextPhaseLabel }}</button>
 		</div>
 
 		<div class="controls">
