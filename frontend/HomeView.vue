@@ -11,7 +11,7 @@ const sessions = ref<SessionMeta[]>([]);
 const sessionPhases = ref<Record<string, ProgressPhase>>({});
 const renamingId = ref<string | null>(null);
 const renameInput = ref("");
-const renameInputEl = ref<HTMLInputElement | null>(null);
+const renameInputEl = ref<HTMLInputElement[]>([]);
 
 function refreshState(): void {
 	sessions.value = listSessions();
@@ -50,8 +50,9 @@ function onStartRename(session: SessionMeta): void {
 	renamingId.value = session.id;
 	renameInput.value = session.name;
 	void nextTick(() => {
-		renameInputEl.value?.focus();
-		renameInputEl.value?.select();
+		const el = renameInputEl.value[0];
+		el.focus();
+		el.select();
 	});
 }
 
