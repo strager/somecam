@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { onMounted, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
-import { createSession, hasProgressData, saveProgressFile } from "./store.ts";
+import { hasProgressData, saveProgressFile } from "./store.ts";
 
 const route = useRoute();
 const router = useRouter();
@@ -13,9 +13,7 @@ onMounted(() => {
 });
 
 function startOver(): void {
-	if (!window.confirm("Start over with a new session? Your current session will be saved.")) return;
-	const newId = createSession();
-	void router.push({ name: "findMeaning", params: { sessionId: newId } });
+	void router.push({ name: "home" });
 }
 </script>
 
