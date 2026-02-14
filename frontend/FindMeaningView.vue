@@ -6,7 +6,7 @@ import type { MeaningCard, SwipeDirection } from "../shared/meaning-cards.ts";
 import { MEANING_CARDS } from "../shared/meaning-cards.ts";
 import StartOverButton from "./StartOverButton.vue";
 import type { SwipeRecord } from "./store.ts";
-import { detectProgressPhase, loadSwipeProgress, saveChosenCardIds, savePrioritize, saveSwipeProgress } from "./store.ts";
+import { detectProgressPhase, loadSwipeProgress, needsPrioritization, saveChosenCardIds, savePrioritize, selectCandidateCards, saveSwipeProgress } from "./store.ts";
 import SwipeCard from "./SwipeCard.vue";
 
 const router = useRouter();
@@ -106,11 +106,9 @@ function continueToNextPhase(): void {
 		return;
 	}
 
-	const agreeCardIds = swipeHistory.value.filter((r) => r.direction === "agree").map((r) => r.cardId);
-	const unsureCardIds = swipeHistory.value.filter((r) => r.direction === "unsure").map((r) => r.cardId);
-	const cardIdsToConsider = agreeCardIds.length < 3 ? agreeCardIds.concat(unsureCardIds) : agreeCardIds;
+	const cardIdsToConsider = selectCandidateCards();
 
-	if (cardIdsToConsider.length > 5) {
+	if (needsPrioritization()) {
 		savePrioritize({ cardIds: cardIdsToConsider, swipeHistory: [] });
 		void router.push("/find-meaning/prioritize");
 	} else {

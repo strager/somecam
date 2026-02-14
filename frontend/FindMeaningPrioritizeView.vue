@@ -6,7 +6,7 @@ import type { MeaningCard, SwipeDirection } from "../shared/meaning-cards.ts";
 import { MEANING_CARDS } from "../shared/meaning-cards.ts";
 import StartOverButton from "./StartOverButton.vue";
 import type { SwipeRecord } from "./store.ts";
-import { loadPrioritize, removePrioritize, saveChosenCardIds, savePrioritize } from "./store.ts";
+import { loadPrioritize, needsPrioritization, removePrioritize, saveChosenCardIds, savePrioritize } from "./store.ts";
 import SwipeCard from "./SwipeCard.vue";
 
 const router = useRouter();
@@ -29,6 +29,12 @@ onMounted(() => {
 	const saved = loadPrioritize();
 	if (!saved) {
 		void router.replace("/find-meaning");
+		return;
+	}
+	if (!needsPrioritization()) {
+		saveChosenCardIds(saved.cardIds);
+		removePrioritize();
+		void router.replace("/explore");
 		return;
 	}
 	const resolved = saved.cardIds.map((id) => cardsById.get(id)).filter((c): c is MeaningCard => c !== undefined);

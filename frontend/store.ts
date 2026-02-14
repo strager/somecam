@@ -185,6 +185,22 @@ export function saveChosenCardIds(ids: string[]): void {
 	localStorage.setItem(CHOSEN_KEY, JSON.stringify(ids));
 }
 
+export function selectCandidateCards(): string[] {
+	const progress = loadSwipeProgress();
+	if (progress === null) return [];
+	const agreeCardIds = progress.swipeHistory.filter((r) => r.direction === "agree").map((r) => r.cardId);
+	const unsureCardIds = progress.swipeHistory.filter((r) => r.direction === "unsure").map((r) => r.cardId);
+	return agreeCardIds.length < 3 ? agreeCardIds.concat(unsureCardIds) : agreeCardIds;
+}
+
+export function needsPrioritization(): boolean {
+	const prioritize = loadPrioritize();
+	if (prioritize !== null) {
+		return prioritize.cardIds.length > 5;
+	}
+	return selectCandidateCards().length > 5;
+}
+
 export function loadExploreData(): ExploreData | null {
 	const parsed = parseJsonFromStorage(EXPLORE_KEY);
 	if (!isObjectRecord(parsed)) {
