@@ -86,10 +86,10 @@ function continueToNextPhase(): void {
 
 	if (cardIdsToConsider.length > 5) {
 		saveNarrowDown({ cardIds: cardIdsToConsider, swipeHistory: [] });
-		void router.push("/narrow-down");
+		void router.push("/find-meaning/narrow");
 	} else {
 		saveChosenCardIds(cardIdsToConsider);
-		void router.push("/chosen");
+		void router.push("/explore");
 	}
 }
 </script>
@@ -97,7 +97,7 @@ function continueToNextPhase(): void {
 <template>
 	<main>
 		<header>
-			<h1>SoMeCaM</h1>
+			<h1>Find Meaning</h1>
 			<div class="progress">
 				<div class="progress-bar">
 					<div class="progress-fill" :style="{ width: `${String(progressPercent)}%` }" />

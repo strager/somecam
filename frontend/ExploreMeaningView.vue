@@ -1,0 +1,497 @@
+<script setup lang="ts">
+import { computed, nextTick, onMounted, ref } from "vue";
+import { useRoute, useRouter } from "vue-router";
+
+import { fetchAnswerDepthCheck, fetchInferredAnswers } from "./api.ts";
+import ExploreTextarea from "./ExploreTextarea.vue";
+import StartOverButton from "./StartOverButton.vue";
+import type { ExploreEntryFull } from "./store.ts";
+import { loadExploreDataFull, loadFreeformNotes, requestStoragePersistence, saveExploreData, saveFreeformNotes } from "./store.ts";
+import type { ExploreQuestion } from "../shared/explore-questions.ts";
+import { EXPLORE_QUESTIONS } from "../shared/explore-questions.ts";
+import type { MeaningCard } from "../shared/meaning-cards.ts";
+import { MEANING_CARDS } from "../shared/meaning-cards.ts";
+
+const route = useRoute();
+const router = useRouter();
+
+const cardsById = new Map(MEANING_CARDS.map((c) => [c.id, c]));
+const questionsById = new Map(EXPLORE_QUESTIONS.map((q) => [q.id, q]));
+
+const cardId = route.params.meaningId as string;
+
+const card = ref<MeaningCard | undefined>(undefined);
+const entries = ref<ExploreEntryFull[]>([]);
+const currentAnswer = ref("");
+const inferring = ref(false);
+const depthCheckFollowUp = ref("");
+const depthCheckShown = ref(false);
+const pendingInferResult = ref<Map<string, string> | null>(null);
+const activeTextarea = ref<InstanceType<typeof ExploreTextarea> | null>(null);
+const freeformNote = ref("");
+
+const activeIndex = computed(() => {
+	const idx = entries.value.findIndex((e) => !e.submitted);
+	return idx === -1 ? entries.value.length : idx;
+});
+
+const activeQuestion = computed<ExploreQuestion | undefined>(() => {
+	const idx = activeIndex.value;
+	if (idx >= entries.value.length) return undefined;
+	return questionsById.get(entries.value[idx].questionId);
+});
+
+const displayedQuestion = computed<ExploreQuestion | undefined>(() => {
+	if (activeQuestion.value !== undefined) return activeQuestion.value;
+	if (!depthCheckShown.value) return undefined;
+	const last = entries.value.at(-1);
+	if (last === undefined) return undefined;
+	return questionsById.get(last.questionId);
+});
+
+const answeredEntries = computed(() => {
+	const submitted = entries.value.filter((e) => e.submitted);
+	if (depthCheckShown.value && submitted.length > 0) {
+		return submitted.slice(0, -1);
+	}
+	return submitted;
+});
+
+const activeEntryPrefilled = computed(() => {
+	const idx = activeIndex.value;
+	if (idx >= entries.value.length) return false;
+	return entries.value[idx].prefilledAnswer !== "";
+});
+
+const allAnswered = computed(() => {
+	return entries.value.length === EXPLORE_QUESTIONS.length && entries.value.every((e) => e.submitted);
+});
+
+function persistEntries(): void {
+	const data = loadExploreDataFull();
+	if (data === null) return;
+	data[cardId] = entries.value;
+	saveExploreData(data);
+}
+
+let persistTimer: ReturnType<typeof setTimeout> | undefined;
+
+function debouncedPersist(): void {
+	if (persistTimer !== undefined) return;
+	persistTimer = setTimeout(() => {
+		persistTimer = undefined;
+		persistEntries();
+	}, 300);
+}
+
+function persistFreeform(): void {
+	const notes = loadFreeformNotes();
+	notes[cardId] = freeformNote.value;
+	saveFreeformNotes(notes);
+}
+
+let freeformPersistTimer: ReturnType<typeof setTimeout> | undefined;
+
+function debouncedFreeformPersist(): void {
+	if (freeformPersistTimer !== undefined) return;
+	freeformPersistTimer = setTimeout(() => {
+		freeformPersistTimer = undefined;
+		persistFreeform();
+	}, 300);
+}
+
+function answeredQuestionIds(): Set<string> {
+	return new Set(entries.value.filter((e) => e.submitted).map((e) => e.questionId));
+}
+
+function remainingQuestionIds(): string[] {
+	const answered = answeredQuestionIds();
+	const inEntries = new Set(entries.value.map((e) => e.questionId));
+	return EXPLORE_QUESTIONS.filter((q) => !answered.has(q.id) && !inEntries.has(q.id)).map((q) => q.id);
+}
+
+async function submitAnswer(): Promise<void> {
+	if (depthCheckShown.value) {
+		// User pressing Next to skip the guardrail
+		const idx = entries.value.length - 1;
+		if (idx >= 0 && entries.value[idx].submitted) {
+			entries.value[idx].userAnswer = currentAnswer.value.trim();
+			entries.value[idx].submittedAfterGuardrail = true;
+			persistEntries();
+		}
+		depthCheckShown.value = false;
+		depthCheckFollowUp.value = "";
+		applyInferAndAdvance(pendingInferResult.value ?? new Map<string, string>(), remainingQuestionIds());
+		pendingInferResult.value = null;
+		return;
+	}
+
+	const idx = activeIndex.value;
+	if (idx >= entries.value.length) return;
+
+	const answerText = currentAnswer.value.trim();
+	if (answerText === "") return;
+
+	entries.value[idx].userAnswer = answerText;
+	entries.value[idx].submitted = true;
+	persistEntries();
+
+	requestStoragePersistence();
+
+	const remaining = remainingQuestionIds();
+
+	const questions = [...entries.value.filter((e) => e.submitted).map((e) => ({ questionId: e.questionId, answer: e.userAnswer })), ...remaining.map((qId) => ({ questionId: qId, answer: "" }))];
+
+	const inferPromise =
+		remaining.length > 0
+			? fetchInferredAnswers({ cardId, questions })
+					.then((r) => new Map(r.inferredAnswers.map((ia) => [ia.questionId, ia.answer])))
+					.catch(() => new Map<string, string>())
+			: Promise.resolve(new Map<string, string>());
+
+	inferring.value = remaining.length > 0;
+
+	const depthResult = await fetchAnswerDepthCheck({
+		cardId,
+		questionId: entries.value[idx].questionId,
+		answer: answerText,
+	}).catch(() => ({ sufficient: true, followUpQuestion: "" }));
+
+	if (!depthResult.sufficient && depthResult.followUpQuestion) {
+		// Depth check failed fast — cache the still-pending infer promise
+		inferring.value = false;
+		pendingInferResult.value = null;
+		entries.value[idx].guardrailText = depthResult.followUpQuestion;
+		persistEntries();
+		depthCheckFollowUp.value = depthResult.followUpQuestion;
+		depthCheckShown.value = true;
+		void nextTick(() => {
+			activeTextarea.value?.focus();
+		});
+		// Resolve infer in background so it's ready when user skips
+		void inferPromise.then((result) => {
+			pendingInferResult.value = result;
+		});
+		return;
+	}
+
+	const inferResult = await inferPromise;
+	inferring.value = false;
+
+	applyInferAndAdvance(inferResult, remaining);
+}
+
+function applyInferAndAdvance(inferredMap: Map<string, string>, remaining: string[]): void {
+	if (remaining.length === 0) {
+		return;
+	}
+
+	// Pick next question: prefer one with a pre-fill
+	let nextQuestionId: string | undefined;
+	let nextPrefill = "";
+
+	for (const qId of remaining) {
+		const inferred = inferredMap.get(qId);
+		if (inferred !== undefined) {
+			nextQuestionId = qId;
+			nextPrefill = inferred;
+			break;
+		}
+	}
+
+	if (nextQuestionId === undefined) {
+		const randomIndex = Math.floor(Math.random() * remaining.length);
+		nextQuestionId = remaining[randomIndex];
+	}
+
+	entries.value.push({
+		questionId: nextQuestionId,
+		userAnswer: "",
+		prefilledAnswer: nextPrefill,
+		submitted: false,
+		guardrailText: "",
+		submittedAfterGuardrail: false,
+	});
+	persistEntries();
+	currentAnswer.value = nextPrefill;
+}
+
+async function inferAndAdvance(): Promise<void> {
+	const remaining = remainingQuestionIds();
+	if (remaining.length === 0) {
+		return;
+	}
+
+	const questions = [...entries.value.filter((e) => e.submitted).map((e) => ({ questionId: e.questionId, answer: e.userAnswer })), ...remaining.map((qId) => ({ questionId: qId, answer: "" }))];
+
+	inferring.value = true;
+	let inferredMap = new Map<string, string>();
+	try {
+		const result = await fetchInferredAnswers({ cardId, questions });
+		inferredMap = new Map(result.inferredAnswers.map((ia) => [ia.questionId, ia.answer]));
+	} catch {
+		// graceful degradation: no pre-fills
+	} finally {
+		inferring.value = false;
+	}
+
+	applyInferAndAdvance(inferredMap, remaining);
+}
+
+function finishExploring(): void {
+	const idx = activeIndex.value;
+	if (idx < entries.value.length && currentAnswer.value.trim() !== "") {
+		entries.value[idx].userAnswer = currentAnswer.value.trim();
+		persistEntries();
+	}
+	persistFreeform();
+	void router.push("/explore");
+}
+
+function onKeydown(event: KeyboardEvent): void {
+	if (event.key === "Enter" && event.shiftKey) {
+		event.preventDefault();
+		void submitAnswer();
+	}
+}
+
+onMounted(() => {
+	const foundCard = cardsById.get(cardId);
+	if (foundCard === undefined) {
+		void router.replace("/explore");
+		return;
+	}
+
+	try {
+		const data = loadExploreDataFull();
+		if (data === null) {
+			void router.replace("/explore");
+			return;
+		}
+		const cardEntries = data[cardId];
+		if (!Array.isArray(cardEntries) || cardEntries.length === 0) {
+			void router.replace("/explore");
+			return;
+		}
+
+		card.value = foundCard;
+		entries.value = cardEntries;
+		freeformNote.value = loadFreeformNotes()[cardId] ?? "";
+
+		const lastEntry = entries.value[entries.value.length - 1];
+		if (lastEntry.submitted) {
+			if (lastEntry.guardrailText && !lastEntry.submittedAfterGuardrail) {
+				// Refreshed during guardrail — restore it
+				depthCheckFollowUp.value = lastEntry.guardrailText;
+				depthCheckShown.value = true;
+				currentAnswer.value = lastEntry.userAnswer;
+				return;
+			}
+			if (entries.value.length < EXPLORE_QUESTIONS.length) {
+				// Refreshed during inference — re-run it
+				void inferAndAdvance();
+			}
+		} else {
+			// Initialize currentAnswer from the active entry's prefill (or existing user answer)
+			const idx = activeIndex.value;
+			if (idx < entries.value.length) {
+				const entry = entries.value[idx];
+				currentAnswer.value = entry.userAnswer || entry.prefilledAnswer;
+			}
+		}
+	} catch {
+		void router.replace("/explore");
+	}
+});
+</script>
+
+<template>
+	<main v-if="card">
+		<header>
+			<h1>Explore Meaning</h1>
+			<h2>{{ card.source }}</h2>
+		</header>
+
+		<div class="card-wrapper">
+			<div class="card-surface explore-card">
+				<p class="description">{{ card.description }}</p>
+
+				<div v-for="entry in answeredEntries" :key="entry.questionId" class="answered-question">
+					<p class="question">{{ questionsById.get(entry.questionId)?.text }}</p>
+					<ExploreTextarea v-model="entry.userAnswer" variant="answered" :rows="3" @update:model-value="debouncedPersist" @blur="persistEntries()" />
+				</div>
+
+				<div v-if="inferring" class="inferring-indicator">
+					<span class="spinner"></span>
+					<span>Thinking about your next question...</span>
+				</div>
+
+				<div v-else-if="displayedQuestion && (!allAnswered || depthCheckShown)">
+					<p class="question">{{ displayedQuestion.text }}</p>
+					<p v-if="activeEntryPrefilled" class="prefill-hint"><em>This answer was pre-filled based on your previous responses. Feel free to edit it.</em></p>
+					<ExploreTextarea ref="activeTextarea" v-model="currentAnswer" :rows="5" placeholder="Type your reflection here..." @update:model-value="debouncedPersist" @blur="persistEntries()" @keydown="onKeydown" />
+					<p v-if="depthCheckShown" class="depth-follow-up">
+						<em>{{ depthCheckFollowUp }}</em>
+					</p>
+					<button class="submit-btn" :disabled="!depthCheckShown && currentAnswer.trim() === ''" @click="submitAnswer">Next</button>
+					<p v-if="depthCheckShown" class="hint">Press Next to continue as-is, or edit your answer above</p>
+					<p v-else class="hint">Shift + Enter to submit</p>
+				</div>
+
+				<div v-if="allAnswered && !inferring && !depthCheckShown" class="freeform-section">
+					<p class="question">Additional notes about this source of meaning</p>
+					<ExploreTextarea v-model="freeformNote" :rows="5" placeholder="Any other thoughts you'd like to capture (optional)" @update:model-value="debouncedFreeformPersist" @blur="persistFreeform()" />
+				</div>
+
+				<button class="finish-btn" @click="finishExploring">Finish exploring</button>
+			</div>
+		</div>
+
+		<StartOverButton />
+	</main>
+</template>
+
+<style scoped>
+main {
+	margin: 2rem auto;
+	max-width: 36rem;
+	padding: 0 1.5rem;
+	font-family: "Segoe UI", system-ui, sans-serif;
+	color: #1a1a1a;
+}
+
+header {
+	text-align: center;
+	margin-bottom: 2rem;
+}
+
+h1 {
+	font-size: 2rem;
+	margin: 0 0 0.25rem;
+	letter-spacing: 0.02em;
+}
+
+h2 {
+	font-size: 1.25rem;
+	font-weight: 400;
+	color: #555;
+	margin: 0;
+}
+
+.card-wrapper {
+	display: flex;
+	justify-content: center;
+}
+
+.explore-card {
+	text-align: left;
+}
+
+.description {
+	font-size: 1rem;
+	line-height: 1.5;
+	color: #333;
+	margin: 0 0 1rem;
+}
+
+.answered-question {
+	margin-bottom: 1rem;
+	padding-bottom: 0.75rem;
+	border-bottom: 1px solid #e0e0e0;
+}
+
+.question {
+	font-size: 1.1rem;
+	font-weight: 600;
+	color: #2a6e4e;
+	margin: 0 0 0.5rem;
+}
+
+.inferring-indicator {
+	display: flex;
+	align-items: center;
+	gap: 0.75rem;
+	padding: 1rem 0;
+	font-size: 1rem;
+	color: #888;
+	font-style: italic;
+}
+
+.spinner {
+	display: inline-block;
+	width: 1.25rem;
+	height: 1.25rem;
+	border: 2px solid #e0e0e0;
+	border-top-color: #2a6e4e;
+	border-radius: 50%;
+	animation: spin 0.8s linear infinite;
+	flex-shrink: 0;
+}
+
+@keyframes spin {
+	to {
+		transform: rotate(360deg);
+	}
+}
+
+.submit-btn {
+	display: block;
+	width: 100%;
+	margin-top: 1rem;
+	padding: 0.75rem 1.5rem;
+	font-size: 1rem;
+	font-weight: 600;
+	color: #fff;
+	background: #2a6e4e;
+	border: none;
+	border-radius: 8px;
+	cursor: pointer;
+}
+
+.submit-btn:hover:not(:disabled) {
+	background: #225d40;
+}
+
+.submit-btn:disabled {
+	opacity: 0.6;
+	cursor: not-allowed;
+}
+
+.hint {
+	text-align: center;
+	font-size: 0.85rem;
+	color: #888;
+	margin: 0.5rem 0 0;
+}
+
+.depth-follow-up {
+	font-size: 1.1rem;
+	font-weight: 600;
+	color: #b8860b;
+	margin: 0 0 0.5rem;
+}
+
+.prefill-hint {
+	font-size: 0.9rem;
+	color: #b8860b;
+	margin: 0 0 0.5rem;
+}
+
+.finish-btn {
+	display: block;
+	width: 100%;
+	margin-top: 1.5rem;
+	padding: 0.75rem 1.5rem;
+	font-size: 1rem;
+	font-weight: 600;
+	color: #2a6e4e;
+	background: transparent;
+	border: 1.5px solid #2a6e4e;
+	border-radius: 8px;
+	cursor: pointer;
+}
+
+.finish-btn:hover {
+	background: #eaf5ef;
+}
+</style>

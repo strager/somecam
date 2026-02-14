@@ -33,7 +33,7 @@ onMounted(() => {
 	try {
 		const cardIds = loadChosenCardIds();
 		if (cardIds === null) {
-			void router.replace("/cards");
+			void router.replace("/find-meaning");
 			return;
 		}
 
@@ -64,7 +64,7 @@ onMounted(() => {
 			reports.value.push({ card, questions, freeformNote: freeformNotes[cardId] ?? "" });
 		}
 	} catch {
-		void router.replace("/cards");
+		void router.replace("/find-meaning");
 	}
 });
 </script>

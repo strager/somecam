@@ -2,17 +2,17 @@
 
 ## Entering the explore page
 
-After choosing their sources of meaning on the cards page, the user lands on the
-"Your Sources of Meaning" overview. Each card has an **Explore** button. Clicking
-it takes the user to `/explore/:cardId`, where they begin a guided reflection on
-that card.
+After choosing their sources of meaning on the Find Meaning page, the user lands
+on the Explore overview. Each card has an **Explore** button. Clicking it takes
+the user to `/explore/:meaningId`, where they begin a guided reflection on that
+card.
 
 ## Answering the first question
 
 The explore page shows the card's description at the top, followed by a single
 question drawn from one of five exploration topics: Interpretation, Significance,
 Importance, Threat, and Change. The question is randomly assigned when the user
-first visits the chosen-cards page.
+first visits the Explore page.
 
 A textarea is displayed below the question. The user types their reflection and
 clicks **Next** (or presses Shift+Enter) to submit their answer.
@@ -80,5 +80,5 @@ core explore experience.
 
 At any point during the exploration, a **Stop Exploring** button is visible below
 the active question. Clicking it saves whatever text is currently in the textarea
-(if any) and immediately navigates to `/chosen`. The user does not need to answer
+(if any) and immediately navigates to `/explore`. The user does not need to answer
 all five questions — they can stop whenever they feel they have reflected enough.

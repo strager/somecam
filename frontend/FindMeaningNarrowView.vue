@@ -28,12 +28,12 @@ const keptCount = computed(() => swipeHistory.value.filter((r) => r.direction ==
 onMounted(() => {
 	const saved = loadNarrowDown();
 	if (!saved) {
-		void router.replace("/cards");
+		void router.replace("/find-meaning");
 		return;
 	}
 	const resolved = saved.cardIds.map((id) => cardsById.get(id)).filter((c): c is MeaningCard => c !== undefined);
 	if (resolved.length === 0) {
-		void router.replace("/cards");
+		void router.replace("/find-meaning");
 		return;
 	}
 	cards.value = resolved;
@@ -77,14 +77,14 @@ watch(isComplete, (done) => {
 	const keptCardIds = swipeHistory.value.filter((r) => r.direction === "agree").map((r) => r.cardId);
 	saveChosenCardIds(keptCardIds);
 	removeNarrowDown();
-	void router.push("/chosen");
+	void router.push("/explore");
 });
 </script>
 
 <template>
 	<main>
 		<header>
-			<h1>Narrow Down</h1>
+			<h1>Find Meaning — Narrow</h1>
 			<p class="instruction">Keep your top sources of meaning (aim for 3–5)</p>
 			<div class="progress">
 				<div class="progress-bar">

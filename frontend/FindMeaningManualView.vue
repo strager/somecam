@@ -62,7 +62,7 @@ onMounted(() => {
 	try {
 		const cardIds = loadChosenCardIds();
 		if (cardIds === null) {
-			void router.replace("/cards");
+			void router.replace("/find-meaning");
 			return;
 		}
 		chosenIds.value = new Set(cardIds);
@@ -76,7 +76,7 @@ onMounted(() => {
 			}
 		}
 	} catch {
-		void router.replace("/cards");
+		void router.replace("/find-meaning");
 	}
 });
 </script>
@@ -84,8 +84,7 @@ onMounted(() => {
 <template>
 	<main>
 		<header>
-			<h1>SoMeCaM</h1>
-			<h2>Edit Your Cards</h2>
+			<h1>Find Meaning — Manual</h1>
 			<p class="count">{{ selectedCount }} card{{ selectedCount === 1 ? "" : "s" }} selected</p>
 		</header>
 
@@ -108,7 +107,7 @@ onMounted(() => {
 			</label>
 		</div>
 
-		<button class="done-btn" @click="router.push('/chosen')">Done</button>
+		<button class="done-btn" @click="router.push('/explore')">Done</button>
 	</main>
 </template>
 
@@ -130,13 +129,6 @@ h1 {
 	font-size: 2rem;
 	margin: 0 0 0.25rem;
 	letter-spacing: 0.02em;
-}
-
-h2 {
-	font-size: 1.25rem;
-	font-weight: 400;
-	color: #555;
-	margin: 0 0 0.5rem;
 }
 
 .count {

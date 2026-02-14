@@ -55,7 +55,7 @@ becomes part of your final selection, and you are taken to your results.
 
 ## Step 3: Editing your selection
 
-From the results page, you can click **Edit selection** to revisit your
+From the Explore page, you can click **Edit selection** to revisit your
 choices at any time. The edit page shows all 26 cards in a checklist.
 Selected cards are highlighted with a green border and a checked
 checkbox; unselected cards are dimmed.
@@ -68,5 +68,5 @@ You can:
   before removing it, since your exploration answers would no longer
   appear on the results page.
 
-Click **Done** to save your changes and return to the results page with
+Click **Done** to save your changes and return to the Explore page with
 your updated selection.

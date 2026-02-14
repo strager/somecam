@@ -2,13 +2,13 @@ import { createApp } from "vue";
 import { createRouter, createWebHistory } from "vue-router";
 
 import App from "./App.vue";
-import CardSwipeView from "./CardSwipeView.vue";
-import ChosenCardsView from "./ChosenCardsView.vue";
-import EditCardsView from "./EditCardsView.vue";
+import ExploreMeaningView from "./ExploreMeaningView.vue";
 import ExploreView from "./ExploreView.vue";
+import FindMeaningManualView from "./FindMeaningManualView.vue";
+import FindMeaningNarrowView from "./FindMeaningNarrowView.vue";
+import FindMeaningView from "./FindMeaningView.vue";
 import HomeView from "./HomeView.vue";
 import LlmTestView from "./LlmTestView.vue";
-import NarrowDownView from "./NarrowDownView.vue";
 import ReportView from "./ReportView.vue";
 
 const router = createRouter({
@@ -22,28 +22,28 @@ const router = createRouter({
 			component: HomeView,
 		},
 		{
-			path: "/cards",
-			component: CardSwipeView,
+			path: "/find-meaning",
+			component: FindMeaningView,
 		},
 		{
-			path: "/narrow-down",
-			component: NarrowDownView,
+			path: "/find-meaning/narrow",
+			component: FindMeaningNarrowView,
 		},
 		{
-			path: "/chosen",
-			component: ChosenCardsView,
+			path: "/explore",
+			component: ExploreView,
 		},
 		{
-			path: "/edit-cards",
-			component: EditCardsView,
+			path: "/find-meaning/manual",
+			component: FindMeaningManualView,
 		},
 		{
 			path: "/report",
 			component: ReportView,
 		},
 		{
-			path: "/explore/:cardId",
-			component: ExploreView,
+			path: "/explore/:meaningId",
+			component: ExploreMeaningView,
 		},
 		{
 			path: "/llm-test",

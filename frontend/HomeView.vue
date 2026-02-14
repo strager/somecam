@@ -5,13 +5,13 @@ import { loadProgressFile } from "./store.ts";
 const router = useRouter();
 
 function startFindingMeaning(): void {
-	void router.push("/cards");
+	void router.push("/find-meaning");
 }
 
 function onLoadFile(): void {
 	loadProgressFile().then(
 		() => {
-			void router.push("/cards");
+			void router.push("/find-meaning");
 		},
 		(err: unknown) => {
 			window.alert(err instanceof Error ? err.message : "Failed to load progress file");
