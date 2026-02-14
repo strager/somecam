@@ -3,7 +3,7 @@ import { onMounted, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
 
 import { capture } from "./analytics.ts";
-import { loadChosenCardIds, loadExploreData, loadFreeformNotes, loadSummaryCache } from "./store.ts";
+import { loadChosenCardIds, loadExploreData, loadFreeformNotes, loadSummaryCache, lookupCachedSummary } from "./store.ts";
 import { EXPLORE_QUESTIONS } from "../shared/explore-questions.ts";
 import type { MeaningCard } from "../shared/meaning-cards.ts";
 import { MEANING_CARDS } from "../shared/meaning-cards.ts";
@@ -55,21 +55,21 @@ onMounted(() => {
 			const questions: QuestionReport[] = [];
 
 			for (const question of EXPLORE_QUESTIONS) {
-				const cacheKey = `${cardId}:${question.id}`;
-				const summary = cacheKey in summaryCache ? summaryCache[cacheKey].summary : "";
+				const answer = answersByQuestionId.get(question.id) ?? "";
+				const summary = lookupCachedSummary(summaryCache, cardId, answer, question.id) ?? "";
 
 				questions.push({
 					topic: question.topic,
 					question: question.questionFirstPerson,
-					answer: answersByQuestionId.get(question.id) ?? "",
+					answer,
 					summary,
 				});
 			}
 
-			const freeformCacheKey = `${cardId}:freeform`;
-			const freeformSummary = freeformCacheKey in summaryCache ? summaryCache[freeformCacheKey].summary : "";
+			const freeformNote = freeformNotes[cardId] ?? "";
+			const freeformSummary = lookupCachedSummary(summaryCache, cardId, freeformNote) ?? "";
 
-			reports.value.push({ card, questions, freeformNote: freeformNotes[cardId] ?? "", freeformSummary });
+			reports.value.push({ card, questions, freeformNote, freeformSummary });
 		}
 		capture("report_viewed", { session_id: sessionId });
 	} catch {

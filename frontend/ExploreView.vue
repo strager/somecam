@@ -6,7 +6,7 @@ import { fetchSummary } from "./api.ts";
 import { capture } from "./analytics.ts";
 import { assignQuestions } from "./explore-data.ts";
 import type { ExploreEntry, SummaryCache } from "./store.ts";
-import { loadChosenCardIds, loadExploreData, loadFreeformNotes, loadSummaryCache, saveExploreData, saveSummaryCache } from "./store.ts";
+import { loadChosenCardIds, loadExploreData, loadFreeformNotes, loadSummaryCache, lookupCachedSummary, saveExploreData, saveSummaryCache } from "./store.ts";
 import { EXPLORE_QUESTIONS } from "../shared/explore-questions.ts";
 import type { MeaningCard } from "../shared/meaning-cards.ts";
 import { MEANING_CARDS } from "../shared/meaning-cards.ts";
@@ -104,8 +104,9 @@ async function loadSummary(cardId: string, questionId: string, answer: string, c
 	const entry = cardSummaryEntries.value[cardId]?.find((e) => e.questionId === questionId);
 	if (entry === undefined) return;
 
-	if (cacheKey in cache && cache[cacheKey].answer === answer) {
-		entry.summary = cache[cacheKey].summary;
+	const cached = lookupCachedSummary(cache, cardId, answer, questionId);
+	if (cached !== null) {
+		entry.summary = cached;
 		return;
 	}
 
@@ -129,8 +130,9 @@ async function loadSummary(cardId: string, questionId: string, answer: string, c
 async function loadFreeformSummary(cardId: string, noteText: string, cache: SummaryCache, entry: FreeformSummary): Promise<void> {
 	const cacheKey = `${cardId}:freeform`;
 
-	if (cacheKey in cache && cache[cacheKey].answer === noteText) {
-		entry.summary = cache[cacheKey].summary;
+	const cached = lookupCachedSummary(cache, cardId, noteText);
+	if (cached !== null) {
+		entry.summary = cached;
 		return;
 	}
 

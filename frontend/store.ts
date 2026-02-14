@@ -522,6 +522,14 @@ export function saveSummaryCache(sessionId: string, cache: SummaryCache): void {
 	touchSession(sessionId);
 }
 
+export function lookupCachedSummary(cache: SummaryCache, cardId: string, answer: string, questionId?: string): string | null {
+	const cacheKey = `${cardId}:${questionId ?? "freeform"}`;
+	if (cacheKey in cache && cache[cacheKey].answer === answer) {
+		return cache[cacheKey].summary;
+	}
+	return null;
+}
+
 export function loadFreeformNotes(sessionId: string): FreeformNotes {
 	const parsed = parseJsonFromStorage(freeformKey(sessionId));
 	if (!isObjectRecord(parsed)) {
