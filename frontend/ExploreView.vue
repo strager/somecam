@@ -22,6 +22,7 @@ const cardAnswerCounts = ref<Record<string, number>>({});
 const totalQuestions = computed(() => chosenCards.value.length * EXPLORE_QUESTIONS.length);
 const totalAnswered = computed(() => Object.values(cardAnswerCounts.value).reduce((sum, n) => sum + n, 0));
 const overallPercent = computed(() => (totalQuestions.value === 0 ? 0 : Math.round((totalAnswered.value / totalQuestions.value) * 100)));
+const allComplete = computed(() => totalQuestions.value > 0 && totalAnswered.value >= totalQuestions.value);
 
 const instructionText = computed(() => {
 	if (totalAnswered.value === 0) {
@@ -40,6 +41,14 @@ function cardStatus(cardId: string): string {
 	return "partial";
 }
 
+const sortedCards = computed(() =>
+	[...chosenCards.value].sort((a, b) => {
+		const aComplete = cardStatus(a.id) === "complete" ? 1 : 0;
+		const bComplete = cardStatus(b.id) === "complete" ? 1 : 0;
+		return aComplete - bComplete;
+	}),
+);
+
 function exploreButtonLabel(cardId: string): string {
 	const status = cardStatus(cardId);
 	if (status === "complete") return "Review";
@@ -53,6 +62,7 @@ interface SummaryEntry {
 	summary: string;
 	loading: boolean;
 	error: string;
+	unanswered: boolean;
 }
 
 const cardSummaryEntries = ref<Partial<Record<string, SummaryEntry[]>>>({});
@@ -111,18 +121,40 @@ onMounted(() => {
 			const card = cardsById.get(cardId);
 			if (card === undefined) continue;
 
+			const isPartial = answered.length < EXPLORE_QUESTIONS.length;
+			const answeredIds = new Set(answered.map((e) => e.questionId));
+
 			const questionOrder = new Map(EXPLORE_QUESTIONS.map((q, i) => [q.id, i]));
 			const validEntries = answered
 				.map((e) => ({ entry: e, question: questionsById.get(e.questionId) }))
 				.filter((v): v is { entry: ExploreEntry; question: (typeof EXPLORE_QUESTIONS)[number] } => v.question !== undefined)
 				.sort((a, b) => (questionOrder.get(a.entry.questionId) ?? 0) - (questionOrder.get(b.entry.questionId) ?? 0));
-			cardSummaryEntries.value[cardId] = validEntries.map((v) => ({
+
+			const summaryRows: SummaryEntry[] = validEntries.map((v) => ({
 				questionId: v.entry.questionId,
 				topic: v.question.topic,
 				summary: "",
 				loading: false,
 				error: "",
+				unanswered: false,
 			}));
+
+			if (isPartial) {
+				for (const q of EXPLORE_QUESTIONS) {
+					if (!answeredIds.has(q.id)) {
+						summaryRows.push({
+							questionId: q.id,
+							topic: q.topic,
+							summary: "",
+							loading: false,
+							error: "",
+							unanswered: true,
+						});
+					}
+				}
+			}
+
+			cardSummaryEntries.value[cardId] = summaryRows;
 
 			for (const v of validEntries) {
 				promises.push(loadSummary(cardId, v.entry.questionId, v.entry.userAnswer, cache));
@@ -154,29 +186,34 @@ onMounted(() => {
 			<span class="progress-label">{{ totalAnswered }} of {{ totalQuestions }} questions answered</span>
 		</div>
 
+		<button v-if="allComplete" class="report-btn primary" @click="router.push({ name: 'report', params: { sessionId } })">Download Report</button>
+
 		<button class="edit-cards-btn" @click="router.push({ name: 'findMeaningManual', params: { sessionId } })">Edit selection</button>
 
 		<div class="card-list">
-			<div v-for="card in chosenCards" :key="card.id" :class="['card-surface', 'chosen-card', 'status-' + cardStatus(card.id)]">
-				<h3>{{ card.source }}</h3>
+			<div v-for="card in sortedCards" :key="card.id" :class="['card-surface', 'chosen-card', 'status-' + cardStatus(card.id)]">
+				<h3>
+					{{ card.description }} <span class="source-label">({{ card.source }})</span>
+				</h3>
 				<span v-if="cardStatus(card.id) === 'complete'" class="status-badge complete">Complete</span>
 				<span v-else-if="cardStatus(card.id) === 'partial'" class="status-badge partial">In progress</span>
-				<p>{{ card.description }}</p>
 				<div v-if="cardSummaryEntries[card.id]?.some((e) => e.loading)" class="summary-loading">Generating summary...</div>
-				<div v-else-if="cardSummaryEntries[card.id]" class="summary-block">
-					<div v-for="entry in cardSummaryEntries[card.id]" :key="entry.questionId" class="summary-item">
-						<div v-if="entry.error" class="summary-error">Could not load summary.</div>
-						<p v-else-if="entry.summary">
-							<strong>{{ entry.topic }}:</strong> {{ entry.summary }}
-						</p>
-					</div>
-				</div>
-				<p v-if="cardStatus(card.id) !== 'complete'" class="card-progress">{{ cardAnswerCounts[card.id] ?? 0 }} of {{ EXPLORE_QUESTIONS.length }} questions answered</p>
+				<ul v-else-if="cardSummaryEntries[card.id]" class="summary-block">
+					<li v-for="entry in cardSummaryEntries[card.id]" :key="entry.questionId" :class="['summary-item', { unanswered: entry.unanswered }]">
+						<span v-if="entry.unanswered" class="summary-unanswered"
+							><strong>{{ entry.topic }}:</strong> <em>Not yet answered.</em></span
+						>
+						<span v-else-if="entry.error" class="summary-error">Could not load summary.</span>
+						<span v-else-if="entry.summary"
+							><strong>{{ entry.topic }}:</strong> {{ entry.summary }}</span
+						>
+					</li>
+				</ul>
 				<button :class="['explore-btn', { prominent: cardStatus(card.id) !== 'complete' }]" @click="router.push({ name: 'exploreMeaning', params: { sessionId, meaningId: card.id } })">{{ exploreButtonLabel(card.id) }}</button>
 			</div>
 		</div>
 
-		<button class="report-btn" @click="router.push({ name: 'report', params: { sessionId } })">Download Report</button>
+		<button :class="['report-btn', { primary: allComplete }]" @click="router.push({ name: 'report', params: { sessionId } })">Download Report</button>
 	</main>
 </template>
 
@@ -234,6 +271,7 @@ h1 {
 	flex-direction: column;
 	align-items: center;
 	gap: 1rem;
+	margin-bottom: 1.5rem;
 }
 
 .chosen-card {
@@ -255,12 +293,12 @@ h1 {
 
 .status-badge {
 	position: absolute;
-	top: 0.75rem;
-	right: 0.75rem;
-	padding: 0.15rem 0.5rem;
+	top: 0;
+	right: 0;
+	padding: 0.25rem 0.6rem;
 	font-size: 0.75rem;
 	font-weight: 600;
-	border-radius: 999px;
+	border-radius: 0 12px 0 8px;
 }
 
 .status-badge.complete {
@@ -273,32 +311,21 @@ h1 {
 	background: #fff3cd;
 }
 
-.card-progress {
-	font-size: 0.85rem;
-	color: #888;
-	margin: 0.5rem 0 0;
-}
-
-.card-progress.complete {
-	color: #2a6e4e;
-	font-weight: 600;
-}
-
 .chosen-card h3 {
 	font-size: 1.1rem;
 	margin: 0 0 0.5rem;
 	color: #2a6e4e;
 }
 
-.chosen-card p {
-	font-size: 1rem;
-	line-height: 1.5;
-	margin: 0;
-	color: #333;
+.source-label {
+	font-weight: 400;
+	color: #555;
 }
 
 .explore-btn {
+	display: block;
 	margin-top: 0.75rem;
+	margin-left: auto;
 	padding: 0.5rem 1.25rem;
 	font-size: 0.95rem;
 	font-weight: 600;
@@ -341,22 +368,40 @@ h1 {
 	color: #c0392b;
 }
 
+.summary-unanswered,
+.summary-item.unanswered::before {
+	color: #888;
+}
+
+.summary-unanswered {
+	font-style: normal;
+}
+
 .summary-block {
+	list-style: none;
 	margin-top: 0.75rem;
-	padding: 0.75rem 1rem;
+	padding: 0 0 0 1.5rem;
 	font-size: 0.95rem;
 	line-height: 1.5;
 	color: #333;
-	background: #f0faf4;
-	border-left: 3px solid #2a6e4e;
-	border-radius: 4px;
 	display: flex;
 	flex-direction: column;
 	gap: 0.5rem;
 }
 
-.summary-item p {
-	margin: 0;
+.summary-item {
+	position: relative;
+	margin: 0.25rem 0;
+}
+
+.summary-item::before {
+	position: absolute;
+	left: -1.5rem;
+	content: "\2713";
+}
+
+.summary-item.unanswered::before {
+	content: "\2610";
 }
 
 .edit-cards-btn {
@@ -378,7 +423,7 @@ h1 {
 
 .report-btn {
 	display: block;
-	margin: 1.5rem auto 0;
+	margin: 0 auto 1rem;
 	padding: 0.5rem 1.25rem;
 	font-size: 0.95rem;
 	font-weight: 600;
@@ -391,5 +436,15 @@ h1 {
 
 .report-btn:hover {
 	background: #eaf5ef;
+}
+
+.report-btn.primary {
+	background: #2a6e4e;
+	color: #fff;
+	border-color: #2a6e4e;
+}
+
+.report-btn.primary:hover {
+	background: #225d40;
 }
 </style>
