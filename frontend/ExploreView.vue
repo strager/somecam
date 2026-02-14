@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref } from "vue";
+import { computed, onMounted, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
 
 import { fetchSummary } from "./api.ts";
@@ -18,6 +18,16 @@ const cardsById = new Map(MEANING_CARDS.map((c) => [c.id, c]));
 const questionsById = new Map(EXPLORE_QUESTIONS.map((q) => [q.id, q]));
 const chosenCards = ref<MeaningCard[]>([]);
 const answeredCards = ref<Set<string>>(new Set());
+
+const instructionText = computed(() => {
+	if (answeredCards.value.size === 0) {
+		return "Tap a card below to begin exploring what it means to you.";
+	}
+	if (answeredCards.value.size >= chosenCards.value.length) {
+		return "You've explored all your cards! Review your reflections or download your report.";
+	}
+	return `You've explored ${String(answeredCards.value.size)} of ${String(chosenCards.value.length)} cards. Tap another to continue, or download your report.`;
+});
 
 interface SummaryEntry {
 	questionId: string;
@@ -113,6 +123,9 @@ onMounted(() => {
 	<main>
 		<header>
 			<h1>Explore</h1>
+			<div v-if="chosenCards.length > 0" class="instruction-stack">
+				<p class="instruction active">{{ instructionText }}</p>
+			</div>
 		</header>
 
 		<button class="edit-cards-btn" @click="router.push({ name: 'findMeaningManual', params: { sessionId } })">Edit selection</button>

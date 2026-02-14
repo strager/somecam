@@ -2,6 +2,7 @@ import { createApp } from "vue";
 import { createRouter, createWebHistory } from "vue-router";
 
 import App from "./App.vue";
+import "./global.css";
 import ExploreMeaningView from "./ExploreMeaningView.vue";
 import ExploreView from "./ExploreView.vue";
 import FindMeaningManualView from "./FindMeaningManualView.vue";

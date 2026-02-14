@@ -93,7 +93,12 @@ watch(isComplete, (done) => {
 	<main>
 		<header>
 			<h1>Find Meaning — Prioritize</h1>
-			<p class="instruction">Keep your top sources of meaning (aim for 3–5)</p>
+			<div class="instruction-stack">
+				<p :class="['instruction', { active: currentIndex === 0 }]">You selected too many cards. Review each one and keep your top sources of meaning (aim for 3–5).</p>
+				<p :class="['instruction', { active: currentIndex > 0 && keptCount >= 3 && keptCount <= 5 }]">You've kept {{ keptCount }} so far — looking good! Continue reviewing the rest.</p>
+				<p :class="['instruction', { active: currentIndex > 0 && keptCount > 5 }]">You've kept {{ keptCount }} so far. Try to narrow down to 3–5.</p>
+				<p :class="['instruction', { active: currentIndex > 0 && keptCount < 3 }]">Keep your top sources of meaning (aim for 3–5).</p>
+			</div>
 			<div class="progress">
 				<div class="progress-bar">
 					<div class="progress-fill" :style="{ width: `${String(progressPercent)}%` }" />
@@ -141,12 +146,6 @@ h1 {
 	font-size: 2rem;
 	margin: 0 0 0.5rem;
 	letter-spacing: 0.02em;
-}
-
-.instruction {
-	color: #555;
-	margin: 0 0 1rem;
-	font-size: 1rem;
 }
 
 .progress {

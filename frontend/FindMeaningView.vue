@@ -125,6 +125,10 @@ function continueToNextPhase(): void {
 	<main>
 		<header>
 			<h1>Find Meaning</h1>
+			<div v-if="!isComplete" class="instruction-stack">
+				<p :class="['instruction', { active: currentIndex === 0 }]">Read each card and decide if this source of meaning resonates with you.</p>
+				<p :class="['instruction', { active: currentIndex > 0 }]">Keep going — decide if each source of meaning resonates with you.</p>
+			</div>
 			<div class="progress">
 				<div class="progress-bar">
 					<div class="progress-fill" :style="{ width: `${String(progressPercent)}%` }" />

@@ -87,6 +87,12 @@ onMounted(() => {
 	<main>
 		<header>
 			<h1>Find Meaning — Manual</h1>
+			<div class="instruction-stack">
+				<p :class="['instruction', { active: selectedCount === 0 }]">Select at least one source of meaning to explore.</p>
+				<p :class="['instruction', { active: selectedCount >= 1 && selectedCount <= 2 }]">Select the sources of meaning you want to explore (aim for 3–5).</p>
+				<p :class="['instruction', { active: selectedCount >= 3 && selectedCount <= 5 }]">Good selection! Tap Done when you're ready.</p>
+				<p :class="['instruction', { active: selectedCount > 5 }]">Consider narrowing to 3–5 sources for a more focused exploration.</p>
+			</div>
 			<p class="count">{{ selectedCount }} card{{ selectedCount === 1 ? "" : "s" }} selected</p>
 		</header>
 

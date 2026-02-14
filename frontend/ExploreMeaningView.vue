@@ -68,6 +68,8 @@ const allAnswered = computed(() => {
 	return entries.value.length === EXPLORE_QUESTIONS.length && entries.value.every((e) => e.submitted);
 });
 
+const submittedCount = computed(() => entries.value.filter((e) => e.submitted).length);
+
 function persistEntries(): void {
 	const data = loadExploreDataFull(sessionId);
 	if (data === null) return;
@@ -311,6 +313,11 @@ onMounted(() => {
 		<header>
 			<h1>Explore Meaning</h1>
 			<h2>{{ card.source }}</h2>
+			<div class="instruction-stack">
+				<p :class="['instruction', { active: !allAnswered && submittedCount === 0 }]">Reflect on what this source of meaning means to you. Answer each question thoughtfully.</p>
+				<p :class="['instruction', { active: !allAnswered && submittedCount > 0 }]">Question {{ submittedCount + 1 }} of {{ EXPLORE_QUESTIONS.length }} — keep reflecting on this source of meaning.</p>
+				<p :class="['instruction', { active: allAnswered }]">You've answered all questions. Add any additional notes, or finish exploring this card.</p>
+			</div>
 		</header>
 
 		<div class="card-wrapper">
