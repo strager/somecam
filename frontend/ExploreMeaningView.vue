@@ -493,7 +493,7 @@ onMounted(() => {
 					<p v-if="depthCheckShown" class="depth-follow-up">
 						<em>{{ depthCheckFollowUp }}</em>
 					</p>
-					<button class="submit-btn" :disabled="!depthCheckShown && currentAnswer.trim() === ''" @click="submitAnswer">Next</button>
+					<button class="btn-primary submit-btn" :disabled="!depthCheckShown && currentAnswer.trim() === ''" @click="submitAnswer">Next</button>
 					<p v-if="depthCheckShown" class="hint">Press Next to continue as-is, or edit your answer above</p>
 					<p v-else class="hint">Shift + Enter to submit</p>
 				</div>
@@ -503,7 +503,7 @@ onMounted(() => {
 					<ExploreTextarea v-model="freeformNote" :rows="5" placeholder="Any other thoughts you'd like to capture (optional)" @update:model-value="debouncedFreeformPersist" @blur="persistFreeform()" />
 				</div>
 
-				<button class="finish-btn" @click="finishExploring">Finish exploring</button>
+				<button class="btn-secondary finish-btn" @click="finishExploring">Finish exploring</button>
 			</div>
 		</div>
 	</main>
@@ -595,20 +595,6 @@ h2 {
 	display: block;
 	width: 100%;
 	margin-top: 1rem;
-	padding: 0.75rem 1.5rem;
-	font-weight: 600;
-	color: #fff;
-	background: #2a6e4e;
-	border-radius: 8px;
-}
-
-.submit-btn:hover:not(:disabled) {
-	background: #225d40;
-}
-
-.submit-btn:disabled {
-	opacity: 0.6;
-	cursor: not-allowed;
 }
 
 .hint {
@@ -635,15 +621,5 @@ h2 {
 	display: block;
 	width: 100%;
 	margin-top: 1.5rem;
-	padding: 0.75rem 1.5rem;
-	font-weight: 600;
-	color: #2a6e4e;
-	background: transparent;
-	border: 1.5px solid #2a6e4e;
-	border-radius: 8px;
-}
-
-.finish-btn:hover {
-	background: #eaf5ef;
 }
 </style>

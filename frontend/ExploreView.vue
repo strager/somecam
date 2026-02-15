@@ -253,9 +253,9 @@ onMounted(() => {
 			<span class="progress-label">{{ totalAnswered }} of {{ totalQuestions }} questions answered</span>
 		</div>
 
-		<button v-if="allComplete" class="report-btn primary" @click="onOpenReport('explore_overview_primary')">Download Report</button>
+		<button v-if="allComplete" class="btn-primary report-btn" @click="onOpenReport('explore_overview_primary')">Download Report</button>
 
-		<button class="edit-cards-btn" @click="onEditSelection">Edit selection</button>
+		<button class="btn-secondary edit-cards-btn" @click="onEditSelection">Edit selection</button>
 
 		<div class="card-list">
 			<div v-for="card in sortedCards" :key="card.id" :class="['card-surface', 'chosen-card', 'status-' + cardStatus(card.id)]">
@@ -280,11 +280,11 @@ onMounted(() => {
 						</li>
 					</ul>
 				</template>
-				<button :class="['explore-btn', { prominent: cardStatus(card.id) !== 'complete' }]" @click="onExploreCard(card.id)">{{ exploreButtonLabel(card.id) }}</button>
+				<button :class="['explore-btn', cardStatus(card.id) !== 'complete' ? 'btn-primary' : 'btn-secondary']" @click="onExploreCard(card.id)">{{ exploreButtonLabel(card.id) }}</button>
 			</div>
 		</div>
 
-		<button :class="['report-btn', { primary: allComplete }]" @click="onOpenReport('explore_overview_secondary')">Download Report</button>
+		<button :class="['report-btn', allComplete ? 'btn-primary' : 'btn-secondary']" @click="onOpenReport('explore_overview_secondary')">Download Report</button>
 	</main>
 </template>
 
@@ -396,30 +396,10 @@ h1 {
 	display: block;
 	margin-top: 0.75rem;
 	margin-left: auto;
-	padding: 0.5rem 1.25rem;
-	font-size: 0.95rem;
-	font-weight: 600;
-	background: transparent;
-	color: #2a6e4e;
-	border: 1.5px solid #2a6e4e;
-	border-radius: 6px;
 }
 
-.explore-btn:hover {
-	background: #eaf5ef;
-}
-
-.explore-btn.prominent {
-	display: block;
-	margin-left: auto;
+.explore-btn.btn-primary {
 	margin-right: auto;
-	padding: 0.75rem 2rem;
-	color: #fff;
-	background: #2a6e4e;
-}
-
-.explore-btn.prominent:hover {
-	background: #225d40;
 }
 
 .freeform-summary {
@@ -481,42 +461,10 @@ h1 {
 .edit-cards-btn {
 	display: block;
 	margin: 0 auto 1.5rem;
-	padding: 0.5rem 1.25rem;
-	font-size: 0.95rem;
-	font-weight: 600;
-	background: transparent;
-	color: #2a6e4e;
-	border: 1.5px solid #2a6e4e;
-	border-radius: 6px;
-}
-
-.edit-cards-btn:hover {
-	background: #eaf5ef;
 }
 
 .report-btn {
 	display: block;
 	margin: 0 auto 1rem;
-	padding: 0.5rem 1.25rem;
-	font-size: 0.95rem;
-	font-weight: 600;
-	background: transparent;
-	color: #2a6e4e;
-	border: 1.5px solid #2a6e4e;
-	border-radius: 6px;
-}
-
-.report-btn:hover {
-	background: #eaf5ef;
-}
-
-.report-btn.primary {
-	background: #2a6e4e;
-	color: #fff;
-	border-color: #2a6e4e;
-}
-
-.report-btn.primary:hover {
-	background: #225d40;
 }
 </style>

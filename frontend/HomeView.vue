@@ -131,7 +131,7 @@ function onLoadFile(): void {
 
 		<section class="sessions">
 			<div v-if="sessions.length === 0" class="cta">
-				<button type="button" @click="onNewSession">Start Finding Meaning</button>
+				<button type="button" class="btn-primary" @click="onNewSession">Start Finding Meaning</button>
 			</div>
 			<template v-else>
 				<h2>Your Sessions</h2>
@@ -159,7 +159,7 @@ function onLoadFile(): void {
 					</div>
 				</div>
 				<div class="cta">
-					<button type="button" class="new-session-btn" @click="onNewSession">Start New Session</button>
+					<button type="button" class="btn-secondary" @click="onNewSession">Start New Session</button>
 				</div>
 			</template>
 		</section>
@@ -258,7 +258,7 @@ section p {
 	overflow: hidden;
 	text-overflow: ellipsis;
 	white-space: nowrap;
-	color: #2a6e4e;
+	color: var(--color-green-600);
 	text-decoration: none;
 }
 
@@ -285,7 +285,7 @@ section p {
 	font-size: 0.95rem;
 	font-weight: 600;
 	padding: 0.15rem 0.35rem;
-	border: 1px solid #2a6e4e;
+	border: 1px solid var(--color-green-600);
 	border-radius: 4px;
 }
 
@@ -339,30 +339,12 @@ section p {
 
 .action-btn:hover {
 	border-color: #888;
-	color: #1a1a1a;
+	color: var(--color-black);
 }
 
 .delete-btn:hover {
-	border-color: #c0392b;
-	color: #c0392b;
-}
-
-.new-session-btn {
-	font-size: 0.9rem;
-	padding: 0.5rem 1.25rem;
-	border: 2px solid #2a6e4e;
-	border-radius: 6px;
-	background: none;
-	color: #2a6e4e;
-	font-weight: 600;
-	transition:
-		background 0.15s ease,
-		color 0.15s ease;
-}
-
-.new-session-btn:hover {
-	background: #2a6e4e;
-	color: #fff;
+	border-color: var(--color-error);
+	color: var(--color-error);
 }
 
 .cta {
@@ -370,17 +352,9 @@ section p {
 	margin: 2.5rem 0;
 }
 
-.cta button:not(.new-session-btn) {
-	font-size: 1.1rem;
-	padding: 0.75rem 2rem;
-	border-radius: 6px;
-	background: #2a6e4e;
-	color: #fff;
-	transition: background 0.15s ease;
-}
-
-.cta button:not(.new-session-btn):hover {
-	background: #1f5a3e;
+.cta .btn-primary {
+	padding: var(--space-3) var(--space-8);
+	font-size: var(--text-lg);
 }
 
 .file-actions {
@@ -392,14 +366,14 @@ section p {
 
 .file-btn {
 	background: none;
-	color: #999;
-	font-size: 0.85rem;
+	color: var(--color-gray-400);
+	font-size: var(--text-sm);
 	text-decoration: underline;
-	padding: 0.25rem 0.5rem;
+	padding: var(--space-1) var(--space-2);
 }
 
 .file-btn:hover {
-	color: #666;
+	color: var(--color-gray-600);
 }
 
 footer {

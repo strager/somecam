@@ -237,6 +237,13 @@ button:active span {
 	transform: translateY(1px);
 }
 
+.btn-primary,
+.btn-secondary {
+	padding: var(--space-2) var(--space-5);
+	border-radius: 6px;
+	font-weight: 600;
+}
+
 .btn-primary {
 	background: var(--color-green-600);
 	color: var(--color-white);

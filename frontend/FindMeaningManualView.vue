@@ -135,7 +135,7 @@ onMounted(() => {
 			</label>
 		</div>
 
-		<button class="done-btn" @click="onDone">Done</button>
+		<button class="btn-primary done-btn" @click="onDone">Done</button>
 	</main>
 </template>
 
@@ -203,7 +203,7 @@ h1 {
 	width: 1.15rem;
 	height: 1.15rem;
 	flex-shrink: 0;
-	accent-color: #2a6e4e;
+	accent-color: var(--color-green-600);
 	cursor: pointer;
 }
 
@@ -263,8 +263,8 @@ h1 {
 	padding: 0.35rem 1rem;
 	font-size: 0.85rem;
 	font-weight: 600;
-	color: #fff;
-	background: #c0392b;
+	color: var(--color-white);
+	background: var(--color-error);
 	border-radius: 4px;
 }
 
@@ -276,7 +276,7 @@ h1 {
 	padding: 0.35rem 1rem;
 	font-size: 0.85rem;
 	font-weight: 600;
-	color: #333;
+	color: var(--color-gray-800);
 	background: #e0e0e0;
 	border-radius: 4px;
 }
@@ -288,14 +288,5 @@ h1 {
 .done-btn {
 	display: block;
 	margin: 1.5rem auto 0;
-	padding: 0.6rem 2rem;
-	font-weight: 600;
-	color: #fff;
-	background: #2a6e4e;
-	border-radius: 6px;
-}
-
-.done-btn:hover {
-	background: #225d40;
 }
 </style>

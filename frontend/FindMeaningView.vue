@@ -289,17 +289,17 @@ h1 {
 }
 
 .btn.agree {
-	background: #2a6e4e;
-	color: #fff;
+	background: var(--color-green-600);
+	color: var(--color-white);
 }
 
 .btn.agree:hover:not(:disabled) {
-	background: #1f5a3e;
+	background: var(--color-green-700);
 }
 
 .btn.disagree {
 	background: #c83c3c;
-	color: #fff;
+	color: var(--color-white);
 }
 
 .btn.disagree:hover:not(:disabled) {
@@ -308,7 +308,7 @@ h1 {
 
 .btn.unsure {
 	background: #6b7280;
-	color: #fff;
+	color: var(--color-white);
 }
 
 .btn.unsure:hover:not(:disabled) {
@@ -316,24 +316,24 @@ h1 {
 }
 
 .btn.primary {
-	font-size: 1.1rem;
-	padding: 0.75rem 2rem;
-	background: #2a6e4e;
-	color: #fff;
+	font-size: var(--text-lg);
+	padding: var(--space-3) var(--space-8);
+	background: var(--color-green-600);
+	color: var(--color-white);
 }
 
 .btn.primary:hover {
-	background: #1f5a3e;
+	background: var(--color-green-700);
 }
 
 .btn.undo {
 	background: transparent;
-	color: #555;
+	color: var(--color-gray-600);
 	border: 1px solid #ccc;
 }
 
 .btn.undo:hover:not(:disabled) {
-	background: #f3f4f6;
+	background: var(--color-gray-50);
 }
 
 .blank-card {

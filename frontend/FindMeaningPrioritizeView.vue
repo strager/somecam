@@ -223,17 +223,17 @@ h1 {
 }
 
 .btn.agree {
-	background: #2a6e4e;
-	color: #fff;
+	background: var(--color-green-600);
+	color: var(--color-white);
 }
 
 .btn.agree:hover:not(:disabled) {
-	background: #1f5a3e;
+	background: var(--color-green-700);
 }
 
 .btn.disagree {
 	background: #c83c3c;
-	color: #fff;
+	color: var(--color-white);
 }
 
 .btn.disagree:hover:not(:disabled) {
@@ -242,12 +242,12 @@ h1 {
 
 .btn.undo {
 	background: transparent;
-	color: #555;
+	color: var(--color-gray-600);
 	border: 1px solid #ccc;
 }
 
 .btn.undo:hover:not(:disabled) {
-	background: #f3f4f6;
+	background: var(--color-gray-50);
 }
 
 .blank-card {
