@@ -74,7 +74,7 @@ export interface ExploreEntryFull extends ExploreEntry {
 export type ExploreData = Record<string, ExploreEntry[]>;
 export type ExploreDataFull = Record<string, ExploreEntryFull[]>;
 export type SummaryCache = Record<string, { answer: string; summary: string }>;
-export type FreeformNotes = Record<string, string>;
+export type FreeformNotes = Partial<Record<string, string>>;
 
 interface LlmTestRow {
 	questionId: string;
@@ -313,7 +313,7 @@ function parseJsonFromStorage(key: string): unknown {
 		if (raw === null) {
 			return null;
 		}
-		return JSON.parse(raw) as unknown;
+		return JSON.parse(raw);
 	} catch {
 		return null;
 	}
@@ -351,10 +351,10 @@ function toExploreEntryFull(value: unknown): ExploreEntryFull | null {
 		return null;
 	}
 
-	const withOptional = value as ExploreEntry & {
+	const withOptional: ExploreEntry & {
 		guardrailText?: unknown;
 		submittedAfterGuardrail?: unknown;
-	};
+	} = value;
 
 	if (withOptional.guardrailText !== undefined && typeof withOptional.guardrailText !== "string") {
 		return null;
@@ -459,17 +459,19 @@ export function needsPrioritization(sessionId: string): boolean {
 	return selectCandidateCards(sessionId).length > 5;
 }
 
-export function loadExploreData(sessionId: string): ExploreData | null {
-	const parsed = parseJsonFromStorage(exploreKey(sessionId));
-	if (!isObjectRecord(parsed)) {
-		return null;
-	}
-	for (const entries of Object.values(parsed)) {
+function isExploreData(value: unknown): value is ExploreData {
+	if (!isObjectRecord(value)) return false;
+	for (const entries of Object.values(value)) {
 		if (!Array.isArray(entries) || !entries.every((entry) => isExploreEntry(entry))) {
-			return null;
+			return false;
 		}
 	}
-	return parsed as ExploreData;
+	return true;
+}
+
+export function loadExploreData(sessionId: string): ExploreData | null {
+	const parsed = parseJsonFromStorage(exploreKey(sessionId));
+	return isExploreData(parsed) ? parsed : null;
 }
 
 export function loadExploreDataFull(sessionId: string): ExploreDataFull | null {
@@ -504,17 +506,17 @@ export function saveExploreData(sessionId: string, data: ExploreData | ExploreDa
 	touchSession(sessionId);
 }
 
+function isSummaryCache(value: unknown): value is SummaryCache {
+	if (!isObjectRecord(value)) return false;
+	for (const entry of Object.values(value)) {
+		if (!isSummaryCacheEntry(entry)) return false;
+	}
+	return true;
+}
+
 export function loadSummaryCache(sessionId: string): SummaryCache {
 	const parsed = parseJsonFromStorage(summariesKey(sessionId));
-	if (!isObjectRecord(parsed)) {
-		return {};
-	}
-	for (const entry of Object.values(parsed)) {
-		if (!isSummaryCacheEntry(entry)) {
-			return {};
-		}
-	}
-	return parsed as SummaryCache;
+	return isSummaryCache(parsed) ? parsed : {};
 }
 
 export function saveSummaryCache(sessionId: string, cache: SummaryCache): void {
@@ -530,17 +532,17 @@ export function lookupCachedSummary(cache: SummaryCache, cardId: string, answer:
 	return null;
 }
 
+function isFreeformNotes(value: unknown): value is FreeformNotes {
+	if (!isObjectRecord(value)) return false;
+	for (const v of Object.values(value)) {
+		if (typeof v !== "string") return false;
+	}
+	return true;
+}
+
 export function loadFreeformNotes(sessionId: string): FreeformNotes {
 	const parsed = parseJsonFromStorage(freeformKey(sessionId));
-	if (!isObjectRecord(parsed)) {
-		return {};
-	}
-	for (const value of Object.values(parsed)) {
-		if (typeof value !== "string") {
-			return {};
-		}
-	}
-	return parsed as FreeformNotes;
+	return isFreeformNotes(parsed) ? parsed : {};
 }
 
 export function saveFreeformNotes(sessionId: string, notes: FreeformNotes): void {
@@ -633,7 +635,7 @@ export function exportProgressData(): string {
 		for (const suffix of SESSION_DATA_SUFFIXES) {
 			const raw = localStorage.getItem(`somecam-${session.id}-${suffix}`);
 			if (raw !== null) {
-				data[suffix] = JSON.parse(raw) as unknown;
+				data[suffix] = JSON.parse(raw);
 			}
 		}
 		exported.push({ id: session.id, name: session.name, createdAt: session.createdAt, lastUpdatedAt: session.lastUpdatedAt, data });
@@ -643,10 +645,10 @@ export function exportProgressData(): string {
 
 export function importProgressData(json: string): ImportProgressStats {
 	const parsed: unknown = JSON.parse(json);
-	if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
+	if (!isObjectRecord(parsed)) {
 		throw new Error("Invalid progress data: expected an object");
 	}
-	const obj = parsed as Record<string, unknown>;
+	const obj = parsed;
 
 	if (obj.version === EXPORT_VERSION_V1) {
 		return importV1Data(obj);

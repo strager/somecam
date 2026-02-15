@@ -118,7 +118,10 @@ function onPointerDown(e: PointerEvent): void {
 	startY.value = e.clientY;
 	offsetX.value = 0;
 	offsetY.value = 0;
-	(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+	if (!(e.currentTarget instanceof HTMLElement)) {
+		throw new Error("Expected currentTarget to be an HTMLElement");
+	}
+	e.currentTarget.setPointerCapture(e.pointerId);
 }
 
 function onPointerMove(e: PointerEvent): void {

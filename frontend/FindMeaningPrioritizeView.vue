@@ -1,17 +1,17 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue";
-import { useRoute, useRouter } from "vue-router";
+import { useRouter } from "vue-router";
 
 import type { MeaningCard, SwipeDirection } from "../shared/meaning-cards.ts";
 import { MEANING_CARDS } from "../shared/meaning-cards.ts";
 import { capture } from "./analytics.ts";
+import { useStringParam } from "./route-utils.ts";
 import type { SwipeRecord } from "./store.ts";
 import { loadPrioritize, needsPrioritization, removePrioritize, saveChosenCardIds, savePrioritize } from "./store.ts";
 import SwipeCard from "./SwipeCard.vue";
 
-const route = useRoute();
 const router = useRouter();
-const sessionId = route.params.sessionId as string;
+const sessionId = useStringParam("sessionId");
 const cardsById = new Map(MEANING_CARDS.map((c) => [c.id, c]));
 
 const cards = ref<MeaningCard[]>([]);

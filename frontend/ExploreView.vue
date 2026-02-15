@@ -1,19 +1,19 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
-import { useRoute, useRouter } from "vue-router";
+import { useRouter } from "vue-router";
 
 import { fetchSummary } from "./api.ts";
 import { capture } from "./analytics.ts";
 import { assignQuestions } from "./explore-data.ts";
+import { useStringParam } from "./route-utils.ts";
 import type { ExploreEntry, SummaryCache } from "./store.ts";
 import { loadChosenCardIds, loadExploreData, loadFreeformNotes, loadSummaryCache, lookupCachedSummary, saveExploreData, saveSummaryCache } from "./store.ts";
 import { EXPLORE_QUESTIONS } from "../shared/explore-questions.ts";
 import type { MeaningCard } from "../shared/meaning-cards.ts";
 import { MEANING_CARDS } from "../shared/meaning-cards.ts";
 
-const route = useRoute();
 const router = useRouter();
-const sessionId = route.params.sessionId as string;
+const sessionId = useStringParam("sessionId");
 const cardsById = new Map(MEANING_CARDS.map((c) => [c.id, c]));
 const questionsById = new Map(EXPLORE_QUESTIONS.map((q) => [q.id, q]));
 const chosenCards = ref<MeaningCard[]>([]);
@@ -218,7 +218,7 @@ onMounted(() => {
 
 		const freeformNotes = loadFreeformNotes(sessionId);
 		for (const cardId of Object.keys(exploreData)) {
-			const noteText = freeformNotes[cardId] as string | undefined;
+			const noteText: string | undefined = freeformNotes[cardId];
 			if (noteText === undefined || noteText === "") continue;
 
 			const freeformEntry: FreeformSummary = { summary: "", loading: false, error: "" };

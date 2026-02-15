@@ -1,18 +1,18 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
-import { useRoute, useRouter } from "vue-router";
+import { useRouter } from "vue-router";
 import type { RouteLocationRaw } from "vue-router";
 
 import type { MeaningCard, SwipeDirection } from "../shared/meaning-cards.ts";
 import { MEANING_CARDS } from "../shared/meaning-cards.ts";
 import { capture } from "./analytics.ts";
+import { useStringParam } from "./route-utils.ts";
 import type { SwipeRecord } from "./store.ts";
 import { detectSessionPhase, loadSwipeProgress, needsPrioritization, saveChosenCardIds, savePrioritize, selectCandidateCards, saveSwipeProgress } from "./store.ts";
 import SwipeCard from "./SwipeCard.vue";
 
-const route = useRoute();
 const router = useRouter();
-const sessionId = route.params.sessionId as string;
+const sessionId = useStringParam("sessionId");
 
 const shuffledCards = ref<MeaningCard[]>([]);
 const currentIndex = ref(0);

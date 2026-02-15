@@ -49,11 +49,8 @@ function createProblemDetails(status: number, title: string, detail: string, err
 
 function firstErrorMessage(errors: unknown[]): string {
 	const firstError = errors[0];
-	if (typeof firstError === "object" && firstError !== null) {
-		const withMessage = firstError as { message?: unknown };
-		if (typeof withMessage.message === "string" && withMessage.message.length > 0) {
-			return withMessage.message;
-		}
+	if (typeof firstError === "object" && firstError !== null && "message" in firstError && typeof firstError.message === "string" && firstError.message.length > 0) {
+		return firstError.message;
 	}
 	return "Request validation failed.";
 }
@@ -63,17 +60,19 @@ function normalizeApiResponse(value: unknown): ApiResponse {
 		return { statusCode: 204 };
 	}
 
-	if (typeof value === "object" && value !== null && "statusCode" in value) {
-		const withStatusCode = value as {
-			statusCode: number;
-			body?: unknown;
-			headers?: Record<string, string>;
+	if (typeof value === "object" && value !== null && "statusCode" in value && typeof value.statusCode === "number") {
+		const result: ApiResponse = {
+			statusCode: value.statusCode,
+			body: "body" in value ? value.body : undefined,
 		};
-		return {
-			statusCode: withStatusCode.statusCode,
-			body: withStatusCode.body,
-			headers: withStatusCode.headers,
-		};
+		if ("headers" in value && typeof value.headers === "object" && value.headers !== null) {
+			const headers: Record<string, string> = {};
+			for (const [k, v] of Object.entries(value.headers)) {
+				if (typeof v === "string") headers[k] = v;
+			}
+			result.headers = headers;
+		}
+		return result;
 	}
 
 	return {
@@ -157,11 +156,12 @@ function toOpenApiRequest(req: ExpressRequest): OpenApiRequest {
 		}
 	}
 
+	const reqBody: unknown = req.body;
 	return {
 		method: req.method,
 		path: req.url,
 		headers,
-		body: req.body as unknown,
+		body: reqBody,
 	};
 }
 
@@ -180,11 +180,13 @@ api.register({
 			};
 		}
 
-		const { cardId, questionId, answer } = context.request.requestBody as {
-			cardId: string;
-			questionId?: string;
-			answer: string;
-		};
+		const body: unknown = context.request.requestBody;
+		if (typeof body !== "object" || body === null || !("cardId" in body) || typeof body.cardId !== "string" || !("answer" in body) || typeof body.answer !== "string") {
+			throw new Error("Invalid request body for postSummarize");
+		}
+		const cardId = body.cardId;
+		const questionId = "questionId" in body && typeof body.questionId === "string" ? body.questionId : undefined;
+		const answer = body.answer;
 
 		const cardsById = new Map(MEANING_CARDS.map((c) => [c.id, c]));
 
@@ -251,10 +253,18 @@ api.register({
 			};
 		}
 
-		const { cardId, questions } = context.request.requestBody as {
-			cardId: string;
-			questions: { questionId: string; answer: string }[];
-		};
+		const body: unknown = context.request.requestBody;
+		if (typeof body !== "object" || body === null || !("cardId" in body) || typeof body.cardId !== "string" || !("questions" in body) || !Array.isArray(body.questions)) {
+			throw new Error("Invalid request body for postInferAnswers");
+		}
+		const cardId = body.cardId;
+		const items: unknown[] = body.questions;
+		const questions: { questionId: string; answer: string }[] = [];
+		for (const q of items) {
+			if (typeof q === "object" && q !== null && "questionId" in q && typeof q.questionId === "string" && "answer" in q && typeof q.answer === "string") {
+				questions.push({ questionId: q.questionId, answer: q.answer });
+			}
+		}
 
 		const cardsById = new Map(MEANING_CARDS.map((c) => [c.id, c]));
 		const questionsById = new Map(EXPLORE_QUESTIONS.map((q) => [q.id, q]));
@@ -309,16 +319,17 @@ api.register({
 			});
 
 			try {
-				const parsed = JSON.parse(content) as unknown;
+				const parsed: unknown = JSON.parse(content);
 				if (!Array.isArray(parsed)) {
 					return { statusCode: 200, body: { inferredAnswers: [] } };
 				}
+				const items: unknown[] = parsed;
 				const inferredAnswers: { questionId: string; answer: string }[] = [];
-				for (const item of parsed) {
-					if (typeof item === "object" && item !== null && typeof (item as Record<string, unknown>).questionId === "string" && typeof (item as Record<string, unknown>).answer === "string") {
+				for (const item of items) {
+					if (typeof item === "object" && item !== null && "questionId" in item && typeof item.questionId === "string" && "answer" in item && typeof item.answer === "string") {
 						inferredAnswers.push({
-							questionId: (item as Record<string, unknown>).questionId as string,
-							answer: (item as Record<string, unknown>).answer as string,
+							questionId: item.questionId,
+							answer: item.answer,
 						});
 					}
 				}
@@ -344,15 +355,13 @@ api.register({
 			};
 		}
 
-		const {
-			cardId: depthCardId,
-			questionId,
-			answer,
-		} = context.request.requestBody as {
-			cardId: string;
-			questionId: string;
-			answer: string;
-		};
+		const depthBody: unknown = context.request.requestBody;
+		if (typeof depthBody !== "object" || depthBody === null || !("cardId" in depthBody) || typeof depthBody.cardId !== "string" || !("questionId" in depthBody) || typeof depthBody.questionId !== "string" || !("answer" in depthBody) || typeof depthBody.answer !== "string") {
+			throw new Error("Invalid request body for postCheckAnswerDepth");
+		}
+		const depthCardId = depthBody.cardId;
+		const questionId = depthBody.questionId;
+		const answer = depthBody.answer;
 
 		const cardsById = new Map(MEANING_CARDS.map((c) => [c.id, c]));
 		const questionsById = new Map(EXPLORE_QUESTIONS.map((q) => [q.id, q]));
@@ -395,13 +404,12 @@ api.register({
 			});
 
 			try {
-				const parsed = JSON.parse(content) as unknown;
+				const parsed: unknown = JSON.parse(content);
 				if (typeof parsed !== "object" || parsed === null) {
 					return { statusCode: 200, body: { sufficient: true, followUpQuestion: "" } };
 				}
-				const obj = parsed as Record<string, unknown>;
-				const sufficient = typeof obj.sufficient === "boolean" ? obj.sufficient : true;
-				const followUpQuestion = typeof obj.followUpQuestion === "string" ? obj.followUpQuestion : "";
+				const sufficient = "sufficient" in parsed && typeof parsed.sufficient === "boolean" ? parsed.sufficient : true;
+				const followUpQuestion = "followUpQuestion" in parsed && typeof parsed.followUpQuestion === "string" ? parsed.followUpQuestion : "";
 				return { statusCode: 200, body: { sufficient, followUpQuestion } };
 			} catch {
 				return { statusCode: 200, body: { sufficient: true, followUpQuestion: "" } };

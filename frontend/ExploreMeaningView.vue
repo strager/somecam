@@ -1,10 +1,11 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, ref } from "vue";
-import { useRoute, useRouter } from "vue-router";
+import { useRouter } from "vue-router";
 
 import { fetchAnswerDepthCheck, fetchInferredAnswers } from "./api.ts";
 import { capture } from "./analytics.ts";
 import ExploreTextarea from "./ExploreTextarea.vue";
+import { useStringParam } from "./route-utils.ts";
 import type { ExploreEntryFull } from "./store.ts";
 import { loadChosenCardIds, loadExploreDataFull, loadFreeformNotes, requestStoragePersistence, saveExploreData, saveFreeformNotes } from "./store.ts";
 import type { ExploreQuestion } from "../shared/explore-questions.ts";
@@ -12,14 +13,13 @@ import { EXPLORE_QUESTIONS } from "../shared/explore-questions.ts";
 import type { MeaningCard } from "../shared/meaning-cards.ts";
 import { MEANING_CARDS } from "../shared/meaning-cards.ts";
 
-const route = useRoute();
 const router = useRouter();
 
 const cardsById = new Map(MEANING_CARDS.map((c) => [c.id, c]));
 const questionsById = new Map(EXPLORE_QUESTIONS.map((q) => [q.id, q]));
 
-const sessionId = route.params.sessionId as string;
-const cardId = route.params.meaningId as string;
+const sessionId = useStringParam("sessionId");
+const cardId = useStringParam("meaningId");
 
 const card = ref<MeaningCard | undefined>(undefined);
 const entries = ref<ExploreEntryFull[]>([]);

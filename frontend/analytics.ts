@@ -15,7 +15,7 @@ export function initAnalytics(router: Router): void {
 		capture_pageview: false, // We capture $pageview ourselves.
 		capture_pageleave: true,
 	});
-	(window as unknown as Record<string, unknown>).posthog = posthog;
+	Object.assign(window, { posthog });
 
 	router.afterEach((to) => {
 		const routeTemplate = to.matched.at(-1)?.path ?? to.path;

@@ -74,20 +74,11 @@ describe("API", () => {
 		expect(response.status).toBe(400);
 		expect(response.headers.get("content-type")).toContain("application/problem+json");
 
-		const body = (await response.json()) as {
-			type?: unknown;
-			title?: unknown;
-			status?: unknown;
-			detail?: unknown;
-		};
-		expect(body).toEqual(
-			expect.objectContaining({
-				type: "about:blank",
-				title: expect.any(String) as unknown,
-				status: 400,
-				detail: expect.any(String) as unknown,
-			}),
-		);
+		const body: unknown = await response.json();
+		expect(body).toHaveProperty("type", "about:blank");
+		expect(body).toHaveProperty("title", expect.any(String));
+		expect(body).toHaveProperty("status", 400);
+		expect(body).toHaveProperty("detail", expect.any(String));
 	});
 
 	it("returns 500 for POST /api/summarize when config is not set", async () => {
@@ -103,12 +94,7 @@ describe("API", () => {
 		expect(response.status).toBe(500);
 		expect(response.headers.get("content-type")).toContain("application/problem+json");
 
-		const body = (await response.json()) as {
-			type?: unknown;
-			title?: unknown;
-			status?: unknown;
-			detail?: unknown;
-		};
+		const body: unknown = await response.json();
 		expect(body).toEqual(
 			expect.objectContaining({
 				type: "about:blank",
@@ -131,12 +117,7 @@ describe("API", () => {
 		expect(response.status).toBe(500);
 		expect(response.headers.get("content-type")).toContain("application/problem+json");
 
-		const body = (await response.json()) as {
-			type?: unknown;
-			title?: unknown;
-			status?: unknown;
-			detail?: unknown;
-		};
+		const body: unknown = await response.json();
 		expect(body).toEqual(
 			expect.objectContaining({
 				type: "about:blank",
@@ -156,20 +137,11 @@ describe("API", () => {
 		expect(response.status).toBe(400);
 		expect(response.headers.get("content-type")).toContain("application/problem+json");
 
-		const body = (await response.json()) as {
-			type?: unknown;
-			title?: unknown;
-			status?: unknown;
-			detail?: unknown;
-		};
-		expect(body).toEqual(
-			expect.objectContaining({
-				type: "about:blank",
-				title: expect.any(String) as unknown,
-				status: 400,
-				detail: expect.any(String) as unknown,
-			}),
-		);
+		const body: unknown = await response.json();
+		expect(body).toHaveProperty("type", "about:blank");
+		expect(body).toHaveProperty("title", expect.any(String));
+		expect(body).toHaveProperty("status", 400);
+		expect(body).toHaveProperty("detail", expect.any(String));
 	});
 
 	it("returns 500 for POST /api/infer-answers when config is not set", async () => {
@@ -188,12 +160,7 @@ describe("API", () => {
 		expect(response.status).toBe(500);
 		expect(response.headers.get("content-type")).toContain("application/problem+json");
 
-		const body = (await response.json()) as {
-			type?: unknown;
-			title?: unknown;
-			status?: unknown;
-			detail?: unknown;
-		};
+		const body: unknown = await response.json();
 		expect(body).toEqual(
 			expect.objectContaining({
 				type: "about:blank",
@@ -213,20 +180,11 @@ describe("API", () => {
 		expect(response.status).toBe(400);
 		expect(response.headers.get("content-type")).toContain("application/problem+json");
 
-		const body = (await response.json()) as {
-			type?: unknown;
-			title?: unknown;
-			status?: unknown;
-			detail?: unknown;
-		};
-		expect(body).toEqual(
-			expect.objectContaining({
-				type: "about:blank",
-				title: expect.any(String) as unknown,
-				status: 400,
-				detail: expect.any(String) as unknown,
-			}),
-		);
+		const body: unknown = await response.json();
+		expect(body).toHaveProperty("type", "about:blank");
+		expect(body).toHaveProperty("title", expect.any(String));
+		expect(body).toHaveProperty("status", 400);
+		expect(body).toHaveProperty("detail", expect.any(String));
 	});
 
 	it("returns 500 for POST /api/check-answer-depth when config is not set", async () => {
@@ -242,12 +200,7 @@ describe("API", () => {
 		expect(response.status).toBe(500);
 		expect(response.headers.get("content-type")).toContain("application/problem+json");
 
-		const body = (await response.json()) as {
-			type?: unknown;
-			title?: unknown;
-			status?: unknown;
-			detail?: unknown;
-		};
+		const body: unknown = await response.json();
 		expect(body).toEqual(
 			expect.objectContaining({
 				type: "about:blank",
@@ -263,21 +216,11 @@ describe("API", () => {
 		expect(response.status).toBe(400);
 		expect(response.headers.get("content-type")).toContain("application/problem+json");
 
-		const body = (await response.json()) as {
-			type?: unknown;
-			title?: unknown;
-			status?: unknown;
-			detail?: unknown;
-			errors?: unknown;
-		};
-		expect(body).toEqual(
-			expect.objectContaining({
-				type: "about:blank",
-				title: expect.any(String) as unknown,
-				status: 400,
-				detail: expect.any(String) as unknown,
-			}),
-		);
-		expect(Array.isArray(body.errors)).toBe(true);
+		const body: unknown = await response.json();
+		expect(body).toHaveProperty("type", "about:blank");
+		expect(body).toHaveProperty("title", expect.any(String));
+		expect(body).toHaveProperty("status", 400);
+		expect(body).toHaveProperty("detail", expect.any(String));
+		expect(body).toHaveProperty("errors");
 	});
 });

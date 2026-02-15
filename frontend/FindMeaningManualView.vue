@@ -1,15 +1,15 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
-import { useRoute, useRouter } from "vue-router";
+import { useRouter } from "vue-router";
 
 import { assignQuestions } from "./explore-data.ts";
 import { capture } from "./analytics.ts";
+import { useStringParam } from "./route-utils.ts";
 import { loadChosenCardIds, loadExploreData, saveChosenCardIds, saveExploreData } from "./store.ts";
 import { MEANING_CARDS } from "../shared/meaning-cards.ts";
 
-const route = useRoute();
 const router = useRouter();
-const sessionId = route.params.sessionId as string;
+const sessionId = useStringParam("sessionId");
 const chosenIds = ref<Set<string>>(new Set());
 const exploredIds = ref<Set<string>>(new Set());
 const confirmingRemove = ref<string | null>(null);

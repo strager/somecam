@@ -275,7 +275,7 @@ describe("posthog proxy integration", () => {
 
 		expect(res.status).toBe(200);
 		expect(lastUpstreamRequest).toBeDefined();
-		const upstreamBody = JSON.parse(await lastUpstreamRequest!.text()) as unknown; // eslint-disable-line @typescript-eslint/no-non-null-assertion -- guarded by expect above
+		const upstreamBody: unknown = JSON.parse(await lastUpstreamRequest!.text()); // eslint-disable-line @typescript-eslint/no-non-null-assertion -- guarded by expect above
 		expect(upstreamBody).toEqual([
 			{ event: "test", properties: { token: "phc_test", x: 1 } },
 			{ event: "click", properties: { token: "phc_test" } },
@@ -296,7 +296,7 @@ describe("posthog proxy integration", () => {
 
 		expect(res.status).toBe(200);
 		expect(lastUpstreamRequest).toBeDefined();
-		const upstreamBody = JSON.parse(await lastUpstreamRequest!.text()) as unknown; // eslint-disable-line @typescript-eslint/no-non-null-assertion -- guarded by expect above
+		const upstreamBody: unknown = JSON.parse(await lastUpstreamRequest!.text()); // eslint-disable-line @typescript-eslint/no-non-null-assertion -- guarded by expect above
 		expect(upstreamBody).toEqual({ token: "phc_test", distinct_id: "x" });
 	});
 
@@ -314,7 +314,7 @@ describe("posthog proxy integration", () => {
 
 		expect(res.status).toBe(200);
 		expect(lastUpstreamRequest).toBeDefined();
-		const upstreamBody = JSON.parse(await lastUpstreamRequest!.text()) as unknown; // eslint-disable-line @typescript-eslint/no-non-null-assertion -- guarded by expect above
+		const upstreamBody: unknown = JSON.parse(await lastUpstreamRequest!.text()); // eslint-disable-line @typescript-eslint/no-non-null-assertion -- guarded by expect above
 		expect(upstreamBody).toEqual({ token: "something_else", distinct_id: "x" });
 	});
 

@@ -148,24 +148,18 @@ export function isAssetPath(pathname: string): boolean {
 
 export function rewriteTokenInBody(data: unknown, apiKey: string): void {
 	if (Array.isArray(data)) {
-		for (const element of data as unknown[]) {
-			if (element !== null && typeof element === "object" && "properties" in element) {
-				const props = (element as Record<string, unknown>).properties as Record<string, unknown>;
-				if (props.token === ANALYTICS_PROXY_TOKEN) {
-					props.token = apiKey;
-				}
+		const elements: unknown[] = data;
+		for (const element of elements) {
+			if (typeof element === "object" && element !== null && "properties" in element && typeof element.properties === "object" && element.properties !== null && "token" in element.properties && element.properties.token === ANALYTICS_PROXY_TOKEN) {
+				element.properties.token = apiKey;
 			}
 		}
-	} else if (data !== null && typeof data === "object") {
-		const obj = data as Record<string, unknown>;
-		if (obj.token === ANALYTICS_PROXY_TOKEN) {
-			obj.token = apiKey;
+	} else if (typeof data === "object" && data !== null) {
+		if ("token" in data && data.token === ANALYTICS_PROXY_TOKEN) {
+			data.token = apiKey;
 		}
-		if ("properties" in obj && obj.properties !== null && typeof obj.properties === "object") {
-			const props = obj.properties as Record<string, unknown>;
-			if (props.token === ANALYTICS_PROXY_TOKEN) {
-				props.token = apiKey;
-			}
+		if ("properties" in data && typeof data.properties === "object" && data.properties !== null && "token" in data.properties && data.properties.token === ANALYTICS_PROXY_TOKEN) {
+			data.properties.token = apiKey;
 		}
 	}
 }

@@ -593,20 +593,28 @@ describe("clearAllProgress", () => {
 
 describe("exportProgressData/importProgressData", () => {
 	it("exportProgressData returns v2 format with empty session data", () => {
-		const result = JSON.parse(exportProgressData()) as Record<string, unknown>;
-		expect(result.version).toBe("somecam-v2");
-		expect(Array.isArray(result.sessions)).toBe(true);
-		const sessions = result.sessions as Record<string, unknown>[];
-		expect(sessions).toHaveLength(1);
-		expect(sessions[0].data).toEqual({});
+		const result: unknown = JSON.parse(exportProgressData());
+		expect(result).toHaveProperty("version", "somecam-v2");
+		expect(result).toHaveProperty("sessions");
+		if (typeof result !== "object" || result === null || !("sessions" in result) || !Array.isArray(result.sessions)) {
+			throw new Error("Expected sessions array");
+		}
+		expect(result.sessions).toHaveLength(1);
+		expect(result.sessions[0]).toHaveProperty("data", {});
 	});
 
 	it("exportProgressData includes session data", () => {
 		saveChosenCardIds(sid(), ["self-knowledge", "community"]);
-		const result = JSON.parse(exportProgressData()) as Record<string, unknown>;
-		const sessions = result.sessions as Record<string, unknown>[];
-		const data = sessions[0].data as Record<string, unknown>;
-		expect(data.chosen).toEqual(["self-knowledge", "community"]);
+		const result: unknown = JSON.parse(exportProgressData());
+		if (typeof result !== "object" || result === null || !("sessions" in result) || !Array.isArray(result.sessions)) {
+			throw new Error("Expected sessions array");
+		}
+		const sessions: unknown[] = result.sessions;
+		const firstSession: unknown = sessions[0];
+		if (typeof firstSession !== "object" || firstSession === null || !("data" in firstSession)) {
+			throw new Error("Expected data");
+		}
+		expect(firstSession.data).toHaveProperty("chosen", ["self-knowledge", "community"]);
 	});
 
 	it("exportProgressData exports all sessions", () => {
@@ -614,13 +622,20 @@ describe("exportProgressData/importProgressData", () => {
 		const secondId = createSession("Second");
 		saveChosenCardIds(sid(), ["community"]);
 
-		const result = JSON.parse(exportProgressData()) as Record<string, unknown>;
-		const sessions = result.sessions as Record<string, unknown>[];
-		expect(sessions).toHaveLength(2);
+		const result: unknown = JSON.parse(exportProgressData());
+		if (typeof result !== "object" || result === null || !("sessions" in result) || !Array.isArray(result.sessions)) {
+			throw new Error("Expected sessions array");
+		}
+		expect(result.sessions).toHaveLength(2);
 
-		const secondSession = sessions.find((s) => s.id === secondId);
+		const sessions: unknown[] = result.sessions;
+		const secondSession = sessions.find((s) => typeof s === "object" && s !== null && "id" in s && s.id === secondId);
 		expect(secondSession).toBeDefined();
-		expect((secondSession?.data as Record<string, unknown>).chosen).toEqual(["community"]);
+		expect(secondSession).toHaveProperty("data");
+		if (typeof secondSession !== "object" || secondSession === null || !("data" in secondSession)) {
+			throw new Error("Expected data");
+		}
+		expect(secondSession.data).toHaveProperty("chosen", ["community"]);
 	});
 
 	it("importProgressData v1 creates a new session", () => {
@@ -930,8 +945,12 @@ describe("session management", () => {
 
 		// The empty session should be purged from metadata
 		const raw = localStorage.getItem("somecam-sessions");
-		const meta = JSON.parse(raw ?? "[]") as { id: string }[];
-		expect(meta.find((s) => s.id === emptyId)).toBeUndefined();
+		const parsed: unknown = JSON.parse(raw ?? "[]");
+		if (!Array.isArray(parsed)) {
+			throw new Error("Expected sessions array");
+		}
+		const meta: unknown[] = parsed;
+		expect(meta.find((s) => typeof s === "object" && s !== null && "id" in s && s.id === emptyId)).toBeUndefined();
 	});
 
 	it("ensureSessionsInitialized creates one session", () => {

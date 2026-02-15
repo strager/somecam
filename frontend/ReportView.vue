@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import { onMounted, ref } from "vue";
-import { useRoute, useRouter } from "vue-router";
+import { useRouter } from "vue-router";
 
 import { capture } from "./analytics.ts";
+import { useStringParam } from "./route-utils.ts";
 import { loadChosenCardIds, loadExploreData, loadFreeformNotes, loadSummaryCache, lookupCachedSummary } from "./store.ts";
 import { EXPLORE_QUESTIONS } from "../shared/explore-questions.ts";
 import type { MeaningCard } from "../shared/meaning-cards.ts";
@@ -22,9 +23,8 @@ interface CardReport {
 	freeformSummary: string;
 }
 
-const route = useRoute();
 const router = useRouter();
-const sessionId = route.params.sessionId as string;
+const sessionId = useStringParam("sessionId");
 const cardsById = new Map(MEANING_CARDS.map((c) => [c.id, c]));
 
 const reports = ref<CardReport[]>([]);

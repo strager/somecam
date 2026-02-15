@@ -48,6 +48,9 @@ export default [
 			// need manual declarations.
 			"no-undef": "off",
 
+			// Disallow type assertions (`as`, angle-bracket).
+			"@typescript-eslint/consistent-type-assertions": ["warn", { assertionStyle: "never" }],
+
 			// Allow _-prefixed unused args
 			"@typescript-eslint/no-unused-vars": [
 				"error",

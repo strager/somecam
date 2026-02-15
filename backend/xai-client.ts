@@ -12,14 +12,6 @@ interface ChatCompletionOptions {
 	debugPrompt?: boolean;
 }
 
-interface ChatCompletionResponse {
-	choices: {
-		message: {
-			content: string;
-		};
-	}[];
-}
-
 export async function createChatCompletion(options: ChatCompletionOptions): Promise<string> {
 	const body: Record<string, unknown> = {
 		model: options.model,
@@ -56,10 +48,14 @@ export async function createChatCompletion(options: ChatCompletionOptions): Prom
 		console.log("[DEBUG_PROMPT] Response:", text);
 	}
 
-	const data = JSON.parse(text) as ChatCompletionResponse;
-	if (data.choices.length === 0 || !data.choices[0].message.content) {
+	const raw: unknown = JSON.parse(text);
+	if (typeof raw !== "object" || raw === null || !("choices" in raw) || !Array.isArray(raw.choices) || raw.choices.length === 0) {
+		throw new Error("X AI API returned no choices.");
+	}
+	const firstChoice: unknown = raw.choices[0];
+	if (typeof firstChoice !== "object" || firstChoice === null || !("message" in firstChoice) || typeof firstChoice.message !== "object" || firstChoice.message === null || !("content" in firstChoice.message) || typeof firstChoice.message.content !== "string" || firstChoice.message.content === "") {
 		throw new Error("X AI API returned no choices.");
 	}
 
-	return data.choices[0].message.content;
+	return firstChoice.message.content;
 }

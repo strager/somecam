@@ -20,7 +20,10 @@ function focus(): void {
 }
 
 function onInput(event: Event): void {
-	emit("update:modelValue", (event.target as HTMLTextAreaElement).value);
+	if (!(event.target instanceof HTMLTextAreaElement)) {
+		throw new Error("Expected target to be an HTMLTextAreaElement");
+	}
+	emit("update:modelValue", event.target.value);
 }
 
 defineExpose({ focus });
