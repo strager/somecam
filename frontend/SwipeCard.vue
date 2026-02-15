@@ -235,8 +235,6 @@ defineExpose({ flyAway });
 	top: 1rem;
 	font-size: var(--text-lg);
 	font-weight: 700;
-	text-transform: uppercase;
-	letter-spacing: 0.05em;
 	pointer-events: none;
 }
 
@@ -257,10 +255,8 @@ defineExpose({ flyAway });
 }
 
 .card-source {
-	font-size: var(--text-xs);
+	font-size: var(--text-lg);
 	font-weight: 600;
-	text-transform: uppercase;
-	letter-spacing: 0.05em;
 	color: var(--color-gray-400);
 	margin: 0 0 var(--space-2);
 	position: relative;
