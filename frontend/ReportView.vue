@@ -90,8 +90,9 @@ onMounted(() => {
 
 		<section class="summary-section">
 			<h2>What is meaningful to me?</h2>
-			<div v-for="report in reports" :key="report.card.id" class="report-card">
-				<h3>{{ report.card.description }}</h3>
+			<div v-for="report in reports" :key="report.card.id" class="card-hrule report-card">
+				<h3 class="card-title">{{ report.card.description }}</h3>
+				<div class="card-body">
 				<p v-if="report.freeformSummary" class="freeform-summary">{{ report.freeformSummary }}</p>
 				<ul class="summary-list">
 					<template v-for="q in report.questions" :key="q.topic">
@@ -99,22 +100,25 @@ onMounted(() => {
 					</template>
 				</ul>
 				<p v-if="!report.freeformSummary && report.questions.every((q) => !q.summary)" class="qa-unanswered">No self reflections</p>
+				</div>
 			</div>
 		</section>
 
 		<section class="detail-section">
 			<h2>Self reflections</h2>
-			<div v-for="report in reports" :key="report.card.id" class="report-card">
-				<h3>
+			<div v-for="report in reports" :key="report.card.id" class="card-hrule report-card">
+				<h3 class="card-title">
 					{{ report.card.description }} <span class="source-label">({{ report.card.source }})</span>
 				</h3>
-				<div v-if="report.freeformNote" class="qa-block">
-					<p class="qa-freeform-answer">{{ report.freeformNote }}</p>
-				</div>
-				<div v-for="q in report.questions" :key="q.topic" class="qa-block">
-					<p class="qa-topic">{{ q.question }}</p>
-					<p v-if="q.answer" class="qa-answer">{{ q.answer }}</p>
-					<p v-else class="qa-unanswered">Not yet answered.</p>
+				<div class="card-body">
+					<div v-if="report.freeformNote" class="qa-block">
+						<p class="qa-freeform-answer">{{ report.freeformNote }}</p>
+					</div>
+					<div v-for="q in report.questions" :key="q.topic" class="qa-block">
+						<p class="qa-topic">{{ q.question }}</p>
+						<p v-if="q.answer" class="qa-answer">{{ q.answer }}</p>
+						<p v-else class="qa-unanswered">Not yet answered.</p>
+					</div>
 				</div>
 			</div>
 		</section>
@@ -123,78 +127,62 @@ onMounted(() => {
 
 <style scoped>
 main {
-	margin: 2rem auto;
+	margin: var(--space-8) auto;
 	max-width: 42rem;
-	padding: 0 1.5rem;
-	color: #1a1a1a;
+	padding: 0 var(--space-6);
+	color: var(--color-black);
 }
 
 header {
-	text-align: center;
-	margin-bottom: 2rem;
+	margin-bottom: var(--space-8);
 }
 
 h1 {
-	font-size: 2rem;
-	margin: 0 0 0.25rem;
-	letter-spacing: 0.02em;
+	font-family: var(--font-heading);
+	font-size: var(--text-4xl);
+	font-weight: 500;
+	margin: 0 0 var(--space-1);
 }
 
 header h2 {
-	font-size: 1.25rem;
+	font-family: var(--font-heading);
+	font-size: var(--text-lg);
 	font-weight: 400;
-	color: #555;
-	margin: 0 0 1rem;
+	font-style: italic;
+	color: var(--color-gray-600);
+	margin: 0 0 var(--space-4);
 }
 
 .intro {
-	font-size: 0.95rem;
-	line-height: 1.6;
-	color: #333;
-	margin: 0 0 0.75rem;
-	text-align: left;
+	font-size: var(--text-base);
+	line-height: var(--leading-relaxed);
+	color: var(--color-gray-800);
+	margin: 0 0 var(--space-3);
 }
 
 .citation {
-	font-size: 0.85rem;
-	color: #666;
-	line-height: 1.5;
-	margin: 0 0 1rem;
-	text-align: left;
+	font-size: var(--text-sm);
+	color: var(--color-gray-400);
+	line-height: var(--leading-normal);
+	margin: 0 0 var(--space-4);
 }
 
 .empty-notice {
 	text-align: center;
-	padding: 2rem;
-	color: #555;
+	padding: var(--space-8);
+	color: var(--color-gray-600);
 }
 
 section h2 {
-	font-size: 1.4rem;
-	margin: 2rem 0 1rem;
-	padding-bottom: 0.5rem;
-	border-bottom: 2px solid #2a6e4e;
-}
-
-.report-card {
-	padding-top: 1.5rem;
-	padding-bottom: 1.5rem;
-	border-top: 1px solid #eee;
-}
-h2 + .report-card {
-	border-top: none;
-	padding-top: 0;
-}
-
-.report-card h3 {
-	font-size: 1.1rem;
-	margin: 0 0 0.25rem;
-	color: #2a6e4e;
+	font-family: var(--font-heading);
+	font-size: var(--text-3xl);
+	font-weight: 500;
+	margin: var(--space-8) 0 var(--space-4);
 }
 
 .source-label {
 	font-weight: 400;
-	color: #555;
+	color: var(--color-gray-600);
 }
 
 .summary-list {
@@ -202,54 +190,48 @@ h2 + .report-card {
 }
 
 .summary-list li {
-	margin: 0.25rem 0;
-	font-size: 0.95rem;
-	line-height: 1.5;
-	color: #333;
-}
-
-.summary-list li.qa-unanswered {
-	color: #888;
+	margin: var(--space-1) 0;
+	font-size: var(--text-base);
+	line-height: var(--leading-normal);
+	color: var(--color-gray-800);
 }
 
 .freeform-summary {
-	margin: 0.5rem 0 0;
-	font-size: 0.95rem;
-	color: #333;
-	line-height: 1.5;
+	margin: var(--space-2) 0 0;
+	font-size: var(--text-base);
+	color: var(--color-gray-800);
 }
 
 .qa-block {
-	margin-top: 0.75rem;
-	padding-top: 0.75rem;
+	margin-top: var(--space-3);
+	padding-top: var(--space-3);
 }
 
 .qa-topic {
 	margin: 0;
-	font-size: 0.95rem;
-	line-height: 1.5;
-	color: #333;
+	font-size: var(--text-base);
+	color: var(--color-gray-800);
 }
 
 .qa-answer,
 .qa-freeform-answer {
-	margin: 0.25rem 0 0;
-	font-size: 0.95rem;
-	line-height: 1.5;
+	margin: var(--space-1) 0 0;
+	font-size: var(--text-base);
+	line-height: var(--leading-normal);
 	white-space: pre-wrap;
 }
 
 .qa-answer {
-	color: #555;
-	padding-left: 0.5rem;
-	border-left: 3px solid #2a6e4e;
+	color: var(--color-gray-600);
+	padding-left: var(--space-2);
+	border-left: 3px solid var(--color-green-600);
 }
 
 .qa-unanswered {
-	margin: 0.25rem 0 0;
-	font-size: 0.9rem;
+	margin: var(--space-1) 0 0;
+	font-size: var(--text-sm);
 	font-style: italic;
-	color: #888;
+	color: var(--color-gray-400);
 }
 
 @media print {
