@@ -465,7 +465,11 @@ onMounted(() => {
 	<main v-if="card">
 		<header>
 			<h1>Explore meaning</h1>
-			<h2>{{ card.source }}</h2>
+
+			<h2 class="description">
+				&ldquo;{{ card.description }}&rdquo; <span class="source">({{ card.source }})</span>
+			</h2>
+
 			<div class="instruction-stack">
 				<p :class="['instruction', { active: !allAnswered && submittedCount === 0 }]">Reflect on what this source of meaning means to you. Answer each question thoughtfully.</p>
 				<p :class="['instruction', { active: !allAnswered && submittedCount > 0 }]">Question {{ submittedCount + 1 }} of {{ EXPLORE_QUESTIONS.length }} — keep reflecting on this source of meaning.</p>
@@ -473,38 +477,40 @@ onMounted(() => {
 			</div>
 		</header>
 
-		<div class="card-left explore-card">
-			<p class="card-body description">{{ card.description }}</p>
-
-			<div v-for="entry in answeredEntries" :key="entry.questionId" class="answered-question">
-				<p class="question">{{ questionsById.get(entry.questionId)?.text }}</p>
-				<ExploreTextarea v-model="entry.userAnswer" variant="answered" :rows="3" @update:model-value="onAnsweredEntryInput(entry)" @blur="onAnsweredEntryBlur(entry)" />
-			</div>
-
-			<div v-if="inferring" class="inferring-indicator">
-				<span class="spinner"></span>
-				<span>Thinking about your next question...</span>
-			</div>
-
-			<div v-else-if="displayedQuestion && (!allAnswered || depthCheckShown)">
-				<p class="question">{{ displayedQuestion.text }}</p>
-				<p v-if="activeEntryPrefilled" class="prefill-hint"><em>This answer was pre-filled based on your previous responses. Feel free to edit it.</em></p>
-				<ExploreTextarea ref="activeTextarea" v-model="currentAnswer" :rows="5" placeholder="Type your reflection here..." @update:model-value="debouncedPersist" @blur="persistEntries()" @keydown="onKeydown" />
-				<p v-if="depthCheckShown" class="depth-follow-up">
-					<em>{{ depthCheckFollowUp }}</em>
-				</p>
-				<AppButton variant="primary" class="submit-btn" :disabled="!depthCheckShown && currentAnswer.trim() === ''" @click="submitAnswer">Next</AppButton>
-				<p v-if="depthCheckShown" class="hint">Press Next to continue as-is, or edit your answer above</p>
-				<p v-else class="hint">Shift + Enter to submit</p>
-			</div>
-
-			<div v-if="allAnswered && !inferring && !depthCheckShown" class="freeform-section">
-				<p class="question">Additional notes about this source of meaning</p>
-				<ExploreTextarea v-model="freeformNote" :rows="5" placeholder="Any other thoughts you'd like to capture (optional)" @update:model-value="debouncedFreeformPersist" @blur="persistFreeform()" />
-			</div>
-
-			<AppButton variant="secondary" class="finish-btn" @click="finishExploring">Finish exploring</AppButton>
+		<div v-for="entry in answeredEntries" :key="entry.questionId" class="card-hrule">
+			<label :for="`q-${entry.questionId}`"
+				><q>{{ card.description }}</q
+				><br />{{ questionsById.get(entry.questionId)?.text }}</label
+			>
+			<ExploreTextarea :id="`q-${entry.questionId}`" v-model="entry.userAnswer" variant="answered" :rows="3" @update:model-value="onAnsweredEntryInput(entry)" @blur="onAnsweredEntryBlur(entry)" />
 		</div>
+
+		<div v-if="inferring" class="inferring-indicator">
+			<span class="spinner"></span>
+			<span>Thinking about your next question...</span>
+		</div>
+
+		<div v-else-if="displayedQuestion && (!allAnswered || depthCheckShown)" class="card-hrule">
+			<label for="active-question"
+				><q>{{ card.description }}</q
+				><br />{{ displayedQuestion.text }}</label
+			>
+			<p v-if="activeEntryPrefilled" class="prefill-hint"><em>This answer was pre-filled based on your previous responses. Feel free to edit it.</em></p>
+			<ExploreTextarea id="active-question" ref="activeTextarea" v-model="currentAnswer" :rows="5" placeholder="Type your reflection here..." @update:model-value="debouncedPersist" @blur="persistEntries()" @keydown="onKeydown" />
+			<p v-if="depthCheckShown" class="depth-follow-up">
+				<em>{{ depthCheckFollowUp }}</em>
+			</p>
+			<AppButton variant="primary" class="submit-btn" :disabled="!depthCheckShown && currentAnswer.trim() === ''" @click="submitAnswer">Next</AppButton>
+			<p v-if="depthCheckShown" class="hint">Press Next to continue as-is, or edit your answer above</p>
+			<p v-else class="hint">Shift + Enter to submit</p>
+		</div>
+
+		<div v-if="allAnswered && !inferring && !depthCheckShown" class="card-hrule">
+			<label for="freeform-notes">Additional notes about this source of meaning</label>
+			<ExploreTextarea id="freeform-notes" v-model="freeformNote" :rows="5" placeholder="Any other thoughts you'd like to capture (optional)" @update:model-value="debouncedFreeformPersist" @blur="persistFreeform()" />
+		</div>
+
+		<AppButton variant="secondary" class="finish-btn" @click="finishExploring">Finish exploring</AppButton>
 	</main>
 </template>
 
@@ -524,34 +530,23 @@ h1 {
 	margin: 0 0 var(--space-1);
 }
 
-h2 {
-	font-size: var(--text-lg);
-	font-weight: 400;
-	font-style: italic;
-	color: var(--color-gray-600);
-	margin: 0;
-}
-
-.explore-card {
-	padding-right: 0;
-}
-
 .description {
-	margin: 0 0 var(--space-4);
+	font-weight: 400;
+	border-left: 3px solid var(--color-green-600);
+	padding: var(--space-4) 0 var(--space-4) var(--space-5);
+	margin: var(--space-16) 0 var(--space-12) 0;
 }
 
-.answered-question {
-	margin-bottom: var(--space-4);
-	padding-bottom: var(--space-3);
-	border-bottom: var(--border-thin);
+.source {
+	color: var(--color-gray-600);
 }
 
-.question {
+label {
 	font-family: var(--font-heading);
 	font-size: var(--text-lg);
-	font-weight: 600;
-	color: var(--color-black);
-	margin: 0 0 var(--space-2);
+	font-weight: 500;
+	color: var(--color-gray-800);
+	cursor: pointer;
 }
 
 .inferring-indicator {
