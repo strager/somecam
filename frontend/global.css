@@ -228,7 +228,6 @@ button {
 }
 
 .btn-primary {
-	padding: var(--space-2) var(--space-6);
 	background: var(--color-green-600);
 	color: var(--color-white);
 	border: 1px solid var(--color-green-600);
@@ -239,11 +238,6 @@ button {
 	border-color: var(--color-green-700);
 }
 
-.btn-primary:hover:active {
-	padding-top: calc(var(--space-2) + 1px);
-	padding-bottom: calc(var(--space-2) - 1px);
-}
-
 .btn-primary:focus-visible {
 	box-shadow:
 		0 0 0 1px var(--color-white),
@@ -251,7 +245,6 @@ button {
 }
 
 .btn-secondary {
-	padding: var(--space-2) var(--space-6);
 	background: transparent;
 	color: var(--color-green-600);
 	border: 1px solid var(--color-green-600);
@@ -259,11 +252,6 @@ button {
 
 .btn-secondary:hover {
 	background: var(--color-green-50);
-}
-
-.btn-secondary:hover:active {
-	padding-top: calc(var(--space-2) + 1px);
-	padding-bottom: calc(var(--space-2) - 1px);
 }
 
 .btn-secondary:focus-visible {
@@ -277,11 +265,6 @@ button:disabled {
 	color: var(--color-gray-400);
 	border: 1px solid transparent;
 	cursor: not-allowed;
-}
-
-button:disabled:active {
-	padding-top: var(--space-2);
-	padding-bottom: var(--space-2);
 }
 
 /* ============================================================

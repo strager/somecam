@@ -2,6 +2,7 @@
 import { onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
 
+import AppButton from "./AppButton.vue";
 import { capture } from "./analytics.ts";
 import { useStringParam } from "./route-utils.ts";
 import { loadChosenCardIds, loadExploreData, loadFreeformNotes, loadSummaryCache, lookupCachedSummary } from "./store.ts";
@@ -85,7 +86,7 @@ onMounted(() => {
 			<h2>Your Sources of Meaning</h2>
 			<p class="intro">SoMeCaM is a method for mapping and exploring your personal sources of meaning. Based on 26 identified sources of meaning across five dimensions — self-transcendence, self-actualization, order, well-being, and relatedness — the method helps you reflect on what matters most in your life.</p>
 			<p class="citation">Based on: la Cour, P. &amp; Schnell, T. (2020). Presentation of the Sources of Meaning Card Method: The SoMeCaM. <cite>Journal of Humanistic Psychology, 60</cite>(1), 20–42. <a href="https://doi.org/10.1177/0022167816669620" target="_blank" rel="noopener">doi:10.1177/0022167816669620</a></p>
-			<button class="btn-primary download-btn" @click="downloadPdf">Download PDF</button>
+			<AppButton variant="primary" class="download-btn" @click="downloadPdf">Download PDF</AppButton>
 		</header>
 
 		<section class="summary-section">

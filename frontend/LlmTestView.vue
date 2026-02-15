@@ -139,6 +139,7 @@ async function inferAnswers() {
 </script>
 
 <template>
+	<!-- eslint-disable vue/no-restricted-html-elements -->
 	<div class="llm-test">
 		<h1>LLM Test</h1>
 

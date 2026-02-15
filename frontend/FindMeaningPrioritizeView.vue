@@ -129,6 +129,7 @@ watch(isComplete, (done) => {
 			<SwipeCard ref="swipeCardRef" :key="currentIndex" :card="currentCard!" :allow-unsure="false" :show-source="true" @swiped="handleSwipe" />
 		</div>
 
+		<!-- eslint-disable vue/no-restricted-html-elements -->
 		<div class="controls">
 			<button type="button" class="btn disagree" :disabled="isComplete" @click="handleButtonSwipe('disagree')">Remove</button>
 			<button type="button" class="btn agree" :disabled="isComplete" @click="handleButtonSwipe('agree')">Keep</button>
@@ -137,6 +138,7 @@ watch(isComplete, (done) => {
 		<div class="undo-area">
 			<button type="button" class="btn undo" :disabled="!canUndo" @click="handleUndo">Undo</button>
 		</div>
+		<!-- eslint-enable vue/no-restricted-html-elements -->
 	</main>
 </template>
 

@@ -67,6 +67,15 @@ export default [
 				},
 			],
 
+			// Prefer <AppButton> over raw <button> for primary/secondary buttons.
+			"vue/no-restricted-html-elements": [
+				"error",
+				{
+					element: "button",
+					message: "Use <AppButton> instead of raw <button>.",
+				},
+			],
+
 			// Allow _-prefixed unused args
 			"@typescript-eslint/no-unused-vars": [
 				"error",

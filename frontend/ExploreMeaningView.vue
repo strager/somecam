@@ -2,6 +2,7 @@
 import { computed, nextTick, onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
 
+import AppButton from "./AppButton.vue";
 import { fetchAnswerDepthCheck, fetchInferredAnswers } from "./api.ts";
 import { capture } from "./analytics.ts";
 import ExploreTextarea from "./ExploreTextarea.vue";
@@ -492,7 +493,7 @@ onMounted(() => {
 				<p v-if="depthCheckShown" class="depth-follow-up">
 					<em>{{ depthCheckFollowUp }}</em>
 				</p>
-				<button class="btn-primary submit-btn" :disabled="!depthCheckShown && currentAnswer.trim() === ''" @click="submitAnswer">Next</button>
+				<AppButton variant="primary" class="submit-btn" :disabled="!depthCheckShown && currentAnswer.trim() === ''" @click="submitAnswer">Next</AppButton>
 				<p v-if="depthCheckShown" class="hint">Press Next to continue as-is, or edit your answer above</p>
 				<p v-else class="hint">Shift + Enter to submit</p>
 			</div>
@@ -502,7 +503,7 @@ onMounted(() => {
 				<ExploreTextarea v-model="freeformNote" :rows="5" placeholder="Any other thoughts you'd like to capture (optional)" @update:model-value="debouncedFreeformPersist" @blur="persistFreeform()" />
 			</div>
 
-			<button class="btn-secondary finish-btn" @click="finishExploring">Finish exploring</button>
+			<AppButton variant="secondary" class="finish-btn" @click="finishExploring">Finish exploring</AppButton>
 		</div>
 	</main>
 </template>

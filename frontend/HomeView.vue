@@ -2,6 +2,7 @@
 import { nextTick, onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
 import type { RouteLocationRaw } from "vue-router";
+import AppButton from "./AppButton.vue";
 import { capture } from "./analytics.ts";
 import type { ProgressPhase, SessionMeta } from "./store.ts";
 import { createSession, deleteSession, detectSessionPhase, ensureSessionsInitialized, formatSessionDate, listSessions, loadProgressFile, renameSession, saveProgressFile } from "./store.ts";
@@ -135,7 +136,7 @@ function onLoadFile(): void {
 
 		<section class="sessions">
 			<div v-if="sessions.length === 0" class="cta">
-				<button type="button" class="btn-primary" @click="onNewSession">Start finding meaning</button>
+				<AppButton variant="primary" type="button" @click="onNewSession">Start finding meaning</AppButton>
 			</div>
 			<template v-else>
 				<h2>Your sessions</h2>
@@ -148,19 +149,23 @@ function onLoadFile(): void {
 							<router-link v-else :to="sessionRoute(session)" class="session-link" @click="onOpenSession(session)">{{ session.name }}</router-link>
 						</div>
 						<div class="card-meta">
+							<!-- eslint-disable vue/no-restricted-html-elements -->
 							Created {{ formatSessionDate(new Date(session.createdAt)) }}<template v-if="session.lastUpdatedAt !== session.createdAt"> · Updated {{ formatSessionDate(new Date(session.lastUpdatedAt)) }}</template> · <button type="button" class="text-btn" @click="onStartRename(session)">Rename</button> · <button type="button" class="text-btn text-btn-danger" @click="onDelete(session.id)">Delete</button>
+							<!-- eslint-enable vue/no-restricted-html-elements -->
 						</div>
 					</div>
 				</div>
 				<div class="cta">
-					<button type="button" class="btn-secondary" @click="onNewSession">Start new session</button>
+					<AppButton variant="secondary" type="button" @click="onNewSession">Start new session</AppButton>
 				</div>
 			</template>
 		</section>
 
 		<div class="file-actions">
+			<!-- eslint-disable vue/no-restricted-html-elements -->
 			<button v-if="sessions.length > 0" type="button" class="file-btn" @click="onExport">Export all sessions</button>
 			<button type="button" class="file-btn" @click="onLoadFile">Import sessions file</button>
+			<!-- eslint-enable vue/no-restricted-html-elements -->
 		</div>
 
 		<footer>

@@ -175,9 +175,11 @@ function continueToNextPhase(): void {
 		<div v-else class="end-state">
 			<h2>All cards reviewed!</h2>
 			<p>You have reviewed all {{ totalCards }} sources of meaning.</p>
+			<!-- eslint-disable-next-line vue/no-restricted-html-elements -->
 			<button type="button" class="btn primary" @click="continueToNextPhase">{{ nextPhaseLabel }}</button>
 		</div>
 
+		<!-- eslint-disable vue/no-restricted-html-elements -->
 		<div class="controls">
 			<button type="button" class="btn disagree" :disabled="isComplete" @click="handleButtonSwipe('disagree')">Disagree</button>
 			<button type="button" class="btn unsure" :disabled="isComplete" @click="handleButtonSwipe('unsure')">Unsure</button>
@@ -187,6 +189,7 @@ function continueToNextPhase(): void {
 		<div class="undo-area">
 			<button type="button" class="btn undo" :disabled="!canUndo" @click="handleUndo">Undo</button>
 		</div>
+		<!-- eslint-enable vue/no-restricted-html-elements -->
 	</main>
 </template>
 

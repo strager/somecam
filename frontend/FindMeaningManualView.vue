@@ -2,6 +2,7 @@
 import { computed, onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
 
+import AppButton from "./AppButton.vue";
 import { assignQuestions } from "./explore-data.ts";
 import { capture } from "./analytics.ts";
 import { useStringParam } from "./route-utils.ts";
@@ -127,15 +128,17 @@ onMounted(() => {
 
 				<div v-if="confirmingRemove === card.id" class="confirm-overlay" @click.stop>
 					<p>This card has exploration answers. Remove it?</p>
+					<!-- eslint-disable vue/no-restricted-html-elements -->
 					<div class="confirm-actions">
 						<button class="confirm-remove" @click="removeCard(card.id, true)">Remove</button>
 						<button class="confirm-cancel" @click="cancelRemove">Cancel</button>
 					</div>
+					<!-- eslint-enable vue/no-restricted-html-elements -->
 				</div>
 			</label>
 		</div>
 
-		<button class="btn-primary done-btn" @click="onDone">Done</button>
+		<AppButton variant="primary" class="done-btn" @click="onDone">Done</AppButton>
 	</main>
 </template>
 

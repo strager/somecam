@@ -2,6 +2,7 @@
 import { computed, onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
 
+import AppButton from "./AppButton.vue";
 import { fetchSummary } from "./api.ts";
 import { capture } from "./analytics.ts";
 import { assignQuestions } from "./explore-data.ts";
@@ -253,8 +254,8 @@ onMounted(() => {
 			<span class="progress-label">{{ totalAnswered }} of {{ totalQuestions }} questions answered</span>
 		</div>
 
-		<button v-if="allComplete" class="btn-primary report-btn" @click="onOpenReport('explore_overview_primary')">Download report</button>
-		<button class="btn-secondary edit-cards-btn" @click="onEditSelection">Edit selection</button>
+		<AppButton v-if="allComplete" variant="primary" class="report-btn" @click="onOpenReport('explore_overview_primary')">Download report</AppButton>
+		<AppButton variant="secondary" class="edit-cards-btn" @click="onEditSelection">Edit selection</AppButton>
 
 		<div class="card-list">
 			<div v-for="card in sortedCards" :key="card.id" :class="['card-hrule', 'chosen-card', 'status-' + cardStatus(card.id)]">
@@ -279,11 +280,11 @@ onMounted(() => {
 						</li>
 					</ul>
 				</template>
-				<button :class="['explore-btn', cardStatus(card.id) !== 'complete' ? 'btn-primary' : 'btn-secondary']" @click="onExploreCard(card.id)">{{ exploreButtonLabel(card.id) }}</button>
+				<AppButton :variant="cardStatus(card.id) !== 'complete' ? 'primary' : 'secondary'" class="explore-btn" @click="onExploreCard(card.id)">{{ exploreButtonLabel(card.id) }}</AppButton>
 			</div>
 		</div>
 
-		<button :class="['report-btn', allComplete ? 'btn-primary' : 'btn-secondary']" @click="onOpenReport('explore_overview_secondary')">Download report</button>
+		<AppButton :variant="allComplete ? 'primary' : 'secondary'" class="report-btn" @click="onOpenReport('explore_overview_secondary')">Download report</AppButton>
 	</main>
 </template>
 

@@ -1,6 +1,7 @@
 <script setup lang="ts"></script>
 
 <template>
+	<!-- eslint-disable vue/no-restricted-html-elements -->
 	<div class="sg-container">
 		<!-- Header -->
 		<div class="sg-header">
@@ -284,20 +285,20 @@
 			<!-- Buttons -->
 			<div class="sg-subsection">
 				<div class="sg-subsection-title">Buttons</div>
-				<p style="font-size: var(--text-base); color: var(--color-gray-600); margin-bottom: var(--space-4)">Hover darkens the fill (primary) or adds a light green background (secondary). Focus shows a double-outline ring (1px gap + 2px ring on primary, 1px gap + 1px ring on secondary). On press, the button text nudges down 1px via a padding shift — like a key being struck.</p>
+				<p style="font-size: var(--text-base); color: var(--color-gray-600); margin-bottom: var(--space-4)">Hover darkens the fill (primary) or adds a light green background (secondary). Focus shows a double-outline ring (1px gap + 2px ring on primary, 1px gap + 1px ring on secondary). On press, the button text nudges down 1px via an inner span transform — the border stays anchored while only the text moves.</p>
 				<h4 class="sg-group-label">Primary (CTA) — solid green</h4>
 				<div class="sg-button-row">
-					<button class="btn-primary">Submit report</button>
-					<button class="btn-primary">Save changes</button>
+					<button class="btn-primary"><span>Submit report</span></button>
+					<button class="btn-primary"><span>Save changes</span></button>
 				</div>
 				<h4 class="sg-group-label">Secondary (non-CTA) — green outline</h4>
 				<div class="sg-button-row">
-					<button class="btn-secondary">Cancel</button>
-					<button class="btn-secondary">View details</button>
+					<button class="btn-secondary"><span>Cancel</span></button>
+					<button class="btn-secondary"><span>View details</span></button>
 				</div>
 				<h4 class="sg-group-label">Disabled</h4>
 				<div class="sg-button-row">
-					<button disabled>Unavailable</button>
+					<button disabled><span>Unavailable</span></button>
 				</div>
 			</div>
 
@@ -597,8 +598,8 @@
 					</div>
 
 					<div style="margin-top: var(--space-8); display: flex; gap: var(--space-3)">
-						<button class="btn-primary">Download full report</button>
-						<button class="btn-secondary">Share</button>
+						<button class="btn-primary"><span>Download full report</span></button>
+						<button class="btn-secondary"><span>Share</span></button>
 					</div>
 					<small style="margin-top: var(--space-4)">Last updated February 14, 2026 &middot; Document ref #QR-2026Q1</small>
 				</div>
@@ -765,6 +766,20 @@
 	gap: var(--space-4);
 	align-items: center;
 	margin-bottom: var(--space-6);
+}
+
+button span {
+	display: block;
+	padding: var(--space-2) var(--space-6);
+	transition: transform 0.06s ease;
+}
+
+button:hover:active span {
+	transform: translateY(1px);
+}
+
+button:disabled:active span {
+	transform: none;
 }
 
 .sg-mockup {
