@@ -82,8 +82,8 @@ onMounted(() => {
 <template>
 	<main>
 		<header>
-			<h1>SoMeCaM Report</h1>
-			<h2>Your Sources of Meaning</h2>
+			<h1>SoMeCaM report</h1>
+			<h2>Your sources of meaning</h2>
 			<p class="intro">SoMeCaM is a method for mapping and exploring your personal sources of meaning. Based on 26 identified sources of meaning across five dimensions — self-transcendence, self-actualization, order, well-being, and relatedness — the method helps you reflect on what matters most in your life.</p>
 			<p class="citation">Based on: la Cour, P. &amp; Schnell, T. (2020). Presentation of the Sources of Meaning Card Method: The SoMeCaM. <cite>Journal of Humanistic Psychology, 60</cite>(1), 20–42. <a href="https://doi.org/10.1177/0022167816669620" target="_blank" rel="noopener">doi:10.1177/0022167816669620</a></p>
 			<AppButton variant="primary" class="download-btn" @click="downloadPdf">Download PDF</AppButton>
@@ -91,9 +91,8 @@ onMounted(() => {
 
 		<section class="summary-section">
 			<h2>What is meaningful to me?</h2>
-			<div v-for="report in reports" :key="report.card.id" class="card-hrule report-card">
-				<h3 class="card-title">{{ report.card.description }}</h3>
-				<div class="card-body">
+			<div v-for="report in reports" :key="report.card.id" class="report-card">
+				<h4>{{ report.card.description }}</h4>
 				<p v-if="report.freeformSummary" class="freeform-summary">{{ report.freeformSummary }}</p>
 				<ul class="summary-list">
 					<template v-for="q in report.questions" :key="q.topic">
@@ -101,25 +100,22 @@ onMounted(() => {
 					</template>
 				</ul>
 				<p v-if="!report.freeformSummary && report.questions.every((q) => !q.summary)" class="qa-unanswered">No self reflections</p>
-				</div>
 			</div>
 		</section>
 
 		<section class="detail-section">
 			<h2>Self reflections</h2>
-			<div v-for="report in reports" :key="report.card.id" class="card-hrule report-card">
-				<h3 class="card-title">
+			<div v-for="report in reports" :key="report.card.id" class="report-card">
+				<h3>
 					{{ report.card.description }} <span class="source-label">({{ report.card.source }})</span>
 				</h3>
-				<div class="card-body">
-					<div v-if="report.freeformNote" class="qa-block">
-						<blockquote class="qa-freeform-answer">{{ report.freeformNote }}</blockquote>
-					</div>
-					<div v-for="q in report.questions" :key="q.topic" class="qa-block">
-						<p class="qa-topic">{{ q.question }}</p>
-						<blockquote v-if="q.answer" class="qa-answer">{{ q.answer }}</blockquote>
-						<p v-else class="qa-unanswered">Not yet answered.</p>
-					</div>
+				<div v-if="report.freeformNote" class="qa-block">
+					<p class="qa-freeform-answer">{{ report.freeformNote }}</p>
+				</div>
+				<div v-for="q in report.questions" :key="q.topic" class="qa-block">
+					<h4 class="qa-topic">{{ q.question }}</h4>
+					<p v-if="q.answer" class="qa-answer">{{ q.answer }}</p>
+					<p v-else class="qa-unanswered">Not yet answered.</p>
 				</div>
 			</div>
 		</section>
@@ -196,15 +192,13 @@ section h2 {
 	color: var(--color-gray-800);
 }
 
-.qa-block {
+.qa-block h4 {
 	margin-top: var(--space-3);
 	padding-top: var(--space-3);
 }
 
-.qa-topic {
-	margin: 0;
-	font-size: var(--text-base);
-	color: var(--color-gray-800);
+h4 {
+	font-size: var(--text-lg);
 }
 
 .qa-answer,
@@ -220,6 +214,17 @@ section h2 {
 	font-size: var(--text-sm);
 	font-style: italic;
 	color: var(--color-gray-400);
+}
+
+.summary-section .report-card {
+	margin-top: var(--space-8);
+}
+.detail-section .report-card {
+	margin-top: var(--space-16);
+}
+.summary-section h2 + .report-card,
+.detail-section h2 + .report-card {
+	margin-top: 0;
 }
 
 @media print {
