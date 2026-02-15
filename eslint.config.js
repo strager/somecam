@@ -62,6 +62,21 @@ export default [
 		},
 	},
 
+	// Relax strict `any` rules in tests — JSON.parse() results etc. don't
+	// need narrowing boilerplate in test assertions.
+	{
+		files: ["**/*.test.ts"],
+		rules: {
+			"@typescript-eslint/no-unsafe-assignment": "off",
+			"@typescript-eslint/no-unsafe-member-access": "off",
+			"@typescript-eslint/no-unsafe-argument": "off",
+			"@typescript-eslint/no-unsafe-call": "off",
+			"@typescript-eslint/no-unsafe-return": "off",
+			"@typescript-eslint/no-explicit-any": "off",
+			"@typescript-eslint/no-non-null-assertion": "off",
+		},
+	},
+
 	// Prettier MUST be last — disables all formatting rules
 	eslintConfigPrettier,
 ];
