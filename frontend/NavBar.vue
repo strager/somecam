@@ -25,7 +25,7 @@ const phaseLabel = computed(() => {
 		case "findMeaningPrioritize":
 			return "Prioritize";
 		case "findMeaningManual":
-			return "Edit Selection";
+			return null; // handled as Explore sub-page
 		case "explore":
 			return "Explore";
 		case "exploreMeaning":
@@ -42,6 +42,7 @@ const phaseLabel = computed(() => {
 });
 
 const meaningCardName = computed(() => {
+	if (route.name === "findMeaningManual") return "Edit Selection";
 	if (route.name !== "exploreMeaning") return null;
 	const meaningId = route.params.meaningId;
 	if (typeof meaningId !== "string") return null;

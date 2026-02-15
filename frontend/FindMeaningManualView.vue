@@ -131,7 +131,7 @@ onMounted(() => {
 					<!-- eslint-disable vue/no-restricted-html-elements -->
 					<div class="confirm-actions">
 						<button class="confirm-remove" @click="removeCard(card.id, true)">Remove</button>
-						<button class="confirm-cancel" @click="cancelRemove">Cancel</button>
+						<button class="btn-secondary confirm-cancel" @click="cancelRemove">Cancel</button>
 					</div>
 					<!-- eslint-enable vue/no-restricted-html-elements -->
 				</div>
@@ -147,23 +147,20 @@ main {
 	margin: 2rem auto;
 	max-width: 36rem;
 	padding: 0 1.5rem;
-	color: #1a1a1a;
+	color: var(--color-black);
 }
 
 header {
-	text-align: center;
 	margin-bottom: 1.5rem;
 }
 
 h1 {
-	font-size: 2rem;
 	margin: 0 0 0.25rem;
-	letter-spacing: 0.02em;
 }
 
 .count {
 	font-size: 0.95rem;
-	color: #888;
+	color: var(--color-gray-400);
 	margin: 0;
 }
 
@@ -179,22 +176,17 @@ h1 {
 	align-items: center;
 	gap: 0.75rem;
 	padding: 0.75rem 1rem;
-	border-radius: 6px;
 	cursor: pointer;
-	transition:
-		background 0.15s,
-		border-color 0.15s;
+	transition: background 0.15s;
 	user-select: none;
 }
 
 .card-row.selected {
-	background: #eaf5ef;
-	border-left: 4px solid #2a6e4e;
+	background: var(--color-white);
 }
 
 .card-row.unselected {
-	background: #f5f5f5;
-	border-left: 4px solid #ccc;
+	background: var(--color-white);
 	opacity: 0.7;
 }
 
@@ -225,18 +217,15 @@ h1 {
 
 .card-desc {
 	font-size: 0.85rem;
-	color: #555;
+	color: var(--color-gray-600);
 }
 
 .explored-badge {
 	flex-shrink: 0;
 	margin-left: 0.75rem;
-	padding: 0.15rem 0.5rem;
 	font-size: 0.75rem;
 	font-weight: 600;
-	color: #2a6e4e;
-	background: #d4edda;
-	border-radius: 999px;
+	color: var(--color-green-600);
 }
 
 .confirm-overlay {
@@ -247,14 +236,13 @@ h1 {
 	align-items: center;
 	justify-content: center;
 	background: rgba(255, 255, 255, 0.95);
-	border-radius: 6px;
 	z-index: 1;
 }
 
 .confirm-overlay p {
 	margin: 0 0 0.5rem;
 	font-size: 0.9rem;
-	color: #333;
+	color: var(--color-gray-800);
 }
 
 .confirm-actions {
@@ -263,33 +251,19 @@ h1 {
 }
 
 .confirm-remove {
-	padding: 0.35rem 1rem;
+	padding: var(--space-2) var(--space-6);
 	font-size: 0.85rem;
 	font-weight: 600;
 	color: var(--color-white);
 	background: var(--color-error);
-	border-radius: 4px;
-}
-
-.confirm-remove:hover {
-	background: #a93226;
+	border: 1px solid var(--color-error);
 }
 
 .confirm-cancel {
-	padding: 0.35rem 1rem;
-	font-size: 0.85rem;
-	font-weight: 600;
-	color: var(--color-gray-800);
-	background: #e0e0e0;
-	border-radius: 4px;
-}
-
-.confirm-cancel:hover {
-	background: #d0d0d0;
+	padding: var(--space-2) var(--space-6);
 }
 
 .done-btn {
-	display: block;
-	margin: 1.5rem auto 0;
+	margin-top: var(--space-6);
 }
 </style>
