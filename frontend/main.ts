@@ -12,6 +12,7 @@ import FindMeaningView from "./FindMeaningView.vue";
 import HomeView from "./HomeView.vue";
 import LlmTestView from "./LlmTestView.vue";
 import ReportView from "./ReportView.vue";
+import StyleGuideView from "./StyleGuideView.vue";
 
 const router = createRouter({
 	history: createWebHistory(),
@@ -58,6 +59,11 @@ const router = createRouter({
 			path: "/llm-test",
 			name: "llmTest",
 			component: LlmTestView,
+		},
+		{
+			path: "/style-guide",
+			name: "styleGuide",
+			component: StyleGuideView,
 		},
 	],
 });

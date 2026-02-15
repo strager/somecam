@@ -34,6 +34,8 @@ const phaseLabel = computed(() => {
 			return "Report";
 		case "llmTest":
 			return "LLM Test";
+		case "styleGuide":
+			return "Style Guide";
 		default:
 			return null;
 	}
