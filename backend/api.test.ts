@@ -211,6 +211,66 @@ describe("API", () => {
 		);
 	});
 
+	it("returns 500 for POST /api/report-pdf when DOCRAPTOR_API_KEY is not set", async () => {
+		const response = await fetch(`${baseUrl}/api/report-pdf`, {
+			method: "POST",
+			headers: { "Content-Type": "text/plain" },
+			body: "some session data",
+		});
+		expect(response.status).toBe(500);
+		expect(response.headers.get("content-type")).toContain("application/problem+json");
+
+		const body: unknown = await response.json();
+		expect(body).toEqual(
+			expect.objectContaining({
+				type: "about:blank",
+				title: "Internal Server Error",
+				status: 500,
+				detail: "PDF generation is not configured.",
+			}),
+		);
+	});
+
+	it("returns 400 for POST /api/report-pdf with empty body", async () => {
+		const savedKey = process.env.DOCRAPTOR_API_KEY;
+		process.env.DOCRAPTOR_API_KEY = "test-key";
+		try {
+			const response = await fetch(`${baseUrl}/api/report-pdf`, {
+				method: "POST",
+				headers: { "Content-Type": "text/plain" },
+				body: "",
+			});
+			expect(response.status).toBe(400);
+			expect(response.headers.get("content-type")).toContain("application/problem+json");
+		} finally {
+			if (savedKey === undefined) {
+				delete process.env.DOCRAPTOR_API_KEY;
+			} else {
+				process.env.DOCRAPTOR_API_KEY = savedKey;
+			}
+		}
+	});
+
+	it("returns 400 for POST /api/report-pdf with invalid session data", async () => {
+		const savedKey = process.env.DOCRAPTOR_API_KEY;
+		process.env.DOCRAPTOR_API_KEY = "test-key";
+		try {
+			const response = await fetch(`${baseUrl}/api/report-pdf`, {
+				method: "POST",
+				headers: { "Content-Type": "text/plain" },
+				body: "not valid json",
+			});
+			expect(response.status).toBe(400);
+			expect(response.headers.get("content-type")).toContain("application/problem+json");
+		} finally {
+			if (savedKey === undefined) {
+				delete process.env.DOCRAPTOR_API_KEY;
+			} else {
+				process.env.DOCRAPTOR_API_KEY = savedKey;
+			}
+		}
+	});
+
 	it("returns RFC 9457 problem details for validation failures", async () => {
 		const response = await fetch(`${baseUrl}/api/health?timeoutSeconds=invalid`);
 		expect(response.status).toBe(400);
