@@ -199,7 +199,6 @@ main {
 }
 
 header {
-	text-align: center;
 	margin-bottom: var(--space-8);
 }
 
@@ -210,13 +209,11 @@ h1 {
 .progress {
 	display: flex;
 	flex-direction: column;
-	align-items: center;
 	gap: var(--space-1);
 }
 
 .progress-bar {
 	width: 100%;
-	max-width: 16rem;
 	height: 6px;
 	background: var(--color-gray-200);
 	overflow: hidden;
@@ -244,7 +241,6 @@ h1 {
 }
 
 .end-state {
-	text-align: center;
 	padding: var(--space-8) 0;
 }
 

@@ -193,12 +193,10 @@ defineExpose({ flyAway });
 .peek-card {
 	position: absolute;
 	inset: 0;
-	z-index: 0;
 	display: flex;
 	flex-direction: column;
-	align-items: center;
 	justify-content: center;
-	text-align: center;
+	z-index: 0;
 	pointer-events: none;
 }
 
@@ -208,9 +206,7 @@ defineExpose({ flyAway });
 	margin: 0 auto;
 	display: flex;
 	flex-direction: column;
-	align-items: center;
 	justify-content: center;
-	text-align: center;
 	cursor: grab;
 	user-select: none;
 	touch-action: none;
