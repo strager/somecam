@@ -514,7 +514,6 @@ main {
 	margin: 2rem auto;
 	max-width: 36rem;
 	padding: 0 1.5rem;
-	font-family: "Segoe UI", system-ui, sans-serif;
 	color: #1a1a1a;
 }
 
@@ -597,13 +596,10 @@ h2 {
 	width: 100%;
 	margin-top: 1rem;
 	padding: 0.75rem 1.5rem;
-	font-size: 1rem;
 	font-weight: 600;
 	color: #fff;
 	background: #2a6e4e;
-	border: none;
 	border-radius: 8px;
-	cursor: pointer;
 }
 
 .submit-btn:hover:not(:disabled) {
@@ -640,13 +636,11 @@ h2 {
 	width: 100%;
 	margin-top: 1.5rem;
 	padding: 0.75rem 1.5rem;
-	font-size: 1rem;
 	font-weight: 600;
 	color: #2a6e4e;
 	background: transparent;
 	border: 1.5px solid #2a6e4e;
 	border-radius: 8px;
-	cursor: pointer;
 }
 
 .finish-btn:hover {

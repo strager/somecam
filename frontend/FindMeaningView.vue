@@ -195,7 +195,6 @@ main {
 	margin: 2rem auto;
 	max-width: 36rem;
 	padding: 0 1.5rem;
-	font-family: "Segoe UI", system-ui, sans-serif;
 	color: #1a1a1a;
 }
 
@@ -276,12 +275,8 @@ h1 {
 }
 
 .btn {
-	font-size: 1rem;
 	padding: 0.6rem 1.5rem;
-	border: none;
 	border-radius: 6px;
-	cursor: pointer;
-	font-family: inherit;
 	font-weight: 500;
 	transition:
 		background 0.15s ease,

@@ -293,7 +293,6 @@ main {
 	margin: 2rem auto;
 	max-width: 36rem;
 	padding: 0 1.5rem;
-	font-family: "Segoe UI", system-ui, sans-serif;
 	color: #1a1a1a;
 }
 
@@ -404,7 +403,6 @@ h1 {
 	color: #2a6e4e;
 	border: 1.5px solid #2a6e4e;
 	border-radius: 6px;
-	cursor: pointer;
 }
 
 .explore-btn:hover {
@@ -416,10 +414,8 @@ h1 {
 	margin-left: auto;
 	margin-right: auto;
 	padding: 0.75rem 2rem;
-	font-size: 1rem;
 	color: #fff;
 	background: #2a6e4e;
-	border: none;
 }
 
 .explore-btn.prominent:hover {
@@ -492,7 +488,6 @@ h1 {
 	color: #2a6e4e;
 	border: 1.5px solid #2a6e4e;
 	border-radius: 6px;
-	cursor: pointer;
 }
 
 .edit-cards-btn:hover {
@@ -509,7 +504,6 @@ h1 {
 	color: #2a6e4e;
 	border: 1.5px solid #2a6e4e;
 	border-radius: 6px;
-	cursor: pointer;
 }
 
 .report-btn:hover {

@@ -250,7 +250,6 @@ textarea {
 .remove-btn {
 	padding: 0.5rem 0.75rem;
 	font-size: 0.875rem;
-	cursor: pointer;
 }
 
 .row-actions {
@@ -261,8 +260,6 @@ textarea {
 .row-actions button,
 .global-actions button {
 	padding: 0.5rem 1rem;
-	font-size: 1rem;
-	cursor: pointer;
 }
 
 .row-actions button:disabled,

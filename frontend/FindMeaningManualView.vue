@@ -144,7 +144,6 @@ main {
 	margin: 2rem auto;
 	max-width: 36rem;
 	padding: 0 1.5rem;
-	font-family: "Segoe UI", system-ui, sans-serif;
 	color: #1a1a1a;
 }
 
@@ -266,9 +265,7 @@ h1 {
 	font-weight: 600;
 	color: #fff;
 	background: #c0392b;
-	border: none;
 	border-radius: 4px;
-	cursor: pointer;
 }
 
 .confirm-remove:hover {
@@ -281,9 +278,7 @@ h1 {
 	font-weight: 600;
 	color: #333;
 	background: #e0e0e0;
-	border: none;
 	border-radius: 4px;
-	cursor: pointer;
 }
 
 .confirm-cancel:hover {
@@ -294,13 +289,10 @@ h1 {
 	display: block;
 	margin: 1.5rem auto 0;
 	padding: 0.6rem 2rem;
-	font-size: 1rem;
 	font-weight: 600;
 	color: #fff;
 	background: #2a6e4e;
-	border: none;
 	border-radius: 6px;
-	cursor: pointer;
 }
 
 .done-btn:hover {

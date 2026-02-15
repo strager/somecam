@@ -189,7 +189,6 @@ main {
 	margin: 3rem auto;
 	max-width: 36rem;
 	padding: 0 1.5rem;
-	font-family: "Segoe UI", system-ui, sans-serif;
 	color: #1a1a1a;
 }
 
@@ -269,10 +268,7 @@ section p {
 
 .session-link-btn {
 	background: transparent;
-	border: none;
 	padding: 0;
-	cursor: pointer;
-	font-family: inherit;
 	text-align: left;
 }
 
@@ -286,15 +282,11 @@ section p {
 }
 
 .rename-input {
-	font-family: inherit;
 	font-size: 0.95rem;
 	font-weight: 600;
 	padding: 0.15rem 0.35rem;
 	border: 1px solid #2a6e4e;
 	border-radius: 4px;
-	outline: none;
-	width: 100%;
-	box-sizing: border-box;
 }
 
 .session-actions {
@@ -339,8 +331,6 @@ section p {
 	border-radius: 4px;
 	font-size: 0.78rem;
 	padding: 0.25rem 0.5rem;
-	cursor: pointer;
-	font-family: inherit;
 	color: #555;
 	transition:
 		border-color 0.15s ease,
@@ -364,8 +354,6 @@ section p {
 	border-radius: 6px;
 	background: none;
 	color: #2a6e4e;
-	cursor: pointer;
-	font-family: inherit;
 	font-weight: 600;
 	transition:
 		background 0.15s ease,
@@ -385,12 +373,9 @@ section p {
 .cta button:not(.new-session-btn) {
 	font-size: 1.1rem;
 	padding: 0.75rem 2rem;
-	border: none;
 	border-radius: 6px;
 	background: #2a6e4e;
 	color: #fff;
-	cursor: pointer;
-	font-family: inherit;
 	transition: background 0.15s ease;
 }
 
@@ -407,11 +392,8 @@ section p {
 
 .file-btn {
 	background: none;
-	border: none;
 	color: #999;
 	font-size: 0.85rem;
-	cursor: pointer;
-	font-family: inherit;
 	text-decoration: underline;
 	padding: 0.25rem 0.5rem;
 }
@@ -431,10 +413,6 @@ footer {
 	color: #666;
 	line-height: 1.5;
 	margin: 0;
-}
-
-.citation a {
-	color: #2a6e4e;
 }
 
 .github-link {

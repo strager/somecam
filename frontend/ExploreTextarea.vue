@@ -35,13 +35,8 @@ defineExpose({ focus });
 
 <style scoped>
 textarea {
-	width: 100%;
 	padding: 0.75rem;
-	font-size: 1rem;
-	font-family: inherit;
 	border-radius: 6px;
-	resize: vertical;
-	box-sizing: border-box;
 }
 
 textarea.active {
@@ -50,7 +45,6 @@ textarea.active {
 }
 
 textarea.active:focus {
-	outline: none;
 	border-color: #2a6e4e;
 	box-shadow: 0 0 0 2px rgba(42, 110, 78, 0.2);
 }
@@ -67,7 +61,6 @@ textarea.answered:hover {
 }
 
 textarea.answered:focus {
-	outline: none;
 	border-color: #2a6e4e;
 	box-shadow: 0 0 0 2px rgba(42, 110, 78, 0.2);
 	color: #1a1a1a;

@@ -126,7 +126,6 @@ main {
 	margin: 2rem auto;
 	max-width: 42rem;
 	padding: 0 1.5rem;
-	font-family: Georgia, "Times New Roman", serif;
 	color: #1a1a1a;
 }
 
@@ -164,19 +163,13 @@ header h2 {
 	text-align: left;
 }
 
-.citation a {
-	color: #2a6e4e;
-}
-
 .download-btn {
 	padding: 0.5rem 1.25rem;
 	font-size: 0.95rem;
 	font-weight: 600;
 	color: #fff;
 	background: #2a6e4e;
-	border: none;
 	border-radius: 6px;
-	cursor: pointer;
 }
 
 .download-btn:hover {
@@ -187,10 +180,6 @@ header h2 {
 	text-align: center;
 	padding: 2rem;
 	color: #555;
-}
-
-.empty-notice a {
-	color: #2a6e4e;
 }
 
 section h2 {
@@ -274,10 +263,6 @@ h2 + .report-card {
 	font-size: 0.9rem;
 	font-style: italic;
 	color: #888;
-}
-
-.qa-unanswered a {
-	color: #2a6e4e;
 }
 
 @media print {

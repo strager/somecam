@@ -76,7 +76,6 @@ const exploreRoute = computed(() => {
 .nav-bar {
 	border-bottom: 1px solid #e5e7eb;
 	padding: 0.5rem 1rem;
-	font-family: "Segoe UI", system-ui, sans-serif;
 }
 
 .nav-content {
@@ -91,15 +90,8 @@ const exploreRoute = computed(() => {
 
 .nav-home,
 .nav-link {
-	color: #2a6e4e;
-	text-decoration: none;
 	white-space: nowrap;
 	flex-shrink: 0;
-}
-
-.nav-home:hover,
-.nav-link:hover {
-	text-decoration: underline;
 }
 
 .nav-separator {
