@@ -1,0 +1,98 @@
+/* PDF-specific stylesheet for server-side rendering via DocRaptor/Prince.
+   Resolves CSS custom properties to literal values since Prince does not
+   support them. Includes base styles from global.css relevant to reports
+   and adds Paged Media rules for proper page breaks and margins. */
+
+/* --- Page Setup --- */
+@page {
+	size: A4;
+	margin: 20mm 18mm 25mm 18mm;
+}
+
+/* --- Base Reset --- */
+*,
+*::before,
+*::after {
+	margin: 0;
+	padding: 0;
+	box-sizing: border-box;
+}
+
+/* --- Body --- */
+body {
+	font-family: "PT Serif", Georgia, serif;
+	font-size: 16px;
+	line-height: 1.7;
+	color: #333333;
+	background: #ffffff;
+}
+
+/* --- Headings --- */
+h1 {
+	font-family: "EB Garamond", Garamond, "Times New Roman", serif;
+	font-size: 36px;
+	font-weight: 500;
+	line-height: 1.25;
+	color: #1a1a1a;
+}
+
+h2 {
+	font-family: "EB Garamond", Garamond, "Times New Roman", serif;
+	font-size: 30px;
+	font-weight: 500;
+	line-height: 1.25;
+	color: #1a1a1a;
+	break-after: avoid;
+}
+
+h3 {
+	font-family: "EB Garamond", Garamond, "Times New Roman", serif;
+	font-size: 24px;
+	font-weight: 600;
+	line-height: 1.25;
+	color: #1a1a1a;
+	break-after: avoid;
+}
+
+h4 {
+	font-family: "EB Garamond", Garamond, "Times New Roman", serif;
+	font-size: 20px;
+	font-weight: 600;
+	line-height: 1.25;
+	color: #1a1a1a;
+	break-after: avoid;
+}
+
+/* --- Links --- */
+a {
+	color: #2a6e4e;
+	text-decoration: underline;
+	text-underline-offset: 3px;
+	text-decoration-thickness: 1px;
+}
+
+/* --- Lists --- */
+ul,
+ol {
+	padding-left: 24px;
+	margin-bottom: 16px;
+	color: #333333;
+}
+
+li {
+	margin-bottom: 8px;
+	line-height: 1.7;
+}
+
+li:last-child {
+	margin-bottom: 0;
+}
+
+/* --- Page Break Rules --- */
+.report-card {
+	break-inside: avoid;
+}
+
+.qa-block {
+	break-inside: avoid;
+}

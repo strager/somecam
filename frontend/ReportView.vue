@@ -3,26 +3,13 @@ import { onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
 
 import AppButton from "./AppButton.vue";
+import ReportContent from "./ReportContent.vue";
+import type { CardReport, QuestionReport } from "./report-types.ts";
 import { capture } from "./analytics.ts";
 import { useStringParam } from "./route-utils.ts";
 import { loadChosenCardIds, loadExploreData, loadFreeformNotes, loadSummaryCache, lookupCachedSummary } from "./store.ts";
 import { EXPLORE_QUESTIONS } from "../shared/explore-questions.ts";
-import type { MeaningCard } from "../shared/meaning-cards.ts";
 import { MEANING_CARDS } from "../shared/meaning-cards.ts";
-
-interface QuestionReport {
-	topic: string;
-	question: string;
-	answer: string;
-	summary: string;
-}
-
-interface CardReport {
-	card: MeaningCard;
-	questions: QuestionReport[];
-	freeformNote: string;
-	freeformSummary: string;
-}
 
 const router = useRouter();
 const sessionId = useStringParam("sessionId");
@@ -80,168 +67,17 @@ onMounted(() => {
 </script>
 
 <template>
-	<main>
-		<header>
-			<h1>SoMeCaM report</h1>
-			<h2>Your sources of meaning</h2>
-			<p class="intro">SoMeCaM is a method for mapping and exploring your personal sources of meaning. Based on 26 identified sources of meaning across five dimensions — self-transcendence, self-actualization, order, well-being, and relatedness — the method helps you reflect on what matters most in your life.</p>
-			<p class="citation">Based on: la Cour, P. &amp; Schnell, T. (2020). Presentation of the Sources of Meaning Card Method: The SoMeCaM. <cite>Journal of Humanistic Psychology, 60</cite>(1), 20–42. <a href="https://doi.org/10.1177/0022167816669620" target="_blank" rel="noopener">doi:10.1177/0022167816669620</a></p>
+	<ReportContent :reports="reports">
+		<template #header-actions>
 			<AppButton variant="primary" class="download-btn" @click="downloadPdf">Download PDF</AppButton>
-		</header>
-
-		<section class="summary-section">
-			<h2>What is meaningful to me?</h2>
-			<div v-for="report in reports" :key="report.card.id" class="report-card">
-				<h4>{{ report.card.description }}</h4>
-				<p v-if="report.freeformSummary" class="freeform-summary">{{ report.freeformSummary }}</p>
-				<ul class="summary-list">
-					<template v-for="q in report.questions" :key="q.topic">
-						<li v-if="q.summary">{{ q.summary }}</li>
-					</template>
-				</ul>
-				<p v-if="!report.freeformSummary && report.questions.every((q) => !q.summary)" class="qa-unanswered">No self reflections</p>
-			</div>
-		</section>
-
-		<section class="detail-section">
-			<h2>Self reflections</h2>
-			<div v-for="report in reports" :key="report.card.id" class="report-card">
-				<h3>
-					{{ report.card.description }} <span class="source-label">({{ report.card.source }})</span>
-				</h3>
-				<div v-if="report.freeformNote" class="qa-block">
-					<p class="qa-freeform-answer">{{ report.freeformNote }}</p>
-				</div>
-				<div v-for="q in report.questions" :key="q.topic" class="qa-block">
-					<h4 class="qa-topic">{{ q.question }}</h4>
-					<p v-if="q.answer" class="qa-answer">{{ q.answer }}</p>
-					<p v-else class="qa-unanswered">Not yet answered.</p>
-				</div>
-			</div>
-		</section>
-	</main>
+		</template>
+	</ReportContent>
 </template>
 
 <style scoped>
-main {
-	margin: var(--space-8) auto;
-	max-width: 42rem;
-	padding: 0 var(--space-6);
-	color: var(--color-black);
-}
-
-header {
-	margin-bottom: var(--space-8);
-}
-
-h1 {
-	margin: 0 0 var(--space-1);
-}
-
-header h2 {
-	font-size: var(--text-lg);
-	font-weight: 400;
-	font-style: italic;
-	color: var(--color-gray-600);
-	margin: 0 0 var(--space-4);
-}
-
-.intro {
-	font-size: var(--text-base);
-	line-height: var(--leading-relaxed);
-	color: var(--color-gray-800);
-	margin: 0 0 var(--space-3);
-}
-
-.citation {
-	font-size: var(--text-sm);
-	color: var(--color-gray-400);
-	line-height: var(--leading-normal);
-	margin: 0 0 var(--space-4);
-}
-
-.empty-notice {
-	text-align: center;
-	padding: var(--space-8);
-	color: var(--color-gray-600);
-}
-
-section h2 {
-	margin: var(--space-8) 0 var(--space-4);
-}
-
-.source-label {
-	font-weight: 400;
-	color: var(--color-gray-600);
-}
-
-.summary-list {
-	margin-bottom: 0;
-}
-
-.summary-list li {
-	margin: var(--space-1) 0;
-	font-size: var(--text-base);
-	line-height: var(--leading-normal);
-	color: var(--color-gray-800);
-}
-
-.freeform-summary {
-	margin: var(--space-2) 0 0;
-	font-size: var(--text-base);
-	color: var(--color-gray-800);
-}
-
-.qa-block h4 {
-	margin-top: var(--space-3);
-	padding-top: var(--space-3);
-}
-
-h4 {
-	font-size: var(--text-lg);
-}
-
-.qa-answer,
-.qa-freeform-answer {
-	margin: var(--space-1) 0 0;
-	font-size: var(--text-base);
-	line-height: var(--leading-normal);
-	white-space: pre-wrap;
-}
-
-.qa-unanswered {
-	margin: var(--space-1) 0 0;
-	font-size: var(--text-sm);
-	font-style: italic;
-	color: var(--color-gray-400);
-}
-
-.summary-section .report-card {
-	margin-top: var(--space-8);
-}
-.detail-section .report-card {
-	margin-top: var(--space-16);
-}
-.summary-section h2 + .report-card,
-.detail-section h2 + .report-card {
-	margin-top: 0;
-}
-
 @media print {
 	.download-btn {
 		display: none;
-	}
-
-	main {
-		max-width: 100%;
-	}
-
-	.report-card {
-		break-inside: avoid;
-	}
-
-	.qa-block {
-		break-inside: avoid;
 	}
 }
 </style>
