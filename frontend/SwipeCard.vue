@@ -7,10 +7,11 @@ import type { SwipeDirection } from "../shared/meaning-cards.ts";
 const props = withDefaults(
 	defineProps<{
 		card: MeaningCard;
+		nextCard?: MeaningCard | null;
 		allowUnsure?: boolean;
 		showSource?: boolean;
 	}>(),
-	{ allowUnsure: true, showSource: false },
+	{ nextCard: null, allowUnsure: true, showSource: false },
 );
 
 const emit = defineEmits<{
@@ -166,30 +167,44 @@ defineExpose({ flyAway });
 </script>
 
 <template>
-	<div class="card-surface swipe-card" :style="cardStyle" @pointerdown="onPointerDown" @pointermove="onPointerMove" @pointerup="onPointerUp">
-		<div class="card-overlay" :style="overlayStyle" />
-		<span v-if="dominantDirection === 'agree' || flyDirection === 'agree'" class="direction-label agree" :style="{ opacity: labelOpacity }"> Agree ✓ </span>
-		<span v-if="dominantDirection === 'disagree' || flyDirection === 'disagree'" class="direction-label disagree" :style="{ opacity: labelOpacity }"> Disagree ✕ </span>
-		<span v-if="dominantDirection === 'unsure' || flyDirection === 'unsure'" class="direction-label unsure" :style="{ opacity: labelOpacity }"> Unsure ？ </span>
-		<p v-if="showSource" class="card-source">{{ card.source }}</p>
-		<p class="card-text">{{ card.description }}</p>
+	<div class="swipe-card-stack">
+		<div v-if="nextCard" class="card-surface peek-card">
+			<p v-if="showSource" class="card-source">{{ nextCard.source }}</p>
+			<p class="card-text">{{ nextCard.description }}</p>
+		</div>
+			<p v-if="showSource" class="card-source">{{ card.source }}</p>
+			<p class="card-text">{{ card.description }}</p>
 	</div>
 </template>
 
-<style>
+<style scoped>
 .card-surface {
-	width: 100%;
-	max-width: 20rem;
-	min-height: 14rem;
+	height: 14rem;
 	padding: var(--space-8);
 	background: var(--color-white);
 	border: var(--border-thin);
 }
-</style>
+.swipe-card-stack {
+	position: relative;
+	width: 100%;
+	max-width: 20rem;
+}
 
-<style scoped>
+.peek-card {
+	position: absolute;
+	inset: 0;
+	z-index: 0;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	text-align: center;
+	pointer-events: none;
+}
+
 .swipe-card {
 	position: relative;
+	z-index: 1;
 	margin: 0 auto;
 	display: flex;
 	flex-direction: column;
@@ -241,15 +256,6 @@ defineExpose({ flyAway });
 	color: var(--color-gray-400);
 }
 
-@keyframes fade-in {
-	from {
-		opacity: 0;
-	}
-	to {
-		opacity: 1;
-	}
-}
-
 .card-source {
 	font-size: var(--text-xs);
 	font-weight: 600;
@@ -266,7 +272,6 @@ defineExpose({ flyAway });
 	line-height: 1.6;
 	margin: 0;
 	color: var(--color-black);
-	animation: fade-in 0.3s ease;
 	position: relative;
 	z-index: 1;
 }

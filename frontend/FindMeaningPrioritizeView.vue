@@ -21,10 +21,10 @@ const swipeHistory = ref<SwipeRecord[]>([]);
 const swipeCardRef = ref<InstanceType<typeof SwipeCard> | null>(null);
 
 const currentCard = computed(() => cards.value[currentIndex.value] ?? null);
+const nextCard = computed(() => cards.value[currentIndex.value + 1] ?? null);
 const totalCards = computed(() => cards.value.length);
 const progressPercent = computed(() => (totalCards.value > 0 ? Math.round((currentIndex.value / totalCards.value) * 100) : 0));
 const isComplete = computed(() => currentIndex.value >= totalCards.value);
-const isLastCard = computed(() => currentIndex.value >= totalCards.value - 1);
 const canUndo = computed(() => swipeHistory.value.length > 0);
 const keptCount = computed(() => swipeHistory.value.filter((r) => r.direction === "agree").length);
 
@@ -126,8 +126,7 @@ watch(isComplete, (done) => {
 		</header>
 
 		<div v-if="!isComplete" class="card-area">
-			<div v-if="!isLastCard" class="card-surface blank-card" />
-			<SwipeCard ref="swipeCardRef" :key="currentIndex" :card="currentCard!" :allow-unsure="false" :show-source="true" @swiped="handleSwipe" />
+			<SwipeCard ref="swipeCardRef" :key="currentIndex" :card="currentCard!" :next-card="nextCard" :allow-unsure="false" :show-source="true" @swiped="handleSwipe" />
 		</div>
 
 		<div class="controls">
@@ -204,9 +203,5 @@ h1 {
 
 .undo-area {
 	text-align: center;
-}
-
-.blank-card {
-	position: absolute;
 }
 </style>

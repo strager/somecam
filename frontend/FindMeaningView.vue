@@ -40,10 +40,10 @@ function detectNextPhase(): { label: string; route: RouteLocationRaw } | null {
 }
 
 const currentCard = computed(() => shuffledCards.value[currentIndex.value] ?? null);
+const nextCard = computed(() => shuffledCards.value[currentIndex.value + 1] ?? null);
 const totalCards = computed(() => shuffledCards.value.length);
 const progressPercent = computed(() => (totalCards.value > 0 ? Math.round((currentIndex.value / totalCards.value) * 100) : 0));
 const isComplete = computed(() => currentIndex.value >= totalCards.value);
-const isLastCard = computed(() => currentIndex.value >= totalCards.value - 1);
 const canUndo = computed(() => swipeHistory.value.length > 0);
 
 function shuffle<T>(array: readonly T[]): T[] {
@@ -169,8 +169,7 @@ function continueToNextPhase(): void {
 		</header>
 
 		<div v-if="!isComplete" class="card-area">
-			<div v-if="!isLastCard" class="card-surface blank-card" />
-			<SwipeCard ref="swipeCardRef" :key="currentIndex" :card="currentCard!" @swiped="handleSwipe" />
+			<SwipeCard ref="swipeCardRef" :key="currentIndex" :card="currentCard!" :next-card="nextCard" @swiped="handleSwipe" />
 		</div>
 
 		<div v-else class="end-state">
@@ -268,9 +267,5 @@ h1 {
 
 .undo-area {
 	text-align: center;
-}
-
-.blank-card {
-	position: absolute;
 }
 </style>
