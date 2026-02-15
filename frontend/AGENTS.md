@@ -11,6 +11,7 @@
 
 ## UI/UX
 
+- For a comprehensive style guide (CSS rules, etc.) see `docs/style-guide.md`.
 - On page navigation, scroll to the top of the page.
 - When validation fails, focus the relevant input field.
 - Don't rely on color alone to indicate state — pair with icons or other visual cues.
