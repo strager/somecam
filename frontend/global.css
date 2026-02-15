@@ -468,6 +468,59 @@ tr:last-child td {
 }
 
 /* ============================================================
+   LISTS
+   ============================================================ */
+ul,
+ol {
+	padding-left: var(--space-6);
+	margin-bottom: var(--space-4);
+	color: var(--color-gray-800);
+}
+
+li {
+	margin-bottom: var(--space-2);
+	line-height: var(--leading-relaxed);
+}
+
+li:last-child {
+	margin-bottom: 0;
+}
+
+ul ul,
+ol ol,
+ul ol,
+ol ul {
+	margin-top: var(--space-2);
+	margin-bottom: 0;
+}
+
+/* ============================================================
+   BLOCKQUOTES
+   ============================================================ */
+blockquote {
+	border-left: 3px solid var(--color-green-600);
+	padding: var(--space-3) var(--space-5);
+	margin: 0 0 var(--space-4) 0;
+	color: var(--color-gray-600);
+}
+
+blockquote p {
+	margin-bottom: var(--space-2);
+}
+
+blockquote p:last-child {
+	margin-bottom: 0;
+}
+
+blockquote cite {
+	display: block;
+	font-size: var(--text-sm);
+	font-style: normal;
+	color: var(--color-gray-400);
+	margin-top: var(--space-2);
+}
+
+/* ============================================================
    DIVIDER & META TEXT
    ============================================================ */
 hr {

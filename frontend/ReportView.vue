@@ -113,11 +113,11 @@ onMounted(() => {
 				</h3>
 				<div class="card-body">
 					<div v-if="report.freeformNote" class="qa-block">
-						<p class="qa-freeform-answer">{{ report.freeformNote }}</p>
+						<blockquote class="qa-freeform-answer">{{ report.freeformNote }}</blockquote>
 					</div>
 					<div v-for="q in report.questions" :key="q.topic" class="qa-block">
 						<p class="qa-topic">{{ q.question }}</p>
-						<p v-if="q.answer" class="qa-answer">{{ q.answer }}</p>
+						<blockquote v-if="q.answer" class="qa-answer">{{ q.answer }}</blockquote>
 						<p v-else class="qa-unanswered">Not yet answered.</p>
 					</div>
 				</div>
@@ -220,12 +220,6 @@ section h2 {
 	font-size: var(--text-base);
 	line-height: var(--leading-normal);
 	white-space: pre-wrap;
-}
-
-.qa-answer {
-	color: var(--color-gray-600);
-	padding-left: var(--space-2);
-	border-left: 3px solid var(--color-green-600);
 }
 
 .qa-unanswered {

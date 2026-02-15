@@ -400,6 +400,57 @@
 				</table>
 			</div>
 
+			<!-- Lists -->
+			<div class="sg-subsection">
+				<div class="sg-subsection-title">Lists</div>
+				<p style="font-size: var(--text-base); color: var(--color-gray-600); margin-bottom: var(--space-4)">Lists inherit body text styling. Default browser markers (disc for unordered, decimal for ordered) maintain the print-inspired feel. Spacing follows the 4px grid.</p>
+
+				<h4 class="sg-group-label">Unordered list</h4>
+				<ul style="max-width: 600px; margin-bottom: var(--space-6)">
+					<li>Total revenue reached $1.27M this quarter</li>
+					<li>Northeast region led growth at 18%</li>
+					<li>Fourteen new enterprise accounts were opened</li>
+				</ul>
+
+				<h4 class="sg-group-label">Ordered list</h4>
+				<ol style="max-width: 600px; margin-bottom: var(--space-6)">
+					<li>Review the quarterly performance data</li>
+					<li>Verify all transactions against original records</li>
+					<li>Submit final report to compliance</li>
+				</ol>
+
+				<h4 class="sg-group-label">Nested list</h4>
+				<ul style="max-width: 600px; margin-bottom: var(--space-6)">
+					<li>
+						Revenue breakdown
+						<ul>
+							<li>Northeast: $482,300 (+18%)</li>
+							<li>Southeast: $314,100 (+7%)</li>
+							<li>West: $271,500 (+9%)</li>
+						</ul>
+					</li>
+					<li>New accounts: 14 opened</li>
+					<li>Compliance: audit completed</li>
+				</ul>
+			</div>
+
+			<!-- Blockquotes -->
+			<div class="sg-subsection">
+				<div class="sg-subsection-title">Blockquotes</div>
+				<p style="font-size: var(--text-base); color: var(--color-gray-600); margin-bottom: var(--space-4)">Blockquotes use a 3px green left border consistent with card-left and alerts. No background fill keeps them print-clean. Text is gray-600 to visually separate from surrounding prose. Use <code style="font-size: var(--text-sm); background: var(--color-gray-50); padding: 2px 4px">&lt;cite&gt;</code> for attributions.</p>
+
+				<h4 class="sg-group-label">With attribution</h4>
+				<blockquote style="max-width: 600px; margin-bottom: var(--space-6)">
+					<p>The purpose of life is not to be happy. It is to be useful, to be honorable, to be compassionate, to have it make some difference that you have lived and lived well.</p>
+					<cite>Ralph Waldo Emerson</cite>
+				</blockquote>
+
+				<h4 class="sg-group-label">Without attribution</h4>
+				<blockquote style="max-width: 600px; margin-bottom: var(--space-6)">
+					<p>All transactions for this period have been reconciled and verified against the original records. Overall revenue grew 12% compared to the prior quarter.</p>
+				</blockquote>
+			</div>
+
 			<!-- Cards -->
 			<div class="sg-subsection">
 				<div class="sg-subsection-title">Cards</div>
