@@ -90,10 +90,14 @@ function onDelete(id: string): void {
 	refreshState();
 }
 
+function sessionRoute(session: SessionMeta): RouteLocationRaw {
+	const phase = sessionPhases.value[session.id] ?? detectSessionPhase(session.id);
+	return phaseRoute(session.id, phase);
+}
+
 function onOpenSession(session: SessionMeta): void {
 	const phase = sessionPhases.value[session.id] ?? detectSessionPhase(session.id);
 	capture("session_resumed", { session_id: session.id, phase });
-	void router.push(phaseRoute(session.id, phase));
 }
 
 function onExport(): void {
@@ -119,47 +123,37 @@ function onLoadFile(): void {
 			<p class="subtitle">Sources of Meaning Card Method</p>
 		</header>
 
-		<section class="purpose">
-			<h2>Explore What Makes Life Meaningful</h2>
+		<section>
+			<h2>Explore what makes life meaningful</h2>
 			<p>SoMeCaM is a method for mapping and exploring your personal sources of meaning. Based on 26 identified sources of meaning across five dimensions — self-transcendence, self-actualization, order, well-being, and relatedness — the method helps you reflect on what matters most in your life.</p>
 		</section>
 
-		<section class="privacy">
-			<h2>Your Privacy</h2>
+		<section>
+			<h2>Your privacy</h2>
 			<p>Your data is never stored on our servers. Your responses are saved locally in your browser so you can return to them later.</p>
 		</section>
 
 		<section class="sessions">
 			<div v-if="sessions.length === 0" class="cta">
-				<button type="button" class="btn-primary" @click="onNewSession">Start Finding Meaning</button>
+				<button type="button" class="btn-primary" @click="onNewSession">Start finding meaning</button>
 			</div>
 			<template v-else>
-				<h2>Your Sessions</h2>
+				<h2>Your sessions</h2>
 				<div class="session-list">
-					<div v-for="session in sessions" :key="session.id" class="session-item">
-						<div class="session-info">
+					<div v-for="session in sessions" :key="session.id" class="card-hrule">
+						<div class="card-title">
 							<template v-if="renamingId === session.id">
-								<input ref="renameInputEl" v-model="renameInput" type="text" class="rename-input" @keydown="onRenameKeydown" @blur="onConfirmRename" />
+								<input ref="renameInputEl" v-model="renameInput" type="text" @keydown="onRenameKeydown" @blur="onConfirmRename" />
 							</template>
-							<template v-else>
-								<button type="button" class="session-name session-link-btn" @click="onOpenSession(session)">{{ session.name }}</button>
-							</template>
-							<span class="session-date session-date-long">
-								Created {{ formatSessionDate(new Date(session.createdAt)) }}<template v-if="session.lastUpdatedAt !== session.createdAt"> · Updated {{ formatSessionDate(new Date(session.lastUpdatedAt)) }}</template>
-							</span>
+							<router-link v-else :to="sessionRoute(session)" class="session-link" @click="onOpenSession(session)">{{ session.name }}</router-link>
 						</div>
-						<div class="session-actions">
-							<button type="button" class="action-btn" @click="onStartRename(session)">Rename</button>
-							<button type="button" class="action-btn delete-btn" @click="onDelete(session.id)">Delete</button>
-						</div>
-						<div class="session-dates-short">
-							<span class="session-date">Created {{ new Date(session.createdAt).toLocaleDateString() }}</span>
-							<span v-if="session.lastUpdatedAt !== session.createdAt" class="session-date">Updated {{ new Date(session.lastUpdatedAt).toLocaleDateString() }}</span>
+						<div class="card-meta">
+							Created {{ formatSessionDate(new Date(session.createdAt)) }}<template v-if="session.lastUpdatedAt !== session.createdAt"> · Updated {{ formatSessionDate(new Date(session.lastUpdatedAt)) }}</template> · <button type="button" class="text-btn" @click="onStartRename(session)">Rename</button> · <button type="button" class="text-btn text-btn-danger" @click="onDelete(session.id)">Delete</button>
 						</div>
 					</div>
 				</div>
 				<div class="cta">
-					<button type="button" class="btn-secondary" @click="onNewSession">Start New Session</button>
+					<button type="button" class="btn-secondary" @click="onNewSession">Start new session</button>
 				</div>
 			</template>
 		</section>
@@ -186,182 +180,91 @@ function onLoadFile(): void {
 
 <style scoped>
 main {
-	margin: 3rem auto;
+	margin: var(--space-12) auto;
 	max-width: 36rem;
-	padding: 0 1.5rem;
-	color: #1a1a1a;
+	padding: 0 var(--space-6);
 }
 
 header {
-	text-align: center;
-	margin-bottom: 2.5rem;
+	margin-bottom: var(--space-10);
 }
 
 h1 {
-	font-size: 2.5rem;
-	margin: 0 0 0.25rem;
+	font-family: var(--font-heading);
+	font-size: var(--text-4xl);
+	font-weight: 500;
+	color: var(--color-black);
+	margin: 0 0 var(--space-1);
 	letter-spacing: 0.02em;
 }
 
 .subtitle {
-	font-size: 1.1rem;
-	color: #555;
+	font-family: var(--font-heading);
+	font-size: var(--text-lg);
+	font-style: italic;
+	font-weight: 400;
+	color: var(--color-gray-600);
 	margin: 0;
 }
 
 h2 {
-	font-size: 1.25rem;
-	margin: 0 0 0.5rem;
+	font-family: var(--font-heading);
+	font-size: var(--text-2xl);
+	font-weight: 600;
+	color: var(--color-black);
+	margin: 0 0 var(--space-2);
 }
 
 section {
-	margin-bottom: 2rem;
+	margin-bottom: var(--space-8);
 }
 
 section p {
-	line-height: 1.6;
+	line-height: var(--leading-relaxed);
 	margin: 0;
 }
 
 .sessions {
-	margin-bottom: 1rem;
+	margin-bottom: var(--space-4);
 }
 
-.session-list {
-	display: flex;
-	flex-direction: column;
-	gap: 0.5rem;
-}
-
-.session-item {
-	display: flex;
-	flex-wrap: wrap;
-	justify-content: space-between;
-	align-items: center;
-	padding: 0.75rem 1rem;
-	border: 1px solid #ddd;
-	border-radius: 6px;
-	gap: 0.5rem 0.75rem;
-}
-
-.session-info {
-	display: flex;
-	flex-direction: column;
-	gap: 0.15rem;
-	min-width: 0;
-	flex: 1;
-}
-
-.session-name {
-	font-weight: 600;
-	font-size: 0.95rem;
+.session-link {
+	display: block;
 	overflow: hidden;
 	text-overflow: ellipsis;
 	white-space: nowrap;
-	color: var(--color-green-600);
-	text-decoration: none;
 }
 
-.session-name:hover {
-	text-decoration: underline;
-}
-
-.session-link-btn {
-	background: transparent;
-	padding: 0;
-	text-align: left;
-}
-
-.session-date {
-	font-size: 0.8rem;
-	color: #888;
-}
-
-.session-dates-short {
-	display: none;
-}
-
-.rename-input {
-	font-size: 0.95rem;
+.card-title input {
+	font-family: var(--font-heading);
+	font-size: var(--text-xl);
 	font-weight: 600;
-	padding: 0.15rem 0.35rem;
-	border: 1px solid var(--color-green-600);
-	border-radius: 4px;
 }
 
-.session-actions {
-	display: flex;
-	gap: 0.35rem;
-	flex-shrink: 0;
-}
-
-@media (max-width: 480px) {
-	.session-item {
-		display: grid;
-		grid-template-columns: 1fr auto;
-		gap: 0.25rem 0.75rem;
-	}
-
-	.session-info {
-		grid-column: 1 / -1;
-	}
-
-	.session-date-long {
-		display: none;
-	}
-
-	.session-dates-short {
-		display: flex;
-		flex-direction: column;
-		grid-column: 1;
-		grid-row: 2;
-	}
-
-	.session-actions {
-		grid-column: 2;
-		grid-row: 2;
-		align-self: end;
-		flex-direction: column;
-	}
-}
-
-.action-btn {
+.text-btn {
 	background: none;
-	border: 1px solid #ccc;
-	border-radius: 4px;
-	font-size: 0.78rem;
-	padding: 0.25rem 0.5rem;
-	color: #555;
-	transition:
-		border-color 0.15s ease,
-		color 0.15s ease;
+	font-size: inherit;
+	color: inherit;
+	text-decoration: underline;
+	text-underline-offset: 2px;
+	text-decoration-thickness: 1px;
 }
 
-.action-btn:hover {
-	border-color: #888;
-	color: var(--color-black);
+.text-btn:hover {
+	color: var(--color-gray-600);
 }
 
-.delete-btn:hover {
-	border-color: var(--color-error);
+.text-btn-danger:hover {
 	color: var(--color-error);
 }
 
 .cta {
-	text-align: center;
-	margin: 2.5rem 0;
-}
-
-.cta .btn-primary {
-	padding: var(--space-3) var(--space-8);
-	font-size: var(--text-lg);
+	margin: var(--space-10) 0;
 }
 
 .file-actions {
-	text-align: center;
 	display: flex;
-	justify-content: center;
-	gap: 1rem;
+	gap: var(--space-4);
 }
 
 .file-btn {
@@ -369,7 +272,8 @@ section p {
 	color: var(--color-gray-400);
 	font-size: var(--text-sm);
 	text-decoration: underline;
-	padding: var(--space-1) var(--space-2);
+	text-underline-offset: 3px;
+	text-decoration-thickness: 1px;
 }
 
 .file-btn:hover {
@@ -377,27 +281,27 @@ section p {
 }
 
 footer {
-	margin-top: 3rem;
-	padding-top: 1.5rem;
-	border-top: 1px solid #ddd;
+	margin-top: var(--space-12);
+	padding-top: var(--space-6);
+	border-top: var(--border-thin);
 }
 
 .citation {
-	font-size: 0.85rem;
-	color: #666;
-	line-height: 1.5;
+	font-size: var(--text-sm);
+	color: var(--color-gray-600);
+	line-height: var(--leading-normal);
 	margin: 0;
 }
 
 .github-link {
-	display: block;
-	margin-top: 1rem;
-	text-align: center;
-	color: #666;
-	transition: color 0.15s ease;
+	display: inline-block;
+	margin-top: var(--space-4);
+	color: var(--color-gray-400);
+	text-decoration: none;
+	transition: color var(--transition);
 }
 
 .github-link:hover {
-	color: #1a1a1a;
+	color: var(--color-black);
 }
 </style>

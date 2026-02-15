@@ -237,14 +237,8 @@ button:active span {
 	transform: translateY(1px);
 }
 
-.btn-primary,
-.btn-secondary {
-	padding: var(--space-2) var(--space-5);
-	border-radius: 6px;
-	font-weight: 600;
-}
-
 .btn-primary {
+	padding: var(--space-2) var(--space-6);
 	background: var(--color-green-600);
 	color: var(--color-white);
 	border: 1px solid var(--color-green-600);
@@ -262,6 +256,7 @@ button:active span {
 }
 
 .btn-secondary {
+	padding: var(--space-2) var(--space-6);
 	background: transparent;
 	color: var(--color-green-600);
 	border: 1px solid var(--color-green-600);
