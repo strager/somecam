@@ -189,6 +189,13 @@ h1 {
 	align-items: center;
 	min-height: 16rem;
 	margin-bottom: var(--space-6);
+	/* Stretch to full viewport width so overflow-x clips at screen edges,
+	   not at the parent's max-width boundary. 50% is half the parent's
+	   width; -50vw pulls back half the viewport. The difference cancels
+	   out the centering offset, aligning our left edge with the viewport. */
+	width: 100vw;
+	margin-left: calc(-50vw + 50%);
+	overflow-x: clip;
 }
 
 .controls {
