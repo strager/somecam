@@ -167,11 +167,22 @@ defineExpose({ flyAway });
 </script>
 
 <template>
-	<div class="swipe-card-stack">
-		<div v-if="nextCard" class="card-surface peek-card">
-			<p class="card-text">
-				{{ nextCard.description }} <span v-if="showSource" class="card-source">({{ nextCard.source }})</span>
-			</p>
+	<div class="swipe-card-viewport">
+		<div class="swipe-card-stack">
+			<div v-if="nextCard" class="card-surface peek-card">
+				<p class="card-text">
+					{{ nextCard.description }} <span v-if="showSource" class="card-source">({{ nextCard.source }})</span>
+				</p>
+			</div>
+			<div class="card-surface swipe-card" :style="cardStyle" @pointerdown="onPointerDown" @pointermove="onPointerMove" @pointerup="onPointerUp">
+				<div class="card-overlay" :style="overlayStyle" />
+				<span v-if="dominantDirection === 'agree' || flyDirection === 'agree'" class="direction-label agree" :style="{ opacity: labelOpacity }"> Agree ✓ </span>
+				<span v-if="dominantDirection === 'disagree' || flyDirection === 'disagree'" class="direction-label disagree" :style="{ opacity: labelOpacity }"> Disagree ✕ </span>
+				<span v-if="dominantDirection === 'unsure' || flyDirection === 'unsure'" class="direction-label unsure" :style="{ opacity: labelOpacity }"> Unsure ？ </span>
+				<p class="card-text">
+					{{ card.description }} <span v-if="showSource" class="card-source">({{ card.source }})</span>
+				</p>
+			</div>
 		</div>
 	</div>
 </template>
@@ -184,6 +195,18 @@ defineExpose({ flyAway });
 	border: var(--border-thin);
 	font-family: var(--font-heading);
 }
+/* Stretch to full viewport width so overflow-x clips at screen edges,
+   not at the parent's max-width boundary. 50% is half the parent's
+   width; -50vw pulls back half the viewport. The difference cancels
+   out the centering offset, aligning our left edge with the viewport. */
+.swipe-card-viewport {
+	width: 100vw;
+	margin-left: calc(-50vw + 50%);
+	overflow-x: clip;
+	display: flex;
+	justify-content: center;
+}
+
 .swipe-card-stack {
 	position: relative;
 	width: 100%;
