@@ -1,13 +1,26 @@
 <script setup lang="ts">
-defineProps<{
-	variant: "primary" | "secondary";
-	disabled?: boolean;
-}>();
+import { computed } from "vue";
+
+const props = withDefaults(
+	defineProps<{
+		variant: "primary" | "secondary";
+		emphasis?: "default" | "muted";
+		disabled?: boolean;
+	}>(),
+	{ emphasis: "default" },
+);
+
+const btnClass = computed(() => {
+	if (props.emphasis === "muted") {
+		return props.variant === "primary" ? "btn-neutral" : "btn-neutral-secondary";
+	}
+	return `btn-${props.variant}`;
+});
 </script>
 
 <template>
 	<!-- eslint-disable-next-line vue/no-restricted-html-elements -->
-	<button :class="'btn-' + variant" :disabled="disabled">
+	<button :class="btnClass" :disabled="disabled">
 		<span><slot /></span>
 	</button>
 </template>

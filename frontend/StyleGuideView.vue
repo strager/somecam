@@ -1,4 +1,6 @@
-<script setup lang="ts"></script>
+<script setup lang="ts">
+import AppButton from "./AppButton.vue";
+</script>
 
 <template>
 	<!-- eslint-disable vue/no-restricted-html-elements -->
@@ -285,20 +287,30 @@
 			<!-- Buttons -->
 			<div class="sg-subsection">
 				<div class="sg-subsection-title">Buttons</div>
-				<p style="font-size: var(--text-base); color: var(--color-gray-600); margin-bottom: var(--space-4)">Hover darkens the fill (primary) or adds a light green background (secondary). Focus shows a double-outline ring (1px gap + 2px ring on primary, 1px gap + 1px ring on secondary). On press, the button text nudges down 1px via an inner span transform — the border stays anchored while only the text moves.</p>
+				<p style="font-size: var(--text-base); color: var(--color-gray-600); margin-bottom: var(--space-4)">Two axes: variant (primary = solid fill, secondary = outline) and emphasis (default = green, muted = gray). Use muted emphasis for neutral or de-emphasized actions like disagree, unsure, or undo. Hover darkens the fill (primary) or adds a tinted background (secondary). Focus shows a double-outline ring. On press, the button text nudges down 1px via an inner span transform — the border stays anchored while only the text moves.</p>
 				<h4 class="sg-group-label">Primary (CTA) — solid green</h4>
 				<div class="sg-button-row">
-					<button class="btn-primary"><span>Submit report</span></button>
-					<button class="btn-primary"><span>Save changes</span></button>
+					<AppButton variant="primary">Submit report</AppButton>
+					<AppButton variant="primary">Save changes</AppButton>
 				</div>
 				<h4 class="sg-group-label">Secondary (non-CTA) — green outline</h4>
 				<div class="sg-button-row">
-					<button class="btn-secondary"><span>Cancel</span></button>
-					<button class="btn-secondary"><span>View details</span></button>
+					<AppButton variant="secondary">Cancel</AppButton>
+					<AppButton variant="secondary">View details</AppButton>
+				</div>
+				<h4 class="sg-group-label">Primary muted — solid gray</h4>
+				<div class="sg-button-row">
+					<AppButton variant="primary" emphasis="muted">Disagree</AppButton>
+					<AppButton variant="primary" emphasis="muted">Remove</AppButton>
+				</div>
+				<h4 class="sg-group-label">Secondary muted — gray outline</h4>
+				<div class="sg-button-row">
+					<AppButton variant="secondary" emphasis="muted">Unsure</AppButton>
+					<AppButton variant="secondary" emphasis="muted">Undo</AppButton>
 				</div>
 				<h4 class="sg-group-label">Disabled</h4>
 				<div class="sg-button-row">
-					<button disabled><span>Unavailable</span></button>
+					<AppButton variant="primary" :disabled="true">Unavailable</AppButton>
 				</div>
 			</div>
 
@@ -649,8 +661,8 @@
 					</div>
 
 					<div style="margin-top: var(--space-8); display: flex; gap: var(--space-3)">
-						<button class="btn-primary"><span>Download full report</span></button>
-						<button class="btn-secondary"><span>Share</span></button>
+						<AppButton variant="primary">Download full report</AppButton>
+						<AppButton variant="secondary">Share</AppButton>
 					</div>
 					<small style="margin-top: var(--space-4)">Last updated February 14, 2026 &middot; Document ref #QR-2026Q1</small>
 				</div>
@@ -805,20 +817,6 @@
 	gap: var(--space-4);
 	align-items: center;
 	margin-bottom: var(--space-6);
-}
-
-button span {
-	display: block;
-	padding: var(--space-2) var(--space-6);
-	transition: transform 0.06s ease;
-}
-
-button:hover:active span {
-	transform: translateY(1px);
-}
-
-button:disabled:active span {
-	transform: none;
 }
 
 .sg-mockup {

@@ -50,8 +50,8 @@ const pastThreshold = computed(() => {
 
 const DIRECTION_COLORS: Record<SwipeDirection, string> = {
 	agree: "42, 110, 78",
-	disagree: "200, 60, 60",
-	unsure: "107, 114, 128",
+	disagree: "85, 85, 85",
+	unsure: "115, 115, 115",
 };
 
 const overlayColor = computed(() => {
@@ -82,12 +82,21 @@ const labelOpacity = computed(() => {
 	return Math.min(Math.max((dist - 30) / (SWIPE_THRESHOLD - 30), 0), 1);
 });
 
-const cardShadow = computed(() => {
-	if (flyingAway.value) return "0 4px 20px rgba(0, 0, 0, 0.12)";
-	if (!isDragging.value) return undefined;
-	const dist = Math.max(Math.abs(offsetX.value), Math.abs(offsetY.value));
-	const shadowOpacity = Math.min(dist / SWIPE_THRESHOLD, 1) * 0.12;
-	return `0 4px 20px rgba(0, 0, 0, ${String(shadowOpacity)})`;
+const activeDirection = computed<SwipeDirection | null>(() => {
+	if (flyingAway.value) return flyDirection.value;
+	if (isDragging.value) return dominantDirection.value;
+	return null;
+});
+
+const overlayStyle = computed(() => {
+	const style: Record<string, string> = { background: overlayColor.value };
+	const dir = activeDirection.value;
+	if (dir === "unsure") {
+		style.border = `2px dashed rgba(${DIRECTION_COLORS.unsure}, ${String(labelOpacity.value)})`;
+	} else if (dir !== null) {
+		style.border = `2px solid rgba(${DIRECTION_COLORS[dir]}, ${String(labelOpacity.value)})`;
+	}
+	return style;
 });
 
 const cardStyle = computed(() => {
@@ -96,18 +105,16 @@ const cardStyle = computed(() => {
 		return {
 			transform: `translate(${String(flyX.value)}px, ${String(flyY.value)}px) rotate(${String(rotate)}deg)`,
 			opacity: "0",
-			boxShadow: cardShadow.value,
 			transition: `transform ${String(flyDurationMs.value)}ms ease, opacity ${String(flyDurationMs.value)}ms ease`,
 		};
 	}
 	if (!isDragging.value) {
-		return { transition: "transform 0.3s ease", boxShadow: cardShadow.value };
+		return { transition: "transform 0.3s ease" };
 	}
 	const rotate = offsetX.value * 0.08;
 	return {
 		transform: `translate(${String(offsetX.value)}px, ${String(offsetY.value)}px) rotate(${String(rotate)}deg)`,
 		transition: "none",
-		boxShadow: cardShadow.value,
 	};
 });
 
@@ -160,10 +167,10 @@ defineExpose({ flyAway });
 
 <template>
 	<div class="card-surface swipe-card" :style="cardStyle" @pointerdown="onPointerDown" @pointermove="onPointerMove" @pointerup="onPointerUp">
-		<div class="card-overlay" :style="{ background: overlayColor }" />
-		<span v-if="dominantDirection === 'agree' || flyDirection === 'agree'" class="direction-label agree" :style="{ opacity: labelOpacity }"> Agree </span>
-		<span v-if="dominantDirection === 'disagree' || flyDirection === 'disagree'" class="direction-label disagree" :style="{ opacity: labelOpacity }"> Disagree </span>
-		<span v-if="dominantDirection === 'unsure' || flyDirection === 'unsure'" class="direction-label unsure" :style="{ opacity: labelOpacity }"> Unsure </span>
+		<div class="card-overlay" :style="overlayStyle" />
+		<span v-if="dominantDirection === 'agree' || flyDirection === 'agree'" class="direction-label agree" :style="{ opacity: labelOpacity }"> Agree ✓ </span>
+		<span v-if="dominantDirection === 'disagree' || flyDirection === 'disagree'" class="direction-label disagree" :style="{ opacity: labelOpacity }"> Disagree ✕ </span>
+		<span v-if="dominantDirection === 'unsure' || flyDirection === 'unsure'" class="direction-label unsure" :style="{ opacity: labelOpacity }"> Unsure ？ </span>
 		<p v-if="showSource" class="card-source">{{ card.source }}</p>
 		<p class="card-text">{{ card.description }}</p>
 	</div>
@@ -174,10 +181,9 @@ defineExpose({ flyAway });
 	width: 100%;
 	max-width: 20rem;
 	min-height: 14rem;
-	padding: 2rem;
-	border-radius: 12px;
-	background: #fff;
-	box-shadow: 0 4px 20px rgba(0, 0, 0, 0.12);
+	padding: var(--space-8);
+	background: var(--color-white);
+	border: var(--border-thin);
 }
 </style>
 
@@ -203,15 +209,16 @@ defineExpose({ flyAway });
 .card-overlay {
 	position: absolute;
 	inset: 0;
-	border-radius: 12px;
 	pointer-events: none;
-	transition: background 0.1s ease;
+	transition:
+		background 0.1s ease,
+		border 0.1s ease;
 }
 
 .direction-label {
 	position: absolute;
 	top: 1rem;
-	font-size: 1.1rem;
+	font-size: var(--text-lg);
 	font-weight: 700;
 	text-transform: uppercase;
 	letter-spacing: 0.05em;
@@ -220,18 +227,18 @@ defineExpose({ flyAway });
 
 .direction-label.agree {
 	right: 1rem;
-	color: #2a6e4e;
+	color: var(--color-green-600);
 }
 
 .direction-label.disagree {
 	left: 1rem;
-	color: #c83c3c;
+	color: var(--color-gray-600);
 }
 
 .direction-label.unsure {
 	left: 50%;
 	transform: translateX(-50%);
-	color: #6b7280;
+	color: var(--color-gray-400);
 }
 
 @keyframes fade-in {
@@ -244,21 +251,21 @@ defineExpose({ flyAway });
 }
 
 .card-source {
-	font-size: 0.75rem;
+	font-size: var(--text-xs);
 	font-weight: 600;
 	text-transform: uppercase;
 	letter-spacing: 0.05em;
-	color: #888;
-	margin: 0 0 0.5rem;
+	color: var(--color-gray-400);
+	margin: 0 0 var(--space-2);
 	position: relative;
 	z-index: 1;
 }
 
 .card-text {
-	font-size: 1.2rem;
+	font-size: var(--text-xl);
 	line-height: 1.6;
 	margin: 0;
-	color: #1a1a1a;
+	color: var(--color-black);
 	animation: fade-in 0.3s ease;
 	position: relative;
 	z-index: 1;

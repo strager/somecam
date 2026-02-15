@@ -8,6 +8,7 @@ import { capture } from "./analytics.ts";
 import { useStringParam } from "./route-utils.ts";
 import type { SwipeRecord } from "./store.ts";
 import { loadPrioritize, needsPrioritization, removePrioritize, saveChosenCardIds, savePrioritize } from "./store.ts";
+import AppButton from "./AppButton.vue";
 import SwipeCard from "./SwipeCard.vue";
 
 const router = useRouter();
@@ -129,64 +130,59 @@ watch(isComplete, (done) => {
 			<SwipeCard ref="swipeCardRef" :key="currentIndex" :card="currentCard!" :allow-unsure="false" :show-source="true" @swiped="handleSwipe" />
 		</div>
 
-		<!-- eslint-disable vue/no-restricted-html-elements -->
 		<div class="controls">
-			<button type="button" class="btn disagree" :disabled="isComplete" @click="handleButtonSwipe('disagree')">Remove</button>
-			<button type="button" class="btn agree" :disabled="isComplete" @click="handleButtonSwipe('agree')">Keep</button>
+			<AppButton variant="primary" emphasis="muted" :disabled="isComplete" @click="handleButtonSwipe('disagree')">Remove ✕</AppButton>
+
+			<AppButton variant="primary" :disabled="isComplete" @click="handleButtonSwipe('agree')">Keep ✓</AppButton>
 		</div>
 
 		<div class="undo-area">
-			<button type="button" class="btn undo" :disabled="!canUndo" @click="handleUndo">Undo</button>
+			<AppButton variant="secondary" emphasis="muted" :disabled="!canUndo" @click="handleUndo">Undo</AppButton>
 		</div>
-		<!-- eslint-enable vue/no-restricted-html-elements -->
 	</main>
 </template>
 
 <style scoped>
 main {
-	margin: 2rem auto;
+	margin: var(--space-8) auto;
 	max-width: 36rem;
-	padding: 0 1.5rem;
-	color: #1a1a1a;
+	padding: 0 var(--space-6);
+	color: var(--color-black);
 }
 
 header {
 	text-align: center;
-	margin-bottom: 2rem;
+	margin-bottom: var(--space-8);
 }
 
 h1 {
-	font-size: 2rem;
-	margin: 0 0 0.5rem;
-	letter-spacing: 0.02em;
+	margin: 0 0 var(--space-1);
 }
 
 .progress {
 	display: flex;
 	flex-direction: column;
 	align-items: center;
-	gap: 0.4rem;
+	gap: var(--space-1);
 }
 
 .progress-bar {
 	width: 100%;
 	max-width: 16rem;
 	height: 6px;
-	background: #e5e7eb;
-	border-radius: 3px;
+	background: var(--color-gray-200);
 	overflow: hidden;
 }
 
 .progress-fill {
 	height: 100%;
-	background: #2a6e4e;
-	border-radius: 3px;
+	background: var(--color-green-600);
 	transition: width 0.3s ease;
 }
 
 .progress-text {
-	font-size: 0.85rem;
-	color: #666;
+	font-size: var(--text-sm);
+	color: var(--color-gray-400);
 }
 
 .card-area {
@@ -196,60 +192,18 @@ h1 {
 	justify-content: center;
 	align-items: center;
 	min-height: 16rem;
-	margin-bottom: 1.5rem;
+	margin-bottom: var(--space-6);
 }
 
 .controls {
 	display: flex;
 	justify-content: center;
-	gap: 0.75rem;
-	margin-bottom: 1rem;
+	gap: var(--space-3);
+	margin-bottom: var(--space-4);
 }
 
 .undo-area {
 	text-align: center;
-}
-
-.btn {
-	padding: 0.6rem 1.5rem;
-	border-radius: 6px;
-	font-weight: 500;
-	transition:
-		background 0.15s ease,
-		opacity 0.15s ease;
-}
-
-.btn:disabled {
-	opacity: 0.4;
-	cursor: not-allowed;
-}
-
-.btn.agree {
-	background: var(--color-green-600);
-	color: var(--color-white);
-}
-
-.btn.agree:hover:not(:disabled) {
-	background: var(--color-green-700);
-}
-
-.btn.disagree {
-	background: #c83c3c;
-	color: var(--color-white);
-}
-
-.btn.disagree:hover:not(:disabled) {
-	background: #a83232;
-}
-
-.btn.undo {
-	background: transparent;
-	color: var(--color-gray-600);
-	border: 1px solid #ccc;
-}
-
-.btn.undo:hover:not(:disabled) {
-	background: var(--color-gray-50);
 }
 
 .blank-card {
