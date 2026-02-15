@@ -59,7 +59,7 @@ const cardsById = new Map(MEANING_CARDS.map((c) => [c.id, c]));
 onMounted(() => {
 	phaseStartedAtMs.value = performance.now();
 	const saved = loadSwipeProgress(sessionId);
-	if (saved) {
+	if (saved !== null) {
 		const cards = saved.shuffledCardIds.map((id) => cardsById.get(id)).filter((c): c is MeaningCard => c !== undefined);
 		if (cards.length > 0) {
 			shuffledCards.value = cards;
@@ -67,7 +67,7 @@ onMounted(() => {
 			currentIndex.value = saved.swipeHistory.length;
 			cardShownAtMs.value = performance.now();
 			const detected = detectNextPhase();
-			if (detected) {
+			if (detected !== null) {
 				nextPhaseLabel.value = detected.label;
 			}
 			return;
@@ -101,7 +101,7 @@ function handleSwipe(direction: SwipeDirection): void {
 function handleButtonSwipe(direction: SwipeDirection): void {
 	if (isComplete.value) return;
 	lastSwipeMethod.value = "button";
-	if (swipeCardRef.value) {
+	if (swipeCardRef.value !== null) {
 		swipeCardRef.value.flyAway(direction);
 	} else {
 		handleSwipe(direction);
@@ -123,7 +123,7 @@ function handleUndo(): void {
 
 function continueToNextPhase(): void {
 	const detected = detectNextPhase();
-	if (detected) {
+	if (detected !== null) {
 		void router.push(detected.route);
 		return;
 	}

@@ -65,8 +65,8 @@ function debouncedSave(): void {
 }
 
 const stored = loadLlmTestState();
-const selectedCardId = ref(stored ? stored.cardId : MEANING_CARDS[0].id);
-const rows = reactive<QuestionRow[]>(stored ? toQuestionRows(stored.rows) : [createRow()]);
+const selectedCardId = ref(stored !== null ? stored.cardId : MEANING_CARDS[0].id);
+const rows = reactive<QuestionRow[]>(stored !== null ? toQuestionRows(stored.rows) : [createRow()]);
 
 watch(selectedCardId, persistState);
 

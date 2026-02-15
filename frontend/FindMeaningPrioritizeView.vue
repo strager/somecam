@@ -29,7 +29,7 @@ const keptCount = computed(() => swipeHistory.value.filter((r) => r.direction ==
 
 onMounted(() => {
 	const saved = loadPrioritize(sessionId);
-	if (!saved) {
+	if (saved === null) {
 		void router.replace({ name: "findMeaning", params: { sessionId } });
 		return;
 	}
@@ -71,7 +71,7 @@ function handleSwipe(direction: SwipeDirection): void {
 
 function handleButtonSwipe(direction: SwipeDirection): void {
 	if (isComplete.value) return;
-	if (swipeCardRef.value) {
+	if (swipeCardRef.value !== null) {
 		swipeCardRef.value.flyAway(direction);
 	} else {
 		handleSwipe(direction);

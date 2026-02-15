@@ -32,7 +32,7 @@ function importErrorType(error: unknown): string {
 		return "invalid_json";
 	}
 	if (error instanceof Error) {
-		return error.name || "import_error";
+		return error.name !== "" ? error.name : "import_error";
 	}
 	return "import_error";
 }
@@ -227,7 +227,7 @@ export function switchSession(id: string): void {
 export function renameSession(id: string, newName: string): void {
 	const sessions = loadSessionsMeta();
 	const session = sessions.find((s) => s.id === id);
-	if (!session) {
+	if (session === undefined) {
 		throw new Error(`Session not found: ${id}`);
 	}
 	session.name = newName;
@@ -274,7 +274,7 @@ export function deleteSession(id: string): void {
 function touchSession(sessionId: string): void {
 	const sessions = loadSessionsMeta();
 	const session = sessions.find((s) => s.id === sessionId);
-	if (session) {
+	if (session !== undefined) {
 		session.lastUpdatedAt = new Date().toISOString();
 		saveSessionsMeta(sessions);
 	}
@@ -755,7 +755,7 @@ export function saveProgressFile(): void {
 }
 
 export function requestStoragePersistence(sessionId: string): void {
-	if (!sessionStorage.getItem(PERSIST_REQUESTED_KEY)) {
+	if (sessionStorage.getItem(PERSIST_REQUESTED_KEY) === null) {
 		sessionStorage.setItem(PERSIST_REQUESTED_KEY, "1");
 		void navigator.storage.persist().then(
 			(granted) => {
@@ -781,7 +781,7 @@ export function loadProgressFile(): Promise<void> {
 		input.accept = ".json";
 		input.addEventListener("change", () => {
 			const file = input.files?.[0];
-			if (!file) {
+			if (file === undefined) {
 				captureAnalyticsEvent("sessions_import_cancelled");
 				resolve();
 				return;

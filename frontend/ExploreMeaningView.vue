@@ -289,7 +289,7 @@ async function submitAnswer(): Promise<void> {
 		sufficient: depthResult.sufficient,
 	});
 
-	if (!depthResult.sufficient && depthResult.followUpQuestion) {
+	if (!depthResult.sufficient && depthResult.followUpQuestion !== "") {
 		// Depth check failed fast — cache the still-pending infer promise
 		inferring.value = false;
 		pendingInferResult.value = null;
@@ -434,7 +434,7 @@ onMounted(() => {
 
 		const lastEntry = entries.value[entries.value.length - 1];
 		if (lastEntry.submitted) {
-			if (lastEntry.guardrailText && !lastEntry.submittedAfterGuardrail) {
+			if (lastEntry.guardrailText !== "" && !lastEntry.submittedAfterGuardrail) {
 				// Refreshed during guardrail — restore it
 				depthCheckFollowUp.value = lastEntry.guardrailText;
 				depthCheckShown.value = true;
@@ -448,7 +448,7 @@ onMounted(() => {
 			const idx = activeIndex.value;
 			if (idx < entries.value.length) {
 				const entry = entries.value[idx];
-				if (!entry.userAnswer && entry.prefilledAnswer) {
+				if (entry.userAnswer === "" && entry.prefilledAnswer !== "") {
 					entry.userAnswer = entry.prefilledAnswer;
 				}
 				markQuestionStartNow();

@@ -51,6 +51,22 @@ export default [
 			// Disallow type assertions (`as`, angle-bracket).
 			"@typescript-eslint/consistent-type-assertions": ["warn", { assertionStyle: "never" }],
 
+			// Require explicit boolean expressions — no implicit coercion
+			// from strings, numbers, or nullables.
+			"@typescript-eslint/strict-boolean-expressions": [
+				"error",
+				{
+					allowString: false,
+					allowNumber: false,
+					allowNullableObject: false,
+					allowNullableBoolean: true,
+					allowNullableString: false,
+					allowNullableNumber: false,
+					allowNullableEnum: false,
+					allowAny: false,
+				},
+			],
+
 			// Allow _-prefixed unused args
 			"@typescript-eslint/no-unused-vars": [
 				"error",
