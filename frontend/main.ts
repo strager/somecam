@@ -16,7 +16,10 @@ import StyleGuideView from "./StyleGuideView.vue";
 
 const router = createRouter({
 	history: createWebHistory(),
-	scrollBehavior() {
+	scrollBehavior(_to, _from, savedPosition) {
+		if (savedPosition !== null) {
+			return savedPosition;
+		}
 		return { top: 0 };
 	},
 	routes: [
