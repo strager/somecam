@@ -139,6 +139,23 @@ paths:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/ProblemDetails"
+  /report-pdf:
+    post:
+      operationId: postReportPdf
+      summary: Generate a PDF report
+      responses:
+        "200":
+          description: Report generated successfully.
+          content:
+            text/html:
+              schema:
+                type: string
+        "500":
+          description: Internal server error.
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
   /check-answer-depth:
     post:
       operationId: postCheckAnswerDepth

@@ -31,6 +31,7 @@ async function main(): Promise<void> {
 				appType: "spa",
 			}),
 		);
+		app.locals.vite = vite;
 		app.use(vite.middlewares);
 	}
 

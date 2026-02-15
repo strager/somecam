@@ -8,7 +8,7 @@
 	},
 	"scripts": {
 		"dev": "node --env-file-if-exists=.env backend/main.ts",
-		"build": "vite build",
+		"build": "vite build && vite build --ssr pdf-entry.ts --outDir dist-ssr",
 		"typecheck": "tsc -p tsconfig.backend.json && vue-tsc --noEmit -p tsconfig.frontend.json",
 		"test": "vitest run",
 		"lint": "eslint .",
@@ -16,6 +16,7 @@
 		"format": "prettier --write ."
 	},
 	"dependencies": {
+		"@vue/server-renderer": "^3.5.28",
 		"express": "^5.1.0",
 		"openapi-backend": "^5.15.0",
 		"posthog-js": "^1.299.0",

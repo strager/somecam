@@ -58,6 +58,8 @@
           - "--include=frontend/"
           - "--include=frontend/dist/"
           - "--include=frontend/dist/**"
+          - "--include=frontend/dist-ssr/"
+          - "--include=frontend/dist-ssr/**"
           - "--include=package.json"
           - "--include=package-lock.json"
           - "--include=openapi.yaml"

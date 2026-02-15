@@ -4,6 +4,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import type { AppConfig } from "./config.ts";
+import { renderReportHtml } from "./pdf-report.ts";
 import { createChatCompletion } from "./xai-client.ts";
 import { MEANING_CARDS } from "../shared/meaning-cards.ts";
 import { EXPLORE_QUESTIONS } from "../shared/explore-questions.ts";
@@ -422,6 +423,10 @@ api.register({
 				body: createProblemDetails(502, "Bad Gateway", detail),
 			};
 		}
+	},
+	postReportPdf: async (_context: Context, req: ExpressRequest, res: Response): Promise<void> => {
+		const html = await renderReportHtml(req.app.locals.vite);
+		res.type("text/html").send(html);
 	},
 	validationFail: (context: Context): ApiResponse => {
 		const errors = extractValidationErrors(context);
