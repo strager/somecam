@@ -169,11 +169,10 @@ defineExpose({ flyAway });
 <template>
 	<div class="swipe-card-stack">
 		<div v-if="nextCard" class="card-surface peek-card">
-			<p v-if="showSource" class="card-source">{{ nextCard.source }}</p>
-			<p class="card-text">{{ nextCard.description }}</p>
+			<p class="card-text">
+				{{ nextCard.description }} <span v-if="showSource" class="card-source">({{ nextCard.source }})</span>
+			</p>
 		</div>
-			<p v-if="showSource" class="card-source">{{ card.source }}</p>
-			<p class="card-text">{{ card.description }}</p>
 	</div>
 </template>
 
@@ -183,6 +182,7 @@ defineExpose({ flyAway });
 	padding: var(--space-8);
 	background: var(--color-white);
 	border: var(--border-thin);
+	font-family: var(--font-heading);
 }
 .swipe-card-stack {
 	position: relative;
@@ -251,17 +251,13 @@ defineExpose({ flyAway });
 }
 
 .card-source {
-	font-size: var(--text-lg);
-	font-weight: 600;
-	color: var(--color-gray-400);
-	margin: 0 0 var(--space-2);
-	position: relative;
-	z-index: 1;
+	font-weight: 300;
+	color: var(--color-gray-600);
 }
 
 .card-text {
-	font-size: var(--text-xl);
-	line-height: 1.6;
+	font-size: var(--text-2xl);
+	line-height: 1.3;
 	margin: 0;
 	color: var(--color-black);
 	position: relative;
