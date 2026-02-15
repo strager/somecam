@@ -463,7 +463,7 @@ onMounted(() => {
 <template>
 	<main v-if="card">
 		<header>
-			<h1>Explore Meaning</h1>
+			<h1>Explore meaning</h1>
 			<h2>{{ card.source }}</h2>
 			<div class="instruction-stack">
 				<p :class="['instruction', { active: !allAnswered && submittedCount === 0 }]">Reflect on what this source of meaning means to you. Answer each question thoughtfully.</p>
@@ -472,105 +472,99 @@ onMounted(() => {
 			</div>
 		</header>
 
-		<div class="card-wrapper">
-			<div class="card-surface explore-card">
-				<p class="description">{{ card.description }}</p>
+		<div class="card-left explore-card">
+			<p class="card-body description">{{ card.description }}</p>
 
-				<div v-for="entry in answeredEntries" :key="entry.questionId" class="answered-question">
-					<p class="question">{{ questionsById.get(entry.questionId)?.text }}</p>
-					<ExploreTextarea v-model="entry.userAnswer" variant="answered" :rows="3" @update:model-value="onAnsweredEntryInput(entry)" @blur="onAnsweredEntryBlur(entry)" />
-				</div>
-
-				<div v-if="inferring" class="inferring-indicator">
-					<span class="spinner"></span>
-					<span>Thinking about your next question...</span>
-				</div>
-
-				<div v-else-if="displayedQuestion && (!allAnswered || depthCheckShown)">
-					<p class="question">{{ displayedQuestion.text }}</p>
-					<p v-if="activeEntryPrefilled" class="prefill-hint"><em>This answer was pre-filled based on your previous responses. Feel free to edit it.</em></p>
-					<ExploreTextarea ref="activeTextarea" v-model="currentAnswer" :rows="5" placeholder="Type your reflection here..." @update:model-value="debouncedPersist" @blur="persistEntries()" @keydown="onKeydown" />
-					<p v-if="depthCheckShown" class="depth-follow-up">
-						<em>{{ depthCheckFollowUp }}</em>
-					</p>
-					<button class="btn-primary submit-btn" :disabled="!depthCheckShown && currentAnswer.trim() === ''" @click="submitAnswer">Next</button>
-					<p v-if="depthCheckShown" class="hint">Press Next to continue as-is, or edit your answer above</p>
-					<p v-else class="hint">Shift + Enter to submit</p>
-				</div>
-
-				<div v-if="allAnswered && !inferring && !depthCheckShown" class="freeform-section">
-					<p class="question">Additional notes about this source of meaning</p>
-					<ExploreTextarea v-model="freeformNote" :rows="5" placeholder="Any other thoughts you'd like to capture (optional)" @update:model-value="debouncedFreeformPersist" @blur="persistFreeform()" />
-				</div>
-
-				<button class="btn-secondary finish-btn" @click="finishExploring">Finish exploring</button>
+			<div v-for="entry in answeredEntries" :key="entry.questionId" class="answered-question">
+				<p class="question">{{ questionsById.get(entry.questionId)?.text }}</p>
+				<ExploreTextarea v-model="entry.userAnswer" variant="answered" :rows="3" @update:model-value="onAnsweredEntryInput(entry)" @blur="onAnsweredEntryBlur(entry)" />
 			</div>
+
+			<div v-if="inferring" class="inferring-indicator">
+				<span class="spinner"></span>
+				<span>Thinking about your next question...</span>
+			</div>
+
+			<div v-else-if="displayedQuestion && (!allAnswered || depthCheckShown)">
+				<p class="question">{{ displayedQuestion.text }}</p>
+				<p v-if="activeEntryPrefilled" class="prefill-hint"><em>This answer was pre-filled based on your previous responses. Feel free to edit it.</em></p>
+				<ExploreTextarea ref="activeTextarea" v-model="currentAnswer" :rows="5" placeholder="Type your reflection here..." @update:model-value="debouncedPersist" @blur="persistEntries()" @keydown="onKeydown" />
+				<p v-if="depthCheckShown" class="depth-follow-up">
+					<em>{{ depthCheckFollowUp }}</em>
+				</p>
+				<button class="btn-primary submit-btn" :disabled="!depthCheckShown && currentAnswer.trim() === ''" @click="submitAnswer">Next</button>
+				<p v-if="depthCheckShown" class="hint">Press Next to continue as-is, or edit your answer above</p>
+				<p v-else class="hint">Shift + Enter to submit</p>
+			</div>
+
+			<div v-if="allAnswered && !inferring && !depthCheckShown" class="freeform-section">
+				<p class="question">Additional notes about this source of meaning</p>
+				<ExploreTextarea v-model="freeformNote" :rows="5" placeholder="Any other thoughts you'd like to capture (optional)" @update:model-value="debouncedFreeformPersist" @blur="persistFreeform()" />
+			</div>
+
+			<button class="btn-secondary finish-btn" @click="finishExploring">Finish exploring</button>
 		</div>
 	</main>
 </template>
 
 <style scoped>
 main {
-	margin: 2rem auto;
+	margin: var(--space-8) auto;
 	max-width: 36rem;
-	padding: 0 1.5rem;
-	color: #1a1a1a;
+	padding: 0 var(--space-6);
+	color: var(--color-black);
 }
 
 header {
-	text-align: center;
-	margin-bottom: 2rem;
+	margin-bottom: var(--space-8);
 }
 
 h1 {
-	font-size: 2rem;
-	margin: 0 0 0.25rem;
-	letter-spacing: 0.02em;
+	font-family: var(--font-heading);
+	font-size: var(--text-4xl);
+	font-weight: 500;
+	color: var(--color-black);
+	margin: 0 0 var(--space-1);
 }
 
 h2 {
-	font-size: 1.25rem;
+	font-family: var(--font-heading);
+	font-size: var(--text-lg);
 	font-weight: 400;
-	color: #555;
+	font-style: italic;
+	color: var(--color-gray-600);
 	margin: 0;
 }
 
-.card-wrapper {
-	display: flex;
-	justify-content: center;
-}
-
 .explore-card {
-	text-align: left;
+	padding-right: 0;
 }
 
 .description {
-	font-size: 1rem;
-	line-height: 1.5;
-	color: #333;
-	margin: 0 0 1rem;
+	margin: 0 0 var(--space-4);
 }
 
 .answered-question {
-	margin-bottom: 1rem;
-	padding-bottom: 0.75rem;
-	border-bottom: 1px solid #e0e0e0;
+	margin-bottom: var(--space-4);
+	padding-bottom: var(--space-3);
+	border-bottom: var(--border-thin);
 }
 
 .question {
-	font-size: 1.1rem;
+	font-family: var(--font-heading);
+	font-size: var(--text-lg);
 	font-weight: 600;
-	color: #2a6e4e;
-	margin: 0 0 0.5rem;
+	color: var(--color-black);
+	margin: 0 0 var(--space-2);
 }
 
 .inferring-indicator {
 	display: flex;
 	align-items: center;
-	gap: 0.75rem;
-	padding: 1rem 0;
-	font-size: 1rem;
-	color: #888;
+	gap: var(--space-3);
+	padding: var(--space-4) 0;
+	font-size: var(--text-base);
+	color: var(--color-gray-400);
 	font-style: italic;
 }
 
@@ -578,8 +572,8 @@ h2 {
 	display: inline-block;
 	width: 1.25rem;
 	height: 1.25rem;
-	border: 2px solid #e0e0e0;
-	border-top-color: #2a6e4e;
+	border: 2px solid var(--color-gray-200);
+	border-top-color: var(--color-green-600);
 	border-radius: 50%;
 	animation: spin 0.8s linear infinite;
 	flex-shrink: 0;
@@ -592,34 +586,31 @@ h2 {
 }
 
 .submit-btn {
-	display: block;
 	width: 100%;
-	margin-top: 1rem;
+	margin-top: var(--space-4);
 }
 
 .hint {
-	text-align: center;
-	font-size: 0.85rem;
-	color: #888;
-	margin: 0.5rem 0 0;
+	font-size: var(--text-sm);
+	color: var(--color-gray-400);
+	margin: var(--space-2) 0 0;
 }
 
 .depth-follow-up {
-	font-size: 1.1rem;
+	font-size: var(--text-lg);
 	font-weight: 600;
-	color: #b8860b;
-	margin: 0 0 0.5rem;
+	color: var(--color-warning);
+	margin: 0 0 var(--space-2);
 }
 
 .prefill-hint {
-	font-size: 0.9rem;
-	color: #b8860b;
-	margin: 0 0 0.5rem;
+	font-size: var(--text-sm);
+	color: var(--color-warning);
+	margin: 0 0 var(--space-2);
 }
 
 .finish-btn {
-	display: block;
 	width: 100%;
-	margin-top: 1.5rem;
+	margin-top: var(--space-6);
 }
 </style>

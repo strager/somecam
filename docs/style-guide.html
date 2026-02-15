@@ -321,17 +321,8 @@
 				line-height: var(--leading-normal);
 			}
 
-			button span {
-				display: block;
-				padding: var(--space-2) var(--space-6);
-				transition: transform 0.06s ease;
-			}
-
-			button:active span {
-				transform: translateY(1px);
-			}
-
 			.btn-primary {
+				padding: var(--space-2) var(--space-6);
 				background: var(--color-green-600);
 				color: var(--color-white);
 				border: 1px solid var(--color-green-600);
@@ -342,6 +333,11 @@
 				border-color: var(--color-green-700);
 			}
 
+			.btn-primary:hover:active {
+				padding-top: calc(var(--space-2) + 1px);
+				padding-bottom: calc(var(--space-2) - 1px);
+			}
+
 			.btn-primary:focus-visible {
 				box-shadow:
 					0 0 0 1px var(--color-white),
@@ -349,6 +345,7 @@
 			}
 
 			.btn-secondary {
+				padding: var(--space-2) var(--space-6);
 				background: transparent;
 				color: var(--color-green-600);
 				border: 1px solid var(--color-green-600);
@@ -356,6 +353,11 @@
 
 			.btn-secondary:hover {
 				background: var(--color-green-50);
+			}
+
+			.btn-secondary:hover:active {
+				padding-top: calc(var(--space-2) + 1px);
+				padding-bottom: calc(var(--space-2) - 1px);
 			}
 
 			.btn-secondary:focus-visible {
@@ -371,8 +373,9 @@
 				cursor: not-allowed;
 			}
 
-			button:disabled:active span {
-				transform: none;
+			button:disabled:active {
+				padding-top: var(--space-2);
+				padding-bottom: var(--space-2);
 			}
 
 			/* --- Form Inputs --- */
@@ -938,20 +941,20 @@
 				<!-- Buttons -->
 				<div class="sg-subsection">
 					<div class="sg-subsection-title">Buttons</div>
-					<p style="font-size: var(--text-base); color: var(--color-gray-600); margin-bottom: var(--space-4)">Hover darkens the fill (primary) or adds a light green background (secondary). Focus shows a double-outline ring (1px gap + 2px ring on primary, 1px gap + 1px ring on secondary). On press, the button text nudges down 1px while the shell stays anchored — like a key being struck. A small script ensures the same nudge fires on keyboard Enter, since browsers don't reliably trigger :active on keypress.</p>
+					<p style="font-size: var(--text-base); color: var(--color-gray-600); margin-bottom: var(--space-4)">Hover darkens the fill (primary) or adds a light green background (secondary). Focus shows a double-outline ring (1px gap + 2px ring on primary, 1px gap + 1px ring on secondary). On press, the button text nudges down 1px via a padding shift — like a key being struck.</p>
 					<h4 class="sg-group-label">Primary (CTA) — solid green</h4>
 					<div class="sg-button-row">
-						<button class="btn-primary"><span>Submit report</span></button>
-						<button class="btn-primary"><span>Save changes</span></button>
+						<button class="btn-primary">Submit report</button>
+						<button class="btn-primary">Save changes</button>
 					</div>
 					<h4 class="sg-group-label">Secondary (non-CTA) — green outline</h4>
 					<div class="sg-button-row">
-						<button class="btn-secondary"><span>Cancel</span></button>
-						<button class="btn-secondary"><span>View details</span></button>
+						<button class="btn-secondary">Cancel</button>
+						<button class="btn-secondary">View details</button>
 					</div>
 					<h4 class="sg-group-label">Disabled</h4>
 					<div class="sg-button-row">
-						<button disabled><span>Unavailable</span></button>
+						<button disabled>Unavailable</button>
 					</div>
 				</div>
 
@@ -1251,8 +1254,8 @@
 						</div>
 
 						<div style="margin-top: var(--space-8); display: flex; gap: var(--space-3)">
-							<button class="btn-primary"><span>Download full report</span></button>
-							<button class="btn-secondary"><span>Share</span></button>
+							<button class="btn-primary">Download full report</button>
+							<button class="btn-secondary">Share</button>
 						</div>
 						<small style="margin-top: var(--space-4)">Last updated February 14, 2026 &middot; Document ref #QR-2026Q1</small>
 					</div>
@@ -1267,28 +1270,6 @@
 			</div>
 		</div>
 		<script>
-			/* Keyboard Enter triggers the same text-nudge as mouse press.
-     Browsers don't reliably fire :active on Enter, so we add
-     a .pressing class on keydown and remove it on keyup. */
-			document.querySelectorAll("button").forEach(function (btn) {
-				btn.addEventListener("keydown", function (e) {
-					if (e.key === "Enter" || e.key === " ") {
-						var span = btn.querySelector("span");
-						if (span) span.style.transform = "translateY(1px)";
-					}
-				});
-				btn.addEventListener("keyup", function (e) {
-					if (e.key === "Enter" || e.key === " ") {
-						var span = btn.querySelector("span");
-						if (span) span.style.transform = "";
-					}
-				});
-				btn.addEventListener("blur", function () {
-					var span = btn.querySelector("span");
-					if (span) span.style.transform = "";
-				});
-			});
-
 			/* Extract :root block from <style> and display in reference section */
 			(function () {
 				var style = document.querySelector("style");

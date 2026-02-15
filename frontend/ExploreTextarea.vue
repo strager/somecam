@@ -34,36 +34,33 @@ defineExpose({ focus });
 </template>
 
 <style scoped>
-textarea {
-	padding: 0.75rem;
-	border-radius: 6px;
-}
-
 textarea.active {
-	border: 1px solid #ccc;
-	background: #fff;
+	border: none;
+	border-bottom: 1px solid var(--color-gray-400);
+	background: var(--color-gray-50);
 }
 
 textarea.active:focus {
-	border-color: #2a6e4e;
-	box-shadow: 0 0 0 2px rgba(42, 110, 78, 0.2);
+	border-bottom-color: var(--color-green-600);
+	box-shadow: inset 1px 0 0 0 var(--color-green-600);
 }
 
 textarea.answered {
-	border: 1px solid transparent;
+	border: none;
+	border-bottom: 1px solid transparent;
 	background: transparent;
-	color: #555;
-	line-height: 1.5;
+	color: var(--color-gray-600);
+	line-height: var(--leading-normal);
 }
 
 textarea.answered:hover {
-	border-color: #e0e0e0;
+	border-bottom-color: var(--color-gray-200);
 }
 
 textarea.answered:focus {
-	border-color: #2a6e4e;
-	box-shadow: 0 0 0 2px rgba(42, 110, 78, 0.2);
-	color: #1a1a1a;
-	background: #fff;
+	border-bottom-color: var(--color-green-600);
+	box-shadow: inset 1px 0 0 0 var(--color-green-600);
+	color: var(--color-black);
+	background: var(--color-gray-50);
 }
 </style>

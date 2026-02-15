@@ -227,16 +227,6 @@ button {
 	line-height: var(--leading-normal);
 }
 
-button span {
-	display: block;
-	padding: var(--space-2) var(--space-6);
-	transition: transform 0.06s ease;
-}
-
-button:active span {
-	transform: translateY(1px);
-}
-
 .btn-primary {
 	padding: var(--space-2) var(--space-6);
 	background: var(--color-green-600);
@@ -247,6 +237,11 @@ button:active span {
 .btn-primary:hover {
 	background: var(--color-green-700);
 	border-color: var(--color-green-700);
+}
+
+.btn-primary:hover:active {
+	padding-top: calc(var(--space-2) + 1px);
+	padding-bottom: calc(var(--space-2) - 1px);
 }
 
 .btn-primary:focus-visible {
@@ -266,6 +261,11 @@ button:active span {
 	background: var(--color-green-50);
 }
 
+.btn-secondary:hover:active {
+	padding-top: calc(var(--space-2) + 1px);
+	padding-bottom: calc(var(--space-2) - 1px);
+}
+
 .btn-secondary:focus-visible {
 	box-shadow:
 		0 0 0 1px var(--color-white),
@@ -279,8 +279,9 @@ button:disabled {
 	cursor: not-allowed;
 }
 
-button:disabled:active span {
-	transform: none;
+button:disabled:active {
+	padding-top: var(--space-2);
+	padding-bottom: var(--space-2);
 }
 
 /* ============================================================

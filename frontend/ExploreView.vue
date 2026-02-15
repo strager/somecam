@@ -253,15 +253,14 @@ onMounted(() => {
 			<span class="progress-label">{{ totalAnswered }} of {{ totalQuestions }} questions answered</span>
 		</div>
 
-		<button v-if="allComplete" class="btn-primary report-btn" @click="onOpenReport('explore_overview_primary')">Download Report</button>
-
+		<button v-if="allComplete" class="btn-primary report-btn" @click="onOpenReport('explore_overview_primary')">Download report</button>
 		<button class="btn-secondary edit-cards-btn" @click="onEditSelection">Edit selection</button>
 
 		<div class="card-list">
-			<div v-for="card in sortedCards" :key="card.id" :class="['card-surface', 'chosen-card', 'status-' + cardStatus(card.id)]">
-				<h3>
+			<div v-for="card in sortedCards" :key="card.id" :class="['card-hrule', 'chosen-card', 'status-' + cardStatus(card.id)]">
+				<div class="card-title">
 					{{ card.description }} <span class="source-label">({{ card.source }})</span>
-				</h3>
+				</div>
 				<span v-if="cardStatus(card.id) === 'complete'" class="status-badge complete">Complete</span>
 				<span v-else-if="cardStatus(card.id) === 'partial'" class="status-badge partial">In progress</span>
 				<div v-if="cardSummaryEntries[card.id]?.some((e) => e.loading) || cardFreeformSummary[card.id]?.loading" class="summary-loading">Generating summary...</div>
@@ -284,173 +283,137 @@ onMounted(() => {
 			</div>
 		</div>
 
-		<button :class="['report-btn', allComplete ? 'btn-primary' : 'btn-secondary']" @click="onOpenReport('explore_overview_secondary')">Download Report</button>
+		<button :class="['report-btn', allComplete ? 'btn-primary' : 'btn-secondary']" @click="onOpenReport('explore_overview_secondary')">Download report</button>
 	</main>
 </template>
 
 <style scoped>
 main {
-	margin: 2rem auto;
+	margin: var(--space-8) auto;
 	max-width: 36rem;
-	padding: 0 1.5rem;
-	color: #1a1a1a;
+	padding: 0 var(--space-6);
+	color: var(--color-black);
 }
 
 header {
-	text-align: center;
-	margin-bottom: 2rem;
+	margin-bottom: var(--space-8);
 }
 
 h1 {
-	font-size: 2rem;
-	margin: 0 0 0.25rem;
-	letter-spacing: 0.02em;
+	font-family: var(--font-heading);
+	font-size: var(--text-4xl);
+	font-weight: 500;
+	color: var(--color-black);
+	margin: 0 0 var(--space-1);
 }
 
 .overall-progress {
 	display: flex;
 	flex-direction: column;
-	align-items: center;
-	gap: 0.4rem;
-	margin-bottom: 1.5rem;
+	gap: var(--space-1);
+	margin-bottom: var(--space-6);
 }
 
 .progress-bar {
 	width: 100%;
 	max-width: 16rem;
 	height: 6px;
-	background: #e5e7eb;
-	border-radius: 3px;
+	background: var(--color-gray-200);
 	overflow: hidden;
 }
 
 .progress-fill {
 	height: 100%;
-	background: #2a6e4e;
-	border-radius: 3px;
+	background: var(--color-green-600);
 	transition: width 0.3s ease;
 }
 
 .progress-label {
-	font-size: 0.85rem;
-	color: #666;
+	font-size: var(--text-sm);
+	color: var(--color-gray-400);
 }
 
 .card-list {
-	display: flex;
-	flex-direction: column;
-	align-items: center;
-	gap: 1rem;
-	margin-bottom: 1.5rem;
+	margin-bottom: var(--space-6);
 }
 
 .chosen-card {
 	position: relative;
-	text-align: left;
-}
-
-.chosen-card.status-untouched {
-	border-left: 4px solid #ccc;
-}
-
-.chosen-card.status-partial {
-	border-left: 4px solid #b8860b;
-}
-
-.chosen-card.status-complete {
-	border-left: 4px solid #2a6e4e;
 }
 
 .status-badge {
 	position: absolute;
 	top: 0;
 	right: 0;
-	padding: 0.25rem 0.6rem;
-	font-size: 0.75rem;
+	padding: var(--space-1) var(--space-2);
+	font-size: var(--text-xs);
 	font-weight: 600;
-	border-radius: 0 12px 0 8px;
 }
 
 .status-badge.complete {
-	color: #2a6e4e;
-	background: #d4edda;
+	color: var(--color-green-700);
+	background: var(--color-success-bg);
 }
 
 .status-badge.partial {
-	color: #856404;
-	background: #fff3cd;
-}
-
-.chosen-card h3 {
-	font-size: 1.1rem;
-	margin: 0 0 0.5rem;
-	color: #2a6e4e;
+	color: var(--color-warning);
+	background: var(--color-warning-bg);
 }
 
 .source-label {
 	font-weight: 400;
-	color: #555;
+	color: var(--color-gray-600);
 }
 
 .explore-btn {
-	display: block;
-	margin-top: 0.75rem;
-	margin-left: auto;
-}
-
-.explore-btn.btn-primary {
-	margin-right: auto;
+	margin-top: var(--space-3);
 }
 
 .freeform-summary {
-	margin: 0.75rem 0 0;
-	font-size: 0.95rem;
-	color: #333;
-	line-height: 1.5;
+	margin: var(--space-3) 0 0;
+	font-size: var(--text-base);
+	color: var(--color-gray-800);
+	line-height: var(--leading-normal);
 }
 
 .summary-loading {
-	margin-top: 0.75rem;
-	font-size: 0.9rem;
-	color: #888;
+	margin-top: var(--space-3);
+	font-size: var(--text-sm);
+	color: var(--color-gray-400);
 	font-style: italic;
 }
 
 .summary-error {
-	margin-top: 0.75rem;
-	font-size: 0.9rem;
-	color: #c0392b;
+	margin-top: var(--space-3);
+	font-size: var(--text-sm);
+	color: var(--color-error);
 }
 
 .summary-unanswered,
 .summary-item.unanswered::before {
-	color: #888;
-}
-
-.summary-unanswered {
-	font-style: normal;
+	color: var(--color-gray-400);
 }
 
 .summary-block {
 	list-style: none;
-	margin-top: 0.75rem;
-	padding: 0 0 0 1.5rem;
-	font-size: 0.95rem;
-	line-height: 1.5;
-	color: #333;
+	margin-top: var(--space-3);
+	padding: 0 0 0 var(--space-6);
+	font-size: var(--text-base);
+	line-height: var(--leading-normal);
+	color: var(--color-gray-800);
 	display: flex;
 	flex-direction: column;
-	gap: 0.5rem;
+	gap: var(--space-2);
 }
 
 .summary-item {
 	position: relative;
-	margin: 0.25rem 0;
+	margin: var(--space-1) 0;
 }
 
 .summary-item::before {
 	position: absolute;
-	left: -1.5rem;
+	left: calc(-1 * var(--space-6));
 	content: "\2713";
 }
 
@@ -459,12 +422,10 @@ h1 {
 }
 
 .edit-cards-btn {
-	display: block;
-	margin: 0 auto 1.5rem;
+	margin-bottom: var(--space-6);
 }
 
 .report-btn {
-	display: block;
-	margin: 0 auto 1rem;
+	margin-bottom: var(--space-4);
 }
 </style>
