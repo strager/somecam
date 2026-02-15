@@ -1,6 +1,8 @@
 // Loads the Vue SSR entry point (frontend/pdf-entry.ts) and renders report
 // HTML. In dev, uses Vite's ssrLoadModule() for HMR-friendly loading; in
 // production, dynamically imports the pre-built SSR bundle.
+//
+// Also handles calling the DocRaptor API to convert rendered HTML into a PDF.
 
 interface PdfEntryModule {
 	renderPdfHtml: () => Promise<string>;
@@ -46,4 +48,30 @@ async function loadSsrModule(vite: unknown): Promise<PdfEntryModule> {
 export async function renderReportHtml(vite: unknown): Promise<string> {
 	const ssrModule = await loadSsrModule(vite);
 	return ssrModule.renderPdfHtml();
+}
+
+export async function callDocRaptor(html: string, apiKey: string, testMode: boolean): Promise<Buffer> {
+	const body = JSON.stringify({
+		type: "pdf",
+		test: testMode,
+		document_content: html,
+		prince_options: { media: "print" },
+	});
+
+	const credentials = Buffer.from(`${apiKey}:`).toString("base64");
+	const response = await fetch("https://api.docraptor.com/docs", {
+		method: "POST",
+		headers: {
+			"Content-Type": "application/json",
+			Authorization: `Basic ${credentials}`,
+		},
+		body,
+	});
+
+	if (!response.ok) {
+		const detail = await response.text().catch(() => "Unknown error");
+		throw new Error(`DocRaptor returned ${response.status.toString()}: ${detail}`);
+	}
+
+	return Buffer.from(await response.arrayBuffer());
 }

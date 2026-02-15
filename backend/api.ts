@@ -4,7 +4,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import type { AppConfig } from "./config.ts";
-import { renderReportHtml } from "./pdf-report.ts";
+import { callDocRaptor, renderReportHtml } from "./pdf-report.ts";
 import { createChatCompletion } from "./xai-client.ts";
 import { MEANING_CARDS } from "../shared/meaning-cards.ts";
 import { EXPLORE_QUESTIONS } from "../shared/explore-questions.ts";
@@ -425,8 +425,29 @@ api.register({
 		}
 	},
 	postReportPdf: async (_context: Context, req: ExpressRequest, res: Response): Promise<void> => {
+		const apiKey = process.env.DOCRAPTOR_API_KEY;
+		if (apiKey === undefined || apiKey === "") {
+			res
+				.status(500)
+				.type("application/problem+json")
+				.send(JSON.stringify(createProblemDetails(500, "Internal Server Error", "PDF generation is not configured.")));
+			return;
+		}
+
 		const html = await renderReportHtml(req.app.locals.vite);
-		res.type("text/html").send(html);
+		const liveMode = process.env.DOCRAPTOR_LIVE;
+		const testMode = liveMode === undefined || liveMode === "";
+
+		try {
+			const pdf = await callDocRaptor(html, apiKey, testMode);
+			res.status(200).type("application/pdf").setHeader("Content-Disposition", 'attachment; filename="somecam-report.pdf"').send(pdf);
+		} catch (error) {
+			const detail = error instanceof Error ? error.message : "PDF generation failed.";
+			res
+				.status(502)
+				.type("application/problem+json")
+				.send(JSON.stringify(createProblemDetails(502, "Bad Gateway", detail)));
+		}
 	},
 	validationFail: (context: Context): ApiResponse => {
 		const errors = extractValidationErrors(context);

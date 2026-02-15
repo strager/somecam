@@ -147,11 +147,18 @@ paths:
         "200":
           description: Report generated successfully.
           content:
-            text/html:
+            application/pdf:
               schema:
                 type: string
+                format: binary
         "500":
           description: Internal server error.
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+        "502":
+          description: PDF generation service error.
           content:
             application/problem+json:
               schema:
