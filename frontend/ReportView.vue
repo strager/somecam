@@ -4,10 +4,10 @@ import { useRouter } from "vue-router";
 
 import AppButton from "./AppButton.vue";
 import ReportContent from "./ReportContent.vue";
-import type { CardReport, QuestionReport } from "./report-types.ts";
+import type { CardReport, QuestionReport } from "../shared/report-types.ts";
 import { capture } from "./analytics.ts";
 import { useStringParam } from "./route-utils.ts";
-import { loadChosenCardIds, loadExploreData, loadFreeformNotes, loadSummaryCache, lookupCachedSummary } from "./store.ts";
+import { exportSessionData, loadChosenCardIds, loadExploreData, loadFreeformNotes, loadSummaryCache, lookupCachedSummary } from "./store.ts";
 import { EXPLORE_QUESTIONS } from "../shared/explore-questions.ts";
 import { MEANING_CARDS } from "../shared/meaning-cards.ts";
 
@@ -16,10 +16,38 @@ const sessionId = useStringParam("sessionId");
 const cardsById = new Map(MEANING_CARDS.map((c) => [c.id, c]));
 
 const reports = ref<CardReport[]>([]);
+const downloading = ref(false);
+const downloadError = ref("");
 
-function downloadPdf(): void {
+async function downloadPdf(): Promise<void> {
 	capture("pdf_download_initiated", { session_id: sessionId });
-	window.print();
+	downloading.value = true;
+	downloadError.value = "";
+
+	try {
+		const body = exportSessionData(sessionId);
+		const response = await fetch("/api/report-pdf", {
+			method: "POST",
+			headers: { "Content-Type": "text/plain" },
+			body,
+		});
+
+		if (!response.ok) {
+			throw new Error(`PDF generation failed (${response.status.toString()})`);
+		}
+
+		const blob = await response.blob();
+		const url = URL.createObjectURL(blob);
+		const a = document.createElement("a");
+		a.href = url;
+		a.download = "somecam-report.pdf";
+		a.click();
+		URL.revokeObjectURL(url);
+	} catch (error) {
+		downloadError.value = error instanceof Error ? error.message : "PDF download failed.";
+	} finally {
+		downloading.value = false;
+	}
 }
 
 onMounted(() => {
@@ -69,14 +97,24 @@ onMounted(() => {
 <template>
 	<ReportContent :reports="reports">
 		<template #header-actions>
-			<AppButton variant="primary" class="download-btn" @click="downloadPdf">Download PDF</AppButton>
+			<AppButton variant="primary" class="download-btn" :disabled="downloading" @click="downloadPdf">
+				{{ downloading ? "Generating PDF…" : "Download PDF" }}
+			</AppButton>
+			<p v-if="downloadError !== ''" class="download-error">{{ downloadError }}</p>
 		</template>
 	</ReportContent>
 </template>
 
 <style scoped>
+.download-error {
+	margin-top: var(--space-2);
+	font-size: var(--text-sm);
+	color: var(--color-error);
+}
+
 @media print {
-	.download-btn {
+	.download-btn,
+	.download-error {
 		display: none;
 	}
 }

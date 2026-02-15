@@ -643,6 +643,25 @@ export function exportProgressData(): string {
 	return JSON.stringify({ version: EXPORT_VERSION_V2, sessions: exported });
 }
 
+export function exportSessionData(sessionId: string): string {
+	const sessions = loadSessionsMeta();
+	const session = sessions.find((s) => s.id === sessionId);
+	if (session === undefined) {
+		throw new Error(`Session not found: ${sessionId}`);
+	}
+	const data: Record<string, unknown> = {};
+	for (const suffix of SESSION_DATA_SUFFIXES) {
+		const raw = localStorage.getItem(`somecam-${sessionId}-${suffix}`);
+		if (raw !== null) {
+			data[suffix] = JSON.parse(raw);
+		}
+	}
+	return JSON.stringify({
+		version: EXPORT_VERSION_V2,
+		sessions: [{ id: session.id, name: session.name, createdAt: session.createdAt, lastUpdatedAt: session.lastUpdatedAt, data }],
+	});
+}
+
 export function importProgressData(json: string): ImportProgressStats {
 	const parsed: unknown = JSON.parse(json);
 	if (!isObjectRecord(parsed)) {

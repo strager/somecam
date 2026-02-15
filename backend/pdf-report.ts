@@ -3,14 +3,19 @@
 // production, dynamically imports the pre-built SSR bundle.
 //
 // Also handles calling the DocRaptor API to convert rendered HTML into a PDF,
-// and loading/base64-encoding font files for embedding in the HTML document.
+// loading/base64-encoding font files for embedding in the HTML document,
+// and assembling report data from session exports.
 
 import fs from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
+import type { CardReport, QuestionReport } from "../shared/report-types.ts";
+import { EXPLORE_QUESTIONS } from "../shared/explore-questions.ts";
+import { MEANING_CARDS } from "../shared/meaning-cards.ts";
+
 interface PdfEntryModule {
-	renderPdfHtml: (fontCss: string) => Promise<string>;
+	renderPdfHtml: (fontCss: string, reports: CardReport[]) => Promise<string>;
 }
 
 const isProduction = process.env.NODE_ENV === "production";
@@ -90,10 +95,104 @@ async function loadFontCss(): Promise<string> {
 	return cachedFontCss;
 }
 
-export async function renderReportHtml(vite: unknown): Promise<string> {
+// --- Session export parsing and report data assembly ---
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+	return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+export function assembleReportData(sessionExportJson: string): CardReport[] {
+	const parsed: unknown = JSON.parse(sessionExportJson);
+	if (!isRecord(parsed) || parsed.version !== "somecam-v2" || !Array.isArray(parsed.sessions) || parsed.sessions.length === 0) {
+		throw new Error("Invalid session export format.");
+	}
+
+	const session: unknown = parsed.sessions[0];
+	if (!isRecord(session) || !isRecord(session.data)) {
+		throw new Error("Invalid session data.");
+	}
+	const data = session.data;
+
+	const chosenRaw: unknown = data.chosen;
+	if (!Array.isArray(chosenRaw)) {
+		throw new Error("Session has no chosen cards.");
+	}
+	const chosenIds = chosenRaw.filter((id): id is string => typeof id === "string");
+
+	const exploreRaw: unknown = data.explore;
+	const explore: Record<string, unknown[]> = {};
+	if (isRecord(exploreRaw)) {
+		for (const [cardId, entries] of Object.entries(exploreRaw)) {
+			if (Array.isArray(entries)) {
+				explore[cardId] = entries;
+			}
+		}
+	}
+
+	const summariesRaw: unknown = data.summaries;
+	const summaries = new Map<string, { answer: string; summary: string }>();
+	if (isRecord(summariesRaw)) {
+		for (const [key, entry] of Object.entries(summariesRaw)) {
+			if (isRecord(entry) && typeof entry.answer === "string" && typeof entry.summary === "string") {
+				summaries.set(key, { answer: entry.answer, summary: entry.summary });
+			}
+		}
+	}
+
+	const freeformRaw: unknown = data.freeform;
+	const freeform: Record<string, string> = {};
+	if (isRecord(freeformRaw)) {
+		for (const [cardId, note] of Object.entries(freeformRaw)) {
+			if (typeof note === "string") {
+				freeform[cardId] = note;
+			}
+		}
+	}
+
+	const cardsById = new Map(MEANING_CARDS.map((c) => [c.id, c]));
+	const reports: CardReport[] = [];
+
+	for (const cardId of chosenIds) {
+		const card = cardsById.get(cardId);
+		if (card === undefined) continue;
+
+		const entries = explore[cardId] ?? [];
+		const answersByQuestionId = new Map<string, string>();
+		for (const entry of entries) {
+			if (isRecord(entry) && typeof entry.questionId === "string" && typeof entry.userAnswer === "string") {
+				answersByQuestionId.set(entry.questionId, entry.userAnswer);
+			}
+		}
+
+		const questions: QuestionReport[] = [];
+		for (const q of EXPLORE_QUESTIONS) {
+			const answer = answersByQuestionId.get(q.id) ?? "";
+			const cached = summaries.get(`${cardId}:${q.id}`);
+			const summary = cached?.answer === answer ? cached.summary : "";
+
+			questions.push({
+				topic: q.topic,
+				question: q.questionFirstPerson,
+				answer,
+				summary,
+			});
+		}
+
+		const freeformNote = freeform[cardId] ?? "";
+		const cachedFreeform = summaries.get(`${cardId}:freeform`);
+		const freeformSummary = cachedFreeform?.answer === freeformNote ? cachedFreeform.summary : "";
+
+		reports.push({ card, questions, freeformNote, freeformSummary });
+	}
+
+	return reports;
+}
+
+export async function renderReportHtml(vite: unknown, sessionExportJson: string): Promise<string> {
+	const reports = assembleReportData(sessionExportJson);
 	const ssrModule = await loadSsrModule(vite);
 	const fontCss = await loadFontCss();
-	return ssrModule.renderPdfHtml(fontCss);
+	return ssrModule.renderPdfHtml(fontCss, reports);
 }
 
 export async function callDocRaptor(html: string, apiKey: string, testMode: boolean): Promise<Buffer> {

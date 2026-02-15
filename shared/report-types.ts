@@ -1,7 +1,7 @@
 // Report data types shared between ReportView.vue (browser), ReportContent.vue,
-// and pdf-entry.ts (server-side rendering).
+// pdf-entry.ts (server-side rendering), and backend/pdf-report.ts (data assembly).
 
-import type { MeaningCard } from "../shared/meaning-cards.ts";
+import type { MeaningCard } from "./meaning-cards.ts";
 
 export interface QuestionReport {
 	topic: string;

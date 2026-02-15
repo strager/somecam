@@ -3,7 +3,7 @@
      router, localStorage, or analytics dependencies. -->
 
 <script setup lang="ts">
-import type { CardReport } from "./report-types.ts";
+import type { CardReport } from "../shared/report-types.ts";
 
 defineProps<{
 	reports: CardReport[];

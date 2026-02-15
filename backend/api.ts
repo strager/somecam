@@ -434,7 +434,27 @@ api.register({
 			return;
 		}
 
-		const html = await renderReportHtml(req.app.locals.vite);
+		const sessionExport: unknown = req.body;
+		if (typeof sessionExport !== "string" || sessionExport === "") {
+			res
+				.status(400)
+				.type("application/problem+json")
+				.send(JSON.stringify(createProblemDetails(400, "Bad Request", "Request body must be a non-empty session export string.")));
+			return;
+		}
+
+		let html: string;
+		try {
+			html = await renderReportHtml(req.app.locals.vite, sessionExport);
+		} catch (error) {
+			const detail = error instanceof Error ? error.message : "Invalid session data.";
+			res
+				.status(400)
+				.type("application/problem+json")
+				.send(JSON.stringify(createProblemDetails(400, "Bad Request", detail)));
+			return;
+		}
+
 		const liveMode = process.env.DOCRAPTOR_LIVE;
 		const testMode = liveMode === undefined || liveMode === "";
 
