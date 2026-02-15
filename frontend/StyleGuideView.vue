@@ -589,7 +589,7 @@
 					<div class="subtitle">January – March 2026</div>
 					<p style="font-family: var(--font-body)">All transactions for this period have been reconciled and verified against the original records. Overall revenue grew 12% compared to the prior quarter, driven primarily by expansion in the northeast region. Please review the figures below and reach out to your <a href="#">account manager</a> with any questions.</p>
 
-					<h4 style="font-family: var(--font-heading); font-size: var(--text-xl); font-weight: 600; color: var(--color-black); margin-top: var(--space-8); margin-bottom: var(--space-4)">Key metrics</h4>
+					<h4 style="margin-top: var(--space-8); margin-bottom: var(--space-4)">Key metrics</h4>
 
 					<div class="cards-grid" style="margin-bottom: var(--space-8)">
 						<div class="card-left">
@@ -604,7 +604,7 @@
 						</div>
 					</div>
 
-					<h4 style="font-family: var(--font-heading); font-size: var(--text-xl); font-weight: 600; color: var(--color-black); margin-bottom: var(--space-4)">Regional breakdown</h4>
+					<h4 style="margin-bottom: var(--space-4)">Regional breakdown</h4>
 
 					<table style="max-width: 520px; margin-bottom: var(--space-8)">
 						<thead>
@@ -633,7 +633,7 @@
 						</tbody>
 					</table>
 
-					<h4 style="font-family: var(--font-heading); font-size: var(--text-xl); font-weight: 600; color: var(--color-black); margin-bottom: var(--space-4)">Detailed notes</h4>
+					<h4 style="margin-bottom: var(--space-4)">Detailed notes</h4>
 
 					<div style="max-width: 600px">
 						<div class="card-hrule">
@@ -674,10 +674,6 @@
 }
 
 .sg-header h1 {
-	font-family: var(--font-heading);
-	font-size: var(--text-4xl);
-	font-weight: 500;
-	color: var(--color-black);
 	margin-bottom: var(--space-2);
 }
 
@@ -691,10 +687,6 @@
 }
 
 .sg-section-title {
-	font-family: var(--font-heading);
-	font-size: var(--text-3xl);
-	font-weight: 500;
-	color: var(--color-black);
 	margin-bottom: var(--space-2);
 }
 
@@ -734,10 +726,6 @@
 }
 
 .sg-group-label {
-	font-family: var(--font-heading);
-	font-size: var(--text-xl);
-	font-weight: 600;
-	color: var(--color-black);
 	margin-bottom: var(--space-3);
 }
 
@@ -865,10 +853,6 @@ button:disabled:active span {
 }
 
 .sg-mockup-body h2 {
-	font-family: var(--font-heading);
-	font-size: var(--text-3xl);
-	font-weight: 500;
-	color: var(--color-black);
 	margin-bottom: var(--space-1);
 }
 

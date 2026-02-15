@@ -139,14 +139,10 @@ header {
 }
 
 h1 {
-	font-family: var(--font-heading);
-	font-size: var(--text-4xl);
-	font-weight: 500;
 	margin: 0 0 var(--space-1);
 }
 
 header h2 {
-	font-family: var(--font-heading);
 	font-size: var(--text-lg);
 	font-weight: 400;
 	font-style: italic;
@@ -175,9 +171,6 @@ header h2 {
 }
 
 section h2 {
-	font-family: var(--font-heading);
-	font-size: var(--text-3xl);
-	font-weight: 500;
 	margin: var(--space-8) 0 var(--space-4);
 }
 

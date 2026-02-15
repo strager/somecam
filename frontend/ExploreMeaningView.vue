@@ -521,15 +521,10 @@ header {
 }
 
 h1 {
-	font-family: var(--font-heading);
-	font-size: var(--text-4xl);
-	font-weight: 500;
-	color: var(--color-black);
 	margin: 0 0 var(--space-1);
 }
 
 h2 {
-	font-family: var(--font-heading);
 	font-size: var(--text-lg);
 	font-weight: 400;
 	font-style: italic;

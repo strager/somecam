@@ -195,10 +195,6 @@ header {
 }
 
 h1 {
-	font-family: var(--font-heading);
-	font-size: var(--text-4xl);
-	font-weight: 500;
-	color: var(--color-black);
 	margin: 0 0 var(--space-1);
 	letter-spacing: 0.02em;
 }
@@ -213,10 +209,8 @@ h1 {
 }
 
 h2 {
-	font-family: var(--font-heading);
 	font-size: var(--text-2xl);
 	font-weight: 600;
-	color: var(--color-black);
 	margin: 0 0 var(--space-2);
 }
 

@@ -168,6 +168,41 @@ body {
 }
 
 /* ============================================================
+   HEADINGS
+   ============================================================ */
+h1 {
+	font-family: var(--font-heading);
+	font-size: var(--text-4xl);
+	font-weight: 500;
+	line-height: var(--leading-tight);
+	color: var(--color-black);
+}
+
+h2 {
+	font-family: var(--font-heading);
+	font-size: var(--text-3xl);
+	font-weight: 500;
+	line-height: var(--leading-tight);
+	color: var(--color-black);
+}
+
+h3 {
+	font-family: var(--font-heading);
+	font-size: var(--text-2xl);
+	font-weight: 600;
+	line-height: var(--leading-tight);
+	color: var(--color-black);
+}
+
+h4 {
+	font-family: var(--font-heading);
+	font-size: var(--text-xl);
+	font-weight: 600;
+	line-height: var(--leading-tight);
+	color: var(--color-black);
+}
+
+/* ============================================================
    LINKS
    ============================================================ */
 a {
