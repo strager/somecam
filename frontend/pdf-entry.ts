@@ -8,7 +8,23 @@ import { renderToString } from "vue/server-renderer";
 
 import ReportContent from "./ReportContent.vue";
 import type { CardReport } from "../shared/report-types.ts";
-import pdfReportCss from "./pdf-report.css?inline";
+import globalCss from "./global.css?inline";
+
+const pagedMediaCss = `
+@page {
+	size: A4;
+	margin: 20mm 18mm 25mm 18mm;
+}
+h2, h3, h4 {
+	break-after: avoid;
+}
+.report-card {
+	break-inside: avoid;
+}
+.qa-block {
+	break-inside: avoid;
+}
+`;
 
 export async function renderPdfHtml(fontCss: string, reports: CardReport[]): Promise<string> {
 	const app = createSSRApp(ReportContent, { reports });
@@ -20,8 +36,9 @@ export async function renderPdfHtml(fontCss: string, reports: CardReport[]): Pro
 <meta charset="UTF-8">
 <title>SoMeCaM Report</title>
 <style>
+${globalCss}
 ${fontCss}
-${pdfReportCss}
+${pagedMediaCss}
 </style>
 </head>
 <body>
