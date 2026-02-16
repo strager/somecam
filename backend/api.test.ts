@@ -1,3 +1,6 @@
+// Our createApp() creates an Express app, not a Vue app. Suppress false
+// positive from eslint-plugin-vue mistaking it for Vue's createApp().
+/* eslint-disable vue/one-component-per-file */
 import type { Server } from "node:http";
 import os from "node:os";
 import path from "node:path";
