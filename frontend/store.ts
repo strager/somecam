@@ -5,6 +5,7 @@ const SESSIONS_KEY = "somecam-sessions";
 const ACTIVE_SESSION_KEY = "somecam-active-session";
 const LLM_TEST_KEY = "somecam-llm-test";
 const PERSIST_REQUESTED_KEY = "somecam-persist-requested";
+const RATE_LIMIT_SESSION_KEY = "somecam-api-session-id";
 
 const LEGACY_KEYS = ["somecam-progress", "somecam-narrowdown", "somecam-chosen", "somecam-explore", "somecam-summaries", "somecam-freeform"];
 const SESSION_DATA_SUFFIXES = ["progress", "narrowdown", "chosen", "explore", "summaries", "freeform"] as const;
@@ -791,6 +792,16 @@ export function requestStoragePersistence(sessionId: string): void {
 			},
 		);
 	}
+}
+
+// --- Rate limit session token ---
+
+export function loadRateLimitToken(): string | null {
+	return localStorage.getItem(RATE_LIMIT_SESSION_KEY);
+}
+
+export function saveRateLimitToken(token: string): void {
+	localStorage.setItem(RATE_LIMIT_SESSION_KEY, token);
 }
 
 export function loadProgressFile(): Promise<void> {

@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 
 import type { AppConfig } from "./config.ts";
 import { callDocRaptor, renderReportHtml } from "./pdf-report.ts";
+import { ChallengeError, type RateLimiter } from "./rate-limit.ts";
 import { createChatCompletion } from "./xai-client.ts";
 import { MEANING_CARDS } from "../shared/meaning-cards.ts";
 import { EXPLORE_QUESTIONS } from "../shared/explore-questions.ts";
@@ -33,6 +34,7 @@ const api = new OpenAPIBackend({
 
 let initializePromise: Promise<unknown> | undefined;
 let appConfig: AppConfig | undefined;
+let rateLimiter: RateLimiter | undefined;
 
 const problemJsonHeader = {
 	"content-type": "application/problem+json",
@@ -166,13 +168,82 @@ function toOpenApiRequest(req: ExpressRequest): OpenApiRequest {
 	};
 }
 
+async function checkBudget(context: Context, req: ExpressRequest): Promise<ApiResponse | null> {
+	if (rateLimiter === undefined) return null;
+
+	const operation: Record<string, unknown> = context.operation;
+	const cost: unknown = operation["x-somecam-budget-cost"];
+	if (typeof cost !== "number" || cost === 0) return null;
+
+	const authHeader = req.headers.authorization;
+	const result = await rateLimiter.budgetGuard(authHeader, cost);
+	if (result.ok) return null;
+
+	return {
+		statusCode: 429,
+		headers: problemJsonHeader,
+		body: {
+			type: "about:blank",
+			title: "Too Many Requests",
+			status: 429,
+			detail: "Budget insufficient. Solve the challenge to obtain credits.",
+			code: "challenge_required",
+			challenge: result.challenge,
+		},
+	};
+}
+
 api.register({
 	getHealth: (): ApiResponse => ({
 		statusCode: 200,
 		body: { status: "ok" },
 		headers: { "content-type": "application/json" },
 	}),
-	postSummarize: async (context: Context): Promise<ApiResponse> => {
+	postSessionVerify: async (context: Context, req: ExpressRequest): Promise<ApiResponse> => {
+		if (rateLimiter === undefined) {
+			return {
+				statusCode: 500,
+				headers: problemJsonHeader,
+				body: createProblemDetails(500, "Internal Server Error", "Rate limiting is not configured."),
+			};
+		}
+
+		const body: unknown = context.request.requestBody;
+		if (typeof body !== "object" || body === null || !("challengeId" in body) || typeof body.challengeId !== "string" || !("payload" in body) || typeof body.payload !== "string") {
+			return {
+				statusCode: 400,
+				headers: problemJsonHeader,
+				body: createProblemDetails(400, "Bad Request", "Invalid request body."),
+			};
+		}
+
+		try {
+			const result = await rateLimiter.verifyChallenge(body.challengeId, body.payload, req.headers.authorization);
+			return {
+				statusCode: 200,
+				body: { sessionToken: result.sessionToken },
+			};
+		} catch (error) {
+			if (error instanceof ChallengeError) {
+				return {
+					statusCode: error.statusCode,
+					headers: problemJsonHeader,
+					body: {
+						type: "about:blank",
+						title: error.statusCode === 409 ? "Conflict" : "Bad Request",
+						status: error.statusCode,
+						detail: error.message,
+						code: error.code,
+					},
+				};
+			}
+			throw error;
+		}
+	},
+	postSummarize: async (context: Context, req: ExpressRequest): Promise<ApiResponse> => {
+		const budgetBlock = await checkBudget(context, req);
+		if (budgetBlock !== null) return budgetBlock;
+
 		if (appConfig === undefined) {
 			return {
 				statusCode: 500,
@@ -245,7 +316,10 @@ api.register({
 			};
 		}
 	},
-	postInferAnswers: async (context: Context): Promise<ApiResponse> => {
+	postInferAnswers: async (context: Context, req: ExpressRequest): Promise<ApiResponse> => {
+		const budgetBlock = await checkBudget(context, req);
+		if (budgetBlock !== null) return budgetBlock;
+
 		if (appConfig === undefined) {
 			return {
 				statusCode: 500,
@@ -347,7 +421,10 @@ api.register({
 			};
 		}
 	},
-	postCheckAnswerDepth: async (context: Context): Promise<ApiResponse> => {
+	postCheckAnswerDepth: async (context: Context, req: ExpressRequest): Promise<ApiResponse> => {
+		const budgetBlock = await checkBudget(context, req);
+		if (budgetBlock !== null) return budgetBlock;
+
 		if (appConfig === undefined) {
 			return {
 				statusCode: 500,
@@ -424,7 +501,13 @@ api.register({
 			};
 		}
 	},
-	postReportPdf: async (_context: Context, req: ExpressRequest, res: Response): Promise<void> => {
+	postReportPdf: async (context: Context, req: ExpressRequest, res: Response): Promise<void> => {
+		const budgetBlock = await checkBudget(context, req);
+		if (budgetBlock !== null) {
+			sendApiResponse(res, budgetBlock);
+			return;
+		}
+
 		const apiKey = process.env.DOCRAPTOR_API_KEY;
 		if (apiKey === undefined || apiKey === "") {
 			res
@@ -498,9 +581,36 @@ async function ensureApiInitialized(): Promise<void> {
 	await initializePromise;
 }
 
-export async function createApiMiddleware(config?: AppConfig): Promise<RequestHandler> {
+function isRecord(value: unknown): value is Record<string, unknown> {
+	return typeof value === "object" && value !== null;
+}
+
+function validateBudgetCosts(): void {
+	const doc: unknown = api.document;
+	if (!isRecord(doc)) return;
+	const paths = doc.paths;
+	if (!isRecord(paths)) return;
+	for (const [pathKey, methods] of Object.entries(paths)) {
+		if (!isRecord(methods)) continue;
+		for (const [method, operation] of Object.entries(methods)) {
+			if (!isRecord(operation) || !("operationId" in operation)) continue;
+			const cost: unknown = operation["x-somecam-budget-cost"];
+			if (cost === undefined) {
+				throw new Error(`Operation ${method.toUpperCase()} ${pathKey} is missing x-somecam-budget-cost`);
+			}
+			if (typeof cost !== "number" || !Number.isInteger(cost) || cost < 0) {
+				throw new Error(`Operation ${method.toUpperCase()} ${pathKey} has invalid x-somecam-budget-cost: ${JSON.stringify(cost)}`);
+			}
+		}
+	}
+}
+
+export async function createApiMiddleware(config?: AppConfig, limiter?: RateLimiter): Promise<RequestHandler> {
 	appConfig = config;
+	rateLimiter = limiter;
 	await ensureApiInitialized();
+
+	validateBudgetCosts();
 
 	return async (req: ExpressRequest, res: Response, next): Promise<void> => {
 		try {

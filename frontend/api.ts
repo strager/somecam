@@ -1,4 +1,7 @@
+import { solveChallenge } from "altcha-lib";
+
 import { capture } from "./analytics.ts";
+import { loadRateLimitToken, saveRateLimitToken } from "./store.ts";
 
 interface SummarizeRequest {
 	cardId: string;
@@ -30,16 +33,107 @@ interface InferAnswersResponse {
 	inferredAnswers: { questionId: string; answer: string }[];
 }
 
+interface ChallengePayload {
+	challengeId: string;
+	expiresAt: number;
+	altcha: { algorithm: string; challenge: string; maxnumber: number; salt: string; signature: string };
+}
+
+function authHeaders(): Record<string, string> {
+	const token = loadRateLimitToken();
+	if (token !== null) {
+		return { Authorization: `Bearer ${token}` };
+	}
+	return {};
+}
+
+function isChallengeRequired(body: unknown): body is { code: string; challenge: ChallengePayload } {
+	return typeof body === "object" && body !== null && "code" in body && body.code === "challenge_required" && "challenge" in body;
+}
+
+async function solveAndVerify(challenge: ChallengePayload): Promise<void> {
+	const { algorithm, challenge: challengeHash, maxnumber, salt, signature } = challenge.altcha;
+
+	const result = solveChallenge(challengeHash, salt, algorithm, maxnumber);
+	const solution = await result.promise;
+	if (solution === null) {
+		throw new Error("Challenge solving failed");
+	}
+
+	const payload = btoa(
+		JSON.stringify({
+			algorithm,
+			challenge: challengeHash,
+			number: solution.number,
+			salt,
+			signature,
+		}),
+	);
+
+	const verifyResponse = await fetch("/api/session/verify", {
+		method: "POST",
+		headers: {
+			"Content-Type": "application/json",
+			...authHeaders(),
+		},
+		body: JSON.stringify({ challengeId: challenge.challengeId, payload }),
+	});
+
+	if (!verifyResponse.ok) {
+		throw new Error(`Session verify failed (${verifyResponse.status.toString()})`);
+	}
+
+	const verifyBody: unknown = await verifyResponse.json();
+	if (typeof verifyBody === "object" && verifyBody !== null && "sessionToken" in verifyBody && typeof verifyBody.sessionToken === "string") {
+		saveRateLimitToken(verifyBody.sessionToken);
+	}
+}
+
+let challengeInFlight: Promise<void> | null = null;
+
+async function fetchWithChallenge(endpoint: string, buildInit: () => RequestInit): Promise<Response> {
+	for (;;) {
+		const response = await fetch(endpoint, buildInit());
+		if (response.status !== 429) {
+			return response;
+		}
+
+		const errorBody: unknown = await response
+			.clone()
+			.json()
+			.catch(() => null);
+		if (!isChallengeRequired(errorBody)) {
+			return response;
+		}
+
+		if (challengeInFlight === null) {
+			console.time("Proof-of-work challenge");
+			const challengeStart = performance.now();
+			challengeInFlight = solveAndVerify(errorBody.challenge).finally(() => {
+				challengeInFlight = null;
+			});
+			await challengeInFlight;
+			capture("pow_challenge_completed", {
+				endpoint,
+				duration_ms: Math.round(performance.now() - challengeStart),
+			});
+			console.timeEnd("Proof-of-work challenge");
+		} else {
+			await challengeInFlight;
+		}
+	}
+}
+
 async function postJson<T>(endpoint: string, payload: unknown, failureLabel: string, validate: (raw: unknown) => T): Promise<T> {
 	const start = performance.now();
 
 	let response: Response;
 	try {
-		response = await fetch(endpoint, {
+		response = await fetchWithChallenge(endpoint, () => ({
 			method: "POST",
-			headers: { "Content-Type": "application/json" },
+			headers: { "Content-Type": "application/json", ...authHeaders() },
 			body: JSON.stringify(payload),
-		});
+		}));
 	} catch (error) {
 		capture("api_call_failed", { endpoint, error_type: "network_error" });
 		throw error;
@@ -63,6 +157,13 @@ async function postJson<T>(endpoint: string, payload: unknown, failureLabel: str
 		capture("api_call_failed", { endpoint, error_type: "invalid_json" });
 		throw new Error(`${failureLabel} request failed: invalid JSON response`);
 	}
+}
+
+export async function budgetedFetch(endpoint: string, init: Omit<RequestInit, "headers"> & { headers: Record<string, string> }): Promise<Response> {
+	return fetchWithChallenge(endpoint, () => ({
+		...init,
+		headers: { ...init.headers, ...authHeaders() },
+	}));
 }
 
 function validateSummarizeResponse(raw: unknown): SummarizeResponse {

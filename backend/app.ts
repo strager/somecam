@@ -1,9 +1,10 @@
 import express, { type Express, type NextFunction, type Request, type Response } from "express";
 
 import { createApiMiddleware } from "./api.ts";
-import type { AppConfig } from "./config.ts";
-import { loadConfig } from "./config.ts";
+import type { AppConfig, RateLimitConfig } from "./config.ts";
+import { loadConfig, loadRateLimitConfig } from "./config.ts";
 import { createAnalyticsHandler } from "./posthog-proxy.ts";
+import { RateLimiter } from "./rate-limit.ts";
 
 function internalErrorBody(): string {
 	return JSON.stringify({
@@ -14,7 +15,7 @@ function internalErrorBody(): string {
 	});
 }
 
-export async function createApp(): Promise<Express> {
+export async function createApp(overrides?: { rateLimitConfig?: RateLimitConfig }): Promise<Express> {
 	const app = express();
 
 	let config: AppConfig | undefined;
@@ -24,11 +25,14 @@ export async function createApp(): Promise<Express> {
 		console.warn("XAI_API_KEY is not set; AI summarization will be disabled.");
 	}
 
+	const rateLimitConfig = overrides?.rateLimitConfig ?? loadRateLimitConfig();
+	const rateLimiter = new RateLimiter(rateLimitConfig);
+
 	app.use("/api/a", createAnalyticsHandler());
 	app.use(express.json());
 	app.use(express.text());
 	app.use(express.urlencoded({ extended: true }));
-	app.use("/api", await createApiMiddleware(config));
+	app.use("/api", await createApiMiddleware(config, rateLimiter));
 
 	app.use((error: unknown, _req: Request, res: Response, _next: NextFunction): void => {
 		const message = error instanceof Error ? error.message : String(error);

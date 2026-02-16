@@ -6,6 +6,7 @@ paths:
   /health:
     get:
       operationId: getHealth
+      x-somecam-budget-cost: 0
       summary: Health check endpoint
       parameters:
         - in: query
@@ -45,9 +46,58 @@ paths:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/ProblemDetails"
+  /session/verify:
+    post:
+      operationId: postSessionVerify
+      x-somecam-budget-cost: 0
+      summary: Verify a solved PoW challenge and obtain or refresh a session
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SessionVerifyRequest"
+      responses:
+        "200":
+          description: Challenge verified and session created or refreshed.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SessionVerifyResponse"
+        "400":
+          description: Challenge invalid or expired.
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+        "404":
+          description: Route not found.
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+        "405":
+          description: Method not allowed.
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+        "409":
+          description: Challenge already consumed (replayed).
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+        "500":
+          description: Internal API error.
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
   /summarize:
     post:
       operationId: postSummarize
+      x-somecam-budget-cost: 5
       summary: Generate an AI summary of a card exploration answer
       requestBody:
         required: true
@@ -86,6 +136,12 @@ paths:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/ProblemDetails"
+        "429":
+          description: Budget insufficient; challenge required.
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/RateLimitProblem"
         "502":
           description: Upstream AI service error.
           content:
@@ -95,6 +151,7 @@ paths:
   /infer-answers:
     post:
       operationId: postInferAnswers
+      x-somecam-budget-cost: 5
       summary: Infer answers to unanswered exploration questions from existing answers
       requestBody:
         required: true
@@ -133,6 +190,12 @@ paths:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/ProblemDetails"
+        "429":
+          description: Budget insufficient; challenge required.
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/RateLimitProblem"
         "502":
           description: Upstream AI service error.
           content:
@@ -142,6 +205,7 @@ paths:
   /report-pdf:
     post:
       operationId: postReportPdf
+      x-somecam-budget-cost: 100
       summary: Generate a PDF report
       requestBody:
         required: true
@@ -164,6 +228,12 @@ paths:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/ProblemDetails"
+        "429":
+          description: Budget insufficient; challenge required.
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/RateLimitProblem"
         "502":
           description: PDF generation service error.
           content:
@@ -173,6 +243,7 @@ paths:
   /check-answer-depth:
     post:
       operationId: postCheckAnswerDepth
+      x-somecam-budget-cost: 5
       summary: Check whether an exploration answer shows sufficient depth
       requestBody:
         required: true
@@ -211,6 +282,12 @@ paths:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/ProblemDetails"
+        "429":
+          description: Budget insufficient; challenge required.
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/RateLimitProblem"
         "502":
           description: Upstream AI service error.
           content:
@@ -325,6 +402,68 @@ components:
           type: boolean
         followUpQuestion:
           type: string
+    SessionVerifyRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - challengeId
+        - payload
+      properties:
+        challengeId:
+          type: string
+          minLength: 1
+        payload:
+          type: string
+          minLength: 1
+    SessionVerifyResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - sessionToken
+      properties:
+        sessionToken:
+          type: string
+          pattern: "^[a-z]{32}$"
+    ChallengePayload:
+      type: object
+      additionalProperties: false
+      required:
+        - challengeId
+        - expiresAt
+        - altcha
+      properties:
+        challengeId:
+          type: string
+        expiresAt:
+          type: integer
+        altcha:
+          type: object
+    RateLimitProblem:
+      type: object
+      additionalProperties: true
+      required:
+        - type
+        - title
+        - status
+        - detail
+        - code
+        - challenge
+      properties:
+        type:
+          type: string
+          format: uri-reference
+        title:
+          type: string
+        status:
+          type: integer
+          minimum: 100
+          maximum: 599
+        detail:
+          type: string
+        code:
+          type: string
+        challenge:
+          $ref: "#/components/schemas/ChallengePayload"
     ProblemDetails:
       type: object
       additionalProperties: true

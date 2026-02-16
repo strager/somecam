@@ -4,6 +4,7 @@ import { useRouter } from "vue-router";
 
 import AppButton from "./AppButton.vue";
 import ReportContent from "./ReportContent.vue";
+import { budgetedFetch } from "./api.ts";
 import type { CardReport, QuestionReport } from "../shared/report-types.ts";
 import { capture } from "./analytics.ts";
 import { useStringParam } from "./route-utils.ts";
@@ -26,7 +27,7 @@ async function downloadPdf(): Promise<void> {
 
 	try {
 		const body = exportSessionData(sessionId);
-		const response = await fetch("/api/report-pdf", {
+		const response = await budgetedFetch("/api/report-pdf", {
 			method: "POST",
 			headers: { "Content-Type": "text/plain" },
 			body,
