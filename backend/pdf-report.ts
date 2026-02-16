@@ -15,7 +15,7 @@ import { EXPLORE_QUESTIONS } from "../shared/explore-questions.ts";
 import { MEANING_CARDS } from "../shared/meaning-cards.ts";
 
 interface PdfEntryModule {
-	renderPdfHtml: (fontCss: string, reports: CardReport[]) => Promise<string>;
+	renderPdfHtml: (fontCss: string, componentCss: string, reports: CardReport[]) => Promise<string>;
 }
 
 const isProduction = process.env.NODE_ENV === "production";
@@ -27,7 +27,24 @@ function isPdfEntryModule(mod: unknown): mod is PdfEntryModule {
 	return typeof mod === "object" && mod !== null && "renderPdfHtml" in mod && typeof mod.renderPdfHtml === "function";
 }
 
-function isViteDevServer(obj: unknown): obj is { ssrLoadModule: (url: string) => Promise<unknown> } {
+interface ModuleNode {
+	url: string;
+	importedModules: Set<ModuleNode>;
+}
+
+interface TransformResult {
+	code: string;
+}
+
+interface ViteDevServer {
+	ssrLoadModule: (url: string) => Promise<unknown>;
+	transformRequest: (url: string) => Promise<TransformResult | null>;
+	moduleGraph: {
+		getModuleByUrl: (url: string) => Promise<ModuleNode | undefined>;
+	};
+}
+
+function isViteDevServer(obj: unknown): obj is ViteDevServer {
 	return typeof obj === "object" && obj !== null && "ssrLoadModule" in obj && typeof obj.ssrLoadModule === "function";
 }
 
@@ -38,22 +55,52 @@ function assertPdfEntryModule(mod: unknown): PdfEntryModule {
 	return mod;
 }
 
-async function loadSsrModule(vite: unknown): Promise<PdfEntryModule> {
+async function collectSsrCss(vite: ViteDevServer, entryUrl: string): Promise<string> {
+	const cssChunks: string[] = [];
+	const visited = new Set<string>();
+
+	async function traverse(mod: ModuleNode): Promise<void> {
+		if (visited.has(mod.url)) return;
+		visited.add(mod.url);
+
+		if (mod.url.includes("type=style")) {
+			const result = await vite.transformRequest(mod.url + "&inline");
+			if (result !== null) {
+				cssChunks.push(result.code);
+			}
+		}
+
+		for (const dep of mod.importedModules) {
+			await traverse(dep);
+		}
+	}
+
+	const entryMod = await vite.moduleGraph.getModuleByUrl(entryUrl);
+	if (entryMod !== undefined) {
+		await traverse(entryMod);
+	}
+	return cssChunks.join("\n");
+}
+
+async function loadSsrModule(vite: unknown): Promise<{ module: PdfEntryModule; componentCss: string }> {
 	if (isProduction) {
 		if (cachedModule === undefined) {
 			// @ts-expect-error Production build output does not exist at typecheck time.
 			const mod: unknown = await import("../frontend/dist-ssr/pdf-entry.js");
 			cachedModule = assertPdfEntryModule(mod);
 		}
-		return cachedModule;
+		// In production, scoped CSS is bundled into the SSR output.
+		return { module: cachedModule, componentCss: "" };
 	}
 
 	if (!isViteDevServer(vite)) {
 		throw new Error("Vite dev server is required for SSR in development mode.");
 	}
 
-	const mod: unknown = await vite.ssrLoadModule("/pdf-entry.ts");
-	return assertPdfEntryModule(mod);
+	const entryUrl = "/pdf-entry.ts";
+	const mod: unknown = await vite.ssrLoadModule(entryUrl);
+	const componentCss = await collectSsrCss(vite, entryUrl);
+	return { module: assertPdfEntryModule(mod), componentCss };
 }
 
 interface FontSpec {
@@ -190,9 +237,9 @@ export function assembleReportData(sessionExportJson: string): CardReport[] {
 
 export async function renderReportHtml(vite: unknown, sessionExportJson: string): Promise<string> {
 	const reports = assembleReportData(sessionExportJson);
-	const ssrModule = await loadSsrModule(vite);
+	const { module: ssrModule, componentCss } = await loadSsrModule(vite);
 	const fontCss = await loadFontCss();
-	return ssrModule.renderPdfHtml(fontCss, reports);
+	return ssrModule.renderPdfHtml(fontCss, componentCss, reports);
 }
 
 export async function callDocRaptor(html: string, apiKey: string, testMode: boolean): Promise<Buffer> {

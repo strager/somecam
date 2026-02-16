@@ -26,7 +26,7 @@ h2, h3, h4 {
 }
 `;
 
-export async function renderPdfHtml(fontCss: string, reports: CardReport[]): Promise<string> {
+export async function renderPdfHtml(fontCss: string, componentCss: string, reports: CardReport[]): Promise<string> {
 	const app = createSSRApp(ReportContent, { reports });
 	const html = await renderToString(app);
 
@@ -37,7 +37,14 @@ export async function renderPdfHtml(fontCss: string, reports: CardReport[]): Pro
 <title>SoMeCaM Report</title>
 <style>
 ${globalCss}
+</style>
+<style>
 ${fontCss}
+</style>
+<style>
+${componentCss}
+</style>
+<style>
 ${pagedMediaCss}
 </style>
 </head>
