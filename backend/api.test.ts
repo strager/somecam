@@ -352,6 +352,9 @@ describe("API", () => {
 		});
 		expect(response.status).toBe(400);
 		expect(response.headers.get("content-type")).toContain("application/problem+json");
+		const body: unknown = await response.json();
+		expect(body).toHaveProperty("detail", "Invalid session data.");
+		expect(JSON.stringify(body)).not.toContain("Unexpected");
 	});
 
 	it("returns 400 for POST /api/report-pdf with empty body", async () => {
@@ -387,6 +390,9 @@ describe("API", () => {
 			});
 			expect(response.status).toBe(400);
 			expect(response.headers.get("content-type")).toContain("application/problem+json");
+			const body: unknown = await response.json();
+			expect(body).toHaveProperty("detail", "Invalid session data.");
+			expect(JSON.stringify(body)).not.toContain("Unexpected");
 		} finally {
 			if (savedKey === undefined) {
 				delete process.env.DOCRAPTOR_API_KEY;
@@ -407,6 +413,93 @@ describe("API", () => {
 		expect(body).toHaveProperty("status", 400);
 		expect(body).toHaveProperty("detail", expect.any(String));
 		expect(body).toHaveProperty("errors");
+	});
+});
+
+describe("Error sanitization", () => {
+	let server: Server | undefined;
+	let baseUrl = "";
+	let originalXaiApiKey: string | undefined;
+
+	beforeAll(async () => {
+		originalXaiApiKey = process.env.XAI_API_KEY;
+		process.env.XAI_API_KEY = "test-xai-api-key";
+
+		const dbPath = path.join(os.tmpdir(), `rate-limit-test-${crypto.randomUUID()}.sqlite`);
+		const app = await createApp({ rateLimitConfig: { rateLimitDbPath: dbPath, powSecret: crypto.randomUUID(), enableCleanup: false } });
+
+		await new Promise<void>((resolve, reject) => {
+			const candidate = app.listen(0, "127.0.0.1", () => {
+				server = candidate;
+				resolve();
+			});
+			candidate.on("error", reject);
+		});
+
+		if (server === undefined) {
+			throw new Error("Server failed to start.");
+		}
+
+		const address = server.address();
+		if (address === null || typeof address === "string") {
+			throw new Error("Expected server to listen on a TCP port.");
+		}
+
+		baseUrl = `http://127.0.0.1:${address.port.toString()}`;
+	});
+
+	afterAll(async () => {
+		if (server !== undefined) {
+			const runningServer = server;
+			await new Promise<void>((resolve, reject) => {
+				runningServer.close((error) => {
+					if (error !== undefined) {
+						reject(error);
+						return;
+					}
+					resolve();
+				});
+			});
+		}
+
+		if (originalXaiApiKey === undefined) {
+			delete process.env.XAI_API_KEY;
+		} else {
+			process.env.XAI_API_KEY = originalXaiApiKey;
+		}
+	});
+
+	it("never forwards raw upstream AI error messages to clients", async () => {
+		const token = await obtainSessionToken(baseUrl);
+		const upstreamErrorText = "provider rejected request: api_key=test-xai-api-key";
+		const originalFetch = globalThis.fetch;
+		const fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation((input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+			const url = typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
+			if (url === "https://api.x.ai/v1/chat/completions") {
+				return Promise.resolve(new Response(upstreamErrorText, { status: 500 }));
+			}
+			return originalFetch(input, init);
+		});
+
+		try {
+			const response = await fetch(`${baseUrl}/api/summarize`, {
+				method: "POST",
+				headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+				body: JSON.stringify({
+					cardId: "self-knowledge",
+					questionId: "interpretation",
+					answer: "Tell me what this means in my life.",
+				}),
+			});
+
+			expect(response.status).toBe(502);
+			expect(response.headers.get("content-type")).toContain("application/problem+json");
+			const body: unknown = await response.json();
+			expect(body).toHaveProperty("detail", "Upstream AI service error.");
+			expect(JSON.stringify(body)).not.toContain(upstreamErrorText);
+		} finally {
+			fetchSpy.mockRestore();
+		}
 	});
 });
 

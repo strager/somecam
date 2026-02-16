@@ -35,8 +35,7 @@ export async function createApp(overrides?: { rateLimitConfig?: RateLimitConfig 
 	app.use("/api", await createApiMiddleware(config, rateLimiter));
 
 	app.use((error: unknown, _req: Request, res: Response, _next: NextFunction): void => {
-		const message = error instanceof Error ? error.message : String(error);
-		console.error("Unhandled application error:", message);
+		console.error("Unhandled application error:", error);
 		res.status(500);
 		res.type("application/problem+json");
 		res.send(internalErrorBody());

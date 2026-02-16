@@ -40,6 +40,15 @@ const problemJsonHeader = {
 	"content-type": "application/problem+json",
 };
 
+const safeErrorDetails = {
+	responseValidation: "Handler returned a response that could not be validated.",
+	challengeVerificationFailed: "Challenge verification failed.",
+	challengeReplayed: "Challenge has already been consumed.",
+	upstreamAiService: "Upstream AI service error.",
+	invalidSessionData: "Invalid session data.",
+	pdfGenerationService: "PDF generation service error.",
+};
+
 function createProblemDetails(status: number, title: string, detail: string, errors?: unknown[]): ApiProblemDetails {
 	return {
 		type: "about:blank",
@@ -98,6 +107,13 @@ function collectResponseValidationErrors(validationResult: ValidationResult): un
 	return validationResult.errors;
 }
 
+function challengeErrorDetail(code: string): string {
+	if (code === "challenge_replayed") {
+		return safeErrorDetails.challengeReplayed;
+	}
+	return safeErrorDetails.challengeVerificationFailed;
+}
+
 function validateOperationResponse(context: Context, response: ApiResponse): ApiResponse {
 	if (response.body === undefined) {
 		return response;
@@ -115,12 +131,11 @@ function validateOperationResponse(context: Context, response: ApiResponse): Api
 			headers: problemJsonHeader,
 			body: createProblemDetails(500, "Response Validation Failed", "Handler returned a response that does not match the OpenAPI spec.", errors),
 		};
-	} catch (error) {
-		const detail = error instanceof Error ? error.message : "Handler returned a response that could not be validated.";
+	} catch {
 		return {
 			statusCode: 500,
 			headers: problemJsonHeader,
-			body: createProblemDetails(500, "Response Validation Failed", detail),
+			body: createProblemDetails(500, "Response Validation Failed", safeErrorDetails.responseValidation),
 		};
 	}
 }
@@ -232,7 +247,7 @@ api.register({
 						type: "about:blank",
 						title: error.statusCode === 409 ? "Conflict" : "Bad Request",
 						status: error.statusCode,
-						detail: error.message,
+						detail: challengeErrorDetail(error.code),
 						code: error.code,
 					},
 				};
@@ -307,12 +322,11 @@ api.register({
 			});
 
 			return { statusCode: 200, body: { summary: content } };
-		} catch (error) {
-			const detail = error instanceof Error ? error.message : "Upstream AI service error.";
+		} catch {
 			return {
 				statusCode: 502,
 				headers: problemJsonHeader,
-				body: createProblemDetails(502, "Bad Gateway", detail),
+				body: createProblemDetails(502, "Bad Gateway", safeErrorDetails.upstreamAiService),
 			};
 		}
 	},
@@ -412,12 +426,11 @@ api.register({
 			} catch {
 				return { statusCode: 200, body: { inferredAnswers: [] } };
 			}
-		} catch (error) {
-			const detail = error instanceof Error ? error.message : "Upstream AI service error.";
+		} catch {
 			return {
 				statusCode: 502,
 				headers: problemJsonHeader,
-				body: createProblemDetails(502, "Bad Gateway", detail),
+				body: createProblemDetails(502, "Bad Gateway", safeErrorDetails.upstreamAiService),
 			};
 		}
 	},
@@ -492,12 +505,11 @@ api.register({
 			} catch {
 				return { statusCode: 200, body: { sufficient: true, followUpQuestion: "" } };
 			}
-		} catch (error) {
-			const detail = error instanceof Error ? error.message : "Upstream AI service error.";
+		} catch {
 			return {
 				statusCode: 502,
 				headers: problemJsonHeader,
-				body: createProblemDetails(502, "Bad Gateway", detail),
+				body: createProblemDetails(502, "Bad Gateway", safeErrorDetails.upstreamAiService),
 			};
 		}
 	},
@@ -514,12 +526,11 @@ api.register({
 		let html: string;
 		try {
 			html = await renderReportHtml(req.app.locals.vite, sessionExport);
-		} catch (error) {
-			const detail = error instanceof Error ? error.message : "Invalid session data.";
+		} catch {
 			res
 				.status(400)
 				.type("application/problem+json")
-				.send(JSON.stringify(createProblemDetails(400, "Bad Request", detail)));
+				.send(JSON.stringify(createProblemDetails(400, "Bad Request", safeErrorDetails.invalidSessionData)));
 			return;
 		}
 
@@ -553,12 +564,11 @@ api.register({
 		let html: string;
 		try {
 			html = await renderReportHtml(req.app.locals.vite, sessionExport);
-		} catch (error) {
-			const detail = error instanceof Error ? error.message : "Invalid session data.";
+		} catch {
 			res
 				.status(400)
 				.type("application/problem+json")
-				.send(JSON.stringify(createProblemDetails(400, "Bad Request", detail)));
+				.send(JSON.stringify(createProblemDetails(400, "Bad Request", safeErrorDetails.invalidSessionData)));
 			return;
 		}
 
@@ -568,12 +578,11 @@ api.register({
 		try {
 			const pdf = await callDocRaptor(html, apiKey, testMode);
 			res.status(200).type("application/pdf").setHeader("Content-Disposition", 'attachment; filename="somecam-report.pdf"').send(pdf);
-		} catch (error) {
-			const detail = error instanceof Error ? error.message : "PDF generation failed.";
+		} catch {
 			res
 				.status(502)
 				.type("application/problem+json")
-				.send(JSON.stringify(createProblemDetails(502, "Bad Gateway", detail)));
+				.send(JSON.stringify(createProblemDetails(502, "Bad Gateway", safeErrorDetails.pdfGenerationService)));
 		}
 	},
 	validationFail: (context: Context): ApiResponse => {
