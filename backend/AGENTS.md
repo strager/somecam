@@ -9,6 +9,10 @@
 - Follow existing endpoint patterns in `backend/api.ts` when adding new endpoints.
 - Never forward raw JavaScript error messages or third-party API error messages to clients. Return sanitized `application/problem+json` details instead.
 
+## Testing
+
+- Prefer MSW (`msw`) for mocking HTTP requests over `vi.spyOn(globalThis, "fetch")` when possible.
+
 ## LLM Integration
 
 - Backend proxies LLM calls to X AI (grok models).
