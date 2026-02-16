@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 
 import type { AppConfig } from "./config.ts";
 import { callDocRaptor, renderReportHtml } from "./pdf-report.ts";
-import { ChallengeError, type RateLimiter } from "./rate-limit.ts";
+import { ChallengeError, MAX_PDF_DOWNLOADS_PER_DAY, type RateLimiter } from "./rate-limit.ts";
 import { createChatCompletion } from "./xai-client.ts";
 import { MEANING_CARDS } from "../shared/meaning-cards.ts";
 import { EXPLORE_QUESTIONS } from "../shared/explore-questions.ts";
@@ -537,27 +537,62 @@ api.register({
 		res.status(200).type("text/html").setHeader("Content-Disposition", 'attachment; filename="somecam-report.html"').send(html);
 	},
 	postReportPdf: async (context: Context, req: ExpressRequest, res: Response): Promise<void> => {
+		// Daily PDF limit check (before budget, to avoid wasting credits)
+		let pdfRemaining: number | null = null;
+		if (rateLimiter !== undefined) {
+			const limitResult = rateLimiter.checkPdfDailyLimit(req.headers.authorization);
+			pdfRemaining = limitResult.remaining;
+			if (!limitResult.allowed) {
+				const retryAfterSeconds = Math.ceil(limitResult.retryAfterMs / 1000);
+				res
+					.status(429)
+					.type("application/problem+json")
+					.setHeader("X-SoMeCaM-PDF-Downloads-Remaining", "0")
+					.setHeader("Retry-After", retryAfterSeconds.toString())
+					.send(
+						JSON.stringify({
+							type: "about:blank",
+							title: "Too Many Requests",
+							status: 429,
+							detail: `You have reached the daily limit of ${MAX_PDF_DOWNLOADS_PER_DAY.toString()} successful PDF downloads.`,
+							code: "daily_limit_exceeded",
+						}),
+					);
+				return;
+			}
+		}
+
 		const budgetBlock = await checkBudget(context, req);
 		if (budgetBlock !== null) {
-			sendApiResponse(res, budgetBlock);
+			if (rateLimiter === undefined || pdfRemaining === null) {
+				sendApiResponse(res, budgetBlock);
+				return;
+			}
+			const responseWithHeaders: ApiResponse = {
+				...budgetBlock,
+				headers: { ...(budgetBlock.headers ?? {}), "X-SoMeCaM-PDF-Downloads-Remaining": pdfRemaining.toString() },
+			};
+			sendApiResponse(res, responseWithHeaders);
 			return;
 		}
 
 		const apiKey = process.env.DOCRAPTOR_API_KEY;
 		if (apiKey === undefined || apiKey === "") {
-			res
-				.status(500)
-				.type("application/problem+json")
-				.send(JSON.stringify(createProblemDetails(500, "Internal Server Error", "PDF generation is not configured.")));
+			const response = res.status(500).type("application/problem+json");
+			if (pdfRemaining !== null) {
+				response.setHeader("X-SoMeCaM-PDF-Downloads-Remaining", pdfRemaining.toString());
+			}
+			response.send(JSON.stringify(createProblemDetails(500, "Internal Server Error", "PDF generation is not configured.")));
 			return;
 		}
 
 		const sessionExport: unknown = req.body;
 		if (typeof sessionExport !== "string" || sessionExport === "") {
-			res
-				.status(400)
-				.type("application/problem+json")
-				.send(JSON.stringify(createProblemDetails(400, "Bad Request", "Request body must be a non-empty session export string.")));
+			const response = res.status(400).type("application/problem+json");
+			if (pdfRemaining !== null) {
+				response.setHeader("X-SoMeCaM-PDF-Downloads-Remaining", pdfRemaining.toString());
+			}
+			response.send(JSON.stringify(createProblemDetails(400, "Bad Request", "Request body must be a non-empty session export string.")));
 			return;
 		}
 
@@ -565,10 +600,11 @@ api.register({
 		try {
 			html = await renderReportHtml(req.app.locals.vite, sessionExport);
 		} catch {
-			res
-				.status(400)
-				.type("application/problem+json")
-				.send(JSON.stringify(createProblemDetails(400, "Bad Request", safeErrorDetails.invalidSessionData)));
+			const response = res.status(400).type("application/problem+json");
+			if (pdfRemaining !== null) {
+				response.setHeader("X-SoMeCaM-PDF-Downloads-Remaining", pdfRemaining.toString());
+			}
+			response.send(JSON.stringify(createProblemDetails(400, "Bad Request", safeErrorDetails.invalidSessionData)));
 			return;
 		}
 
@@ -577,12 +613,20 @@ api.register({
 
 		try {
 			const pdf = await callDocRaptor(html, apiKey, testMode);
-			res.status(200).type("application/pdf").setHeader("Content-Disposition", 'attachment; filename="somecam-report.pdf"').send(pdf);
+			if (rateLimiter !== undefined) {
+				pdfRemaining = rateLimiter.recordPdfDownload(req.headers.authorization);
+			}
+			const response = res.status(200).type("application/pdf").setHeader("Content-Disposition", 'attachment; filename="somecam-report.pdf"');
+			if (pdfRemaining !== null) {
+				response.setHeader("X-SoMeCaM-PDF-Downloads-Remaining", pdfRemaining.toString());
+			}
+			response.send(pdf);
 		} catch {
-			res
-				.status(502)
-				.type("application/problem+json")
-				.send(JSON.stringify(createProblemDetails(502, "Bad Gateway", safeErrorDetails.pdfGenerationService)));
+			const response = res.status(502).type("application/problem+json");
+			if (pdfRemaining !== null) {
+				response.setHeader("X-SoMeCaM-PDF-Downloads-Remaining", pdfRemaining.toString());
+			}
+			response.send(JSON.stringify(createProblemDetails(502, "Bad Gateway", safeErrorDetails.pdfGenerationService)));
 		}
 	},
 	validationFail: (context: Context): ApiResponse => {

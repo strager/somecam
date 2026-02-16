@@ -6,13 +6,29 @@ import os from "node:os";
 import path from "node:path";
 
 import { solveChallenge } from "altcha-lib";
-import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { http, HttpResponse, passthrough } from "msw";
+import { setupServer } from "msw/node";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { createApp } from "./app.ts";
-import { rateLimitTunables } from "./rate-limit.ts";
+import { MAX_PDF_DOWNLOADS_PER_DAY, rateLimitTunables } from "./rate-limit.ts";
 
 // Use trivial PoW difficulty in tests so challenges solve instantly.
 rateLimitTunables.powMaxNumber = 100;
+
+const mswServer = setupServer(http.all(/^http:\/\/127\.0\.0\.1/, () => passthrough()));
+
+beforeAll(() => {
+	mswServer.listen({ onUnhandledRequest: "error" });
+});
+
+afterEach(() => {
+	mswServer.resetHandlers();
+});
+
+afterAll(() => {
+	mswServer.close();
+});
 
 interface ChallengeResponse {
 	code: string;
@@ -109,6 +125,16 @@ describe("API", () => {
 	beforeAll(async () => {
 		const dbPath = path.join(os.tmpdir(), `rate-limit-test-${crypto.randomUUID()}.sqlite`);
 		const app = await createApp({ rateLimitConfig: { rateLimitDbPath: dbPath, powSecret: crypto.randomUUID(), enableCleanup: false } });
+		app.locals.vite = {
+			ssrLoadModule: (): Promise<unknown> =>
+				Promise.resolve({
+					renderPdfHtml: (): Promise<string> => Promise.resolve("<html><body>Report</body></html>"),
+				}),
+			moduleGraph: {
+				getModuleByUrl: (): Promise<undefined> => Promise.resolve(undefined),
+			},
+			transformRequest: (): Promise<null> => Promise.resolve(null),
+		};
 
 		await new Promise<void>((resolve, reject) => {
 			const candidate = app.listen(0, "127.0.0.1", () => {
@@ -475,34 +501,28 @@ describe("Error sanitization", () => {
 	it("never forwards raw upstream AI error messages to clients", async () => {
 		const token = await obtainSessionToken(baseUrl);
 		const upstreamErrorText = "provider rejected request: api_key=test-xai-api-key";
-		const originalFetch = globalThis.fetch;
-		const fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation((input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
-			const url = typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
-			if (url === "https://api.x.ai/v1/chat/completions") {
-				return Promise.resolve(new Response(upstreamErrorText, { status: 500 }));
-			}
-			return originalFetch(input, init);
+
+		mswServer.use(
+			http.post("https://api.x.ai/v1/chat/completions", () => {
+				return new HttpResponse(upstreamErrorText, { status: 500 });
+			}),
+		);
+
+		const response = await fetch(`${baseUrl}/api/summarize`, {
+			method: "POST",
+			headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+			body: JSON.stringify({
+				cardId: "self-knowledge",
+				questionId: "interpretation",
+				answer: "Tell me what this means in my life.",
+			}),
 		});
 
-		try {
-			const response = await fetch(`${baseUrl}/api/summarize`, {
-				method: "POST",
-				headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-				body: JSON.stringify({
-					cardId: "self-knowledge",
-					questionId: "interpretation",
-					answer: "Tell me what this means in my life.",
-				}),
-			});
-
-			expect(response.status).toBe(502);
-			expect(response.headers.get("content-type")).toContain("application/problem+json");
-			const body: unknown = await response.json();
-			expect(body).toHaveProperty("detail", "Upstream AI service error.");
-			expect(JSON.stringify(body)).not.toContain(upstreamErrorText);
-		} finally {
-			fetchSpy.mockRestore();
-		}
+		expect(response.status).toBe(502);
+		expect(response.headers.get("content-type")).toContain("application/problem+json");
+		const body: unknown = await response.json();
+		expect(body).toHaveProperty("detail", "Upstream AI service error.");
+		expect(JSON.stringify(body)).not.toContain(upstreamErrorText);
 	});
 });
 
@@ -990,5 +1010,263 @@ describe("Rate limiting", () => {
 		} finally {
 			vi.useRealTimers();
 		}
+	});
+});
+
+describe("PDF daily limit", () => {
+	let server: Server | undefined;
+	let baseUrl = "";
+	let originalDocraptorApiKey: string | undefined;
+
+	const validSessionExport = JSON.stringify({
+		version: "somecam-v2",
+		sessions: [
+			{
+				id: "test-session",
+				name: "Test",
+				createdAt: "2025-01-01T00:00:00Z",
+				lastUpdatedAt: "2025-01-01T00:00:00Z",
+				data: {
+					chosen: ["self-knowledge"],
+				},
+			},
+		],
+	});
+
+	beforeAll(async () => {
+		originalDocraptorApiKey = process.env.DOCRAPTOR_API_KEY;
+		process.env.DOCRAPTOR_API_KEY = "test-docraptor-key";
+
+		const dbPath = path.join(os.tmpdir(), `rate-limit-test-${crypto.randomUUID()}.sqlite`);
+		const app = await createApp({ rateLimitConfig: { rateLimitDbPath: dbPath, powSecret: crypto.randomUUID(), enableCleanup: false } });
+		app.locals.vite = {
+			ssrLoadModule: (): Promise<unknown> =>
+				Promise.resolve({
+					renderPdfHtml: (): Promise<string> => Promise.resolve("<html><body>Report</body></html>"),
+				}),
+			moduleGraph: {
+				getModuleByUrl: (): Promise<undefined> => Promise.resolve(undefined),
+			},
+			transformRequest: (): Promise<null> => Promise.resolve(null),
+		};
+
+		await new Promise<void>((resolve, reject) => {
+			const candidate = app.listen(0, "127.0.0.1", () => {
+				server = candidate;
+				resolve();
+			});
+			candidate.on("error", reject);
+		});
+
+		if (server === undefined) {
+			throw new Error("Server failed to start.");
+		}
+
+		const address = server.address();
+		if (address === null || typeof address === "string") {
+			throw new Error("Expected server to listen on a TCP port.");
+		}
+
+		baseUrl = `http://127.0.0.1:${address.port.toString()}`;
+	});
+
+	beforeEach(() => {
+		mswServer.use(
+			http.post("https://api.docraptor.com/docs", () => {
+				return new HttpResponse(Buffer.from("%PDF-1.4 fake"), {
+					status: 200,
+					headers: { "Content-Type": "application/pdf" },
+				});
+			}),
+		);
+	});
+
+	afterAll(async () => {
+		if (server !== undefined) {
+			const runningServer = server;
+
+			await new Promise<void>((resolve, reject) => {
+				runningServer.close((error) => {
+					if (error !== undefined) {
+						reject(error);
+						return;
+					}
+					resolve();
+				});
+			});
+		}
+
+		if (originalDocraptorApiKey === undefined) {
+			delete process.env.DOCRAPTOR_API_KEY;
+		} else {
+			process.env.DOCRAPTOR_API_KEY = originalDocraptorApiKey;
+		}
+	});
+
+	async function doPdfDownloadAndRefresh(token: string, sessionExport = validSessionExport): Promise<{ response: Response; token: string }> {
+		const response = await fetch(`${baseUrl}/api/report-pdf`, {
+			method: "POST",
+			headers: { "Content-Type": "text/plain", Authorization: `Bearer ${token}` },
+			body: sessionExport,
+		});
+
+		if (response.status === 429) {
+			const body: unknown = await response
+				.clone()
+				.json()
+				.catch(() => null);
+			if (isChallengeResponse(body)) {
+				// Budget exhausted — solve challenge and retry
+				const refreshedToken = await solveAndVerify(baseUrl, body, token);
+				const retryResponse = await fetch(`${baseUrl}/api/report-pdf`, {
+					method: "POST",
+					headers: { "Content-Type": "text/plain", Authorization: `Bearer ${refreshedToken}` },
+					body: sessionExport,
+				});
+				return { response: retryResponse, token: refreshedToken };
+			}
+		}
+
+		return { response, token };
+	}
+
+	it("returns daily_limit_exceeded after 3 successful downloads", async () => {
+		const token = await obtainSessionToken(baseUrl);
+		let currentToken = token;
+
+		for (let i = 0; i < MAX_PDF_DOWNLOADS_PER_DAY; i++) {
+			const result = await doPdfDownloadAndRefresh(currentToken);
+			expect(result.response.status).toBe(200);
+			currentToken = result.token;
+		}
+
+		const limitedResponse = await fetch(`${baseUrl}/api/report-pdf`, {
+			method: "POST",
+			headers: { "Content-Type": "text/plain", Authorization: `Bearer ${currentToken}` },
+			body: validSessionExport,
+		});
+
+		expect(limitedResponse.status).toBe(429);
+		const body: unknown = await limitedResponse.json();
+		expect(body).toHaveProperty("code", "daily_limit_exceeded");
+		expect(body).not.toHaveProperty("remaining");
+		expect(body).not.toHaveProperty("retryAfter");
+		expect(limitedResponse.headers.get("Retry-After")).not.toBeNull();
+		expect(limitedResponse.headers.get("X-SoMeCaM-PDF-Downloads-Remaining")).toBe("0");
+	});
+
+	it("remaining header decrements correctly", async () => {
+		const token = await obtainSessionToken(baseUrl);
+		let currentToken = token;
+		const remainingValues: number[] = [];
+
+		for (let i = 0; i < MAX_PDF_DOWNLOADS_PER_DAY; i++) {
+			const result = await doPdfDownloadAndRefresh(currentToken);
+			expect(result.response.status).toBe(200);
+			const remaining = result.response.headers.get("X-SoMeCaM-PDF-Downloads-Remaining");
+			expect(remaining).not.toBeNull();
+			remainingValues.push(parseInt(remaining!, 10));
+			currentToken = result.token;
+		}
+
+		expect(remainingValues).toEqual([2, 1, 0]);
+	});
+
+	it("failed PDF attempts do not consume the daily limit", async () => {
+		const token = await obtainSessionToken(baseUrl);
+		let currentToken = token;
+
+		const failedAttempt = await fetch(`${baseUrl}/api/report-pdf`, {
+			method: "POST",
+			headers: { "Content-Type": "text/plain", Authorization: `Bearer ${currentToken}` },
+			body: "not valid json",
+		});
+		expect(failedAttempt.status).toBe(400);
+		expect(failedAttempt.headers.get("X-SoMeCaM-PDF-Downloads-Remaining")).toBe(MAX_PDF_DOWNLOADS_PER_DAY.toString());
+
+		for (let i = 0; i < MAX_PDF_DOWNLOADS_PER_DAY; i++) {
+			const result = await doPdfDownloadAndRefresh(currentToken);
+			expect(result.response.status).toBe(200);
+			currentToken = result.token;
+		}
+
+		const limitedResponse = await fetch(`${baseUrl}/api/report-pdf`, {
+			method: "POST",
+			headers: { "Content-Type": "text/plain", Authorization: `Bearer ${currentToken}` },
+			body: validSessionExport,
+		});
+		expect(limitedResponse.status).toBe(429);
+		const body: unknown = await limitedResponse.json();
+		expect(body).toHaveProperty("code", "daily_limit_exceeded");
+	});
+
+	it("upstream PDF generation failure does not consume the daily limit", async () => {
+		const token = await obtainSessionToken(baseUrl);
+		let currentToken = token;
+
+		// Make DocRaptor fail with 502
+		mswServer.use(
+			http.post("https://api.docraptor.com/docs", () => {
+				return new HttpResponse("Service Unavailable", { status: 503 });
+			}),
+		);
+
+		const failedAttempt = await fetch(`${baseUrl}/api/report-pdf`, {
+			method: "POST",
+			headers: { "Content-Type": "text/plain", Authorization: `Bearer ${currentToken}` },
+			body: validSessionExport,
+		});
+		expect(failedAttempt.status).toBe(502);
+		expect(failedAttempt.headers.get("X-SoMeCaM-PDF-Downloads-Remaining")).toBe(MAX_PDF_DOWNLOADS_PER_DAY.toString());
+
+		// Restore DocRaptor to succeed
+		mswServer.resetHandlers();
+		mswServer.use(
+			http.post("https://api.docraptor.com/docs", () => {
+				return new HttpResponse(Buffer.from("%PDF-1.4 fake"), {
+					status: 200,
+					headers: { "Content-Type": "application/pdf" },
+				});
+			}),
+		);
+
+		// All 3 downloads should still succeed
+		for (let i = 0; i < MAX_PDF_DOWNLOADS_PER_DAY; i++) {
+			const result = await doPdfDownloadAndRefresh(currentToken);
+			expect(result.response.status).toBe(200);
+			currentToken = result.token;
+		}
+
+		const limitedResponse = await fetch(`${baseUrl}/api/report-pdf`, {
+			method: "POST",
+			headers: { "Content-Type": "text/plain", Authorization: `Bearer ${currentToken}` },
+			body: validSessionExport,
+		});
+		expect(limitedResponse.status).toBe(429);
+		const body: unknown = await limitedResponse.json();
+		expect(body).toHaveProperty("code", "daily_limit_exceeded");
+	});
+
+	it("daily limit check runs before budget check", async () => {
+		const token = await obtainSessionToken(baseUrl);
+		let currentToken = token;
+
+		// Exhaust the daily limit
+		for (let i = 0; i < MAX_PDF_DOWNLOADS_PER_DAY; i++) {
+			const result = await doPdfDownloadAndRefresh(currentToken);
+			expect(result.response.status).toBe(200);
+			currentToken = result.token;
+		}
+
+		// Now try with empty budget — should get daily_limit_exceeded, not challenge_required.
+		const response = await fetch(`${baseUrl}/api/report-pdf`, {
+			method: "POST",
+			headers: { "Content-Type": "text/plain", Authorization: `Bearer ${currentToken}` },
+			body: validSessionExport,
+		});
+
+		expect(response.status).toBe(429);
+		const body: unknown = await response.json();
+		expect(body).toHaveProperty("code", "daily_limit_exceeded");
 	});
 });

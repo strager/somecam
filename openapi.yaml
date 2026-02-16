@@ -246,6 +246,11 @@ paths:
       responses:
         "200":
           description: Report generated successfully.
+          headers:
+            X-SoMeCaM-PDF-Downloads-Remaining:
+              schema:
+                type: integer
+              description: Number of PDF downloads remaining in the rolling 24-hour window.
           content:
             application/pdf:
               schema:
@@ -253,18 +258,41 @@ paths:
                 format: binary
         "500":
           description: Internal server error.
+          headers:
+            X-SoMeCaM-PDF-Downloads-Remaining:
+              schema:
+                type: integer
+              description: Number of PDF downloads remaining in the rolling 24-hour window.
           content:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/ProblemDetails"
         "429":
-          description: Budget insufficient; challenge required.
+          description: >
+            Budget insufficient (challenge_required) or daily PDF download limit
+            reached (daily_limit_exceeded).
+          headers:
+            X-SoMeCaM-PDF-Downloads-Remaining:
+              schema:
+                type: integer
+              description: Number of PDF downloads remaining (0 when daily limit exceeded).
+            Retry-After:
+              schema:
+                type: integer
+              description: Seconds until the oldest successful download in the 24-hour window expires (only present for daily_limit_exceeded).
           content:
             application/problem+json:
               schema:
-                $ref: "#/components/schemas/RateLimitProblem"
+                oneOf:
+                  - $ref: "#/components/schemas/RateLimitProblem"
+                  - $ref: "#/components/schemas/DailyLimitProblem"
         "502":
           description: PDF generation service error.
+          headers:
+            X-SoMeCaM-PDF-Downloads-Remaining:
+              schema:
+                type: integer
+              description: Number of PDF downloads remaining in the rolling 24-hour window.
           content:
             application/problem+json:
               schema:
@@ -493,6 +521,29 @@ components:
           type: string
         challenge:
           $ref: "#/components/schemas/ChallengePayload"
+    DailyLimitProblem:
+      type: object
+      additionalProperties: true
+      required:
+        - type
+        - title
+        - status
+        - detail
+        - code
+      properties:
+        type:
+          type: string
+          format: uri-reference
+        title:
+          type: string
+        status:
+          type: integer
+          minimum: 100
+          maximum: 599
+        detail:
+          type: string
+        code:
+          type: string
     ProblemDetails:
       type: object
       additionalProperties: true

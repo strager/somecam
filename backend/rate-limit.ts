@@ -18,6 +18,8 @@ const SESSION_RETENTION_MS = 24 * 60 * 60 * 1000;
 const CHALLENGE_TTL_MS = 120 * 1000;
 const CHALLENGE_RETENTION_MS = 24 * 60 * 60 * 1000;
 const CLEANUP_INTERVAL_MS = 5 * 60 * 1000;
+export const MAX_PDF_DOWNLOADS_PER_DAY = 3;
+const PDF_DOWNLOAD_WINDOW_MS = 24 * 60 * 60 * 1000;
 
 export const rateLimitTunables = {
 	powMaxNumber: 50_000,
@@ -61,6 +63,8 @@ export interface ChallengeInfo {
 
 export type BudgetGuardResult = { ok: true } | { ok: false; challenge: ChallengeInfo };
 
+export type PdfDailyLimitResult = { allowed: true; remaining: number } | { allowed: false; remaining: 0; retryAfterMs: number };
+
 export interface VerifyResult {
 	sessionToken: string;
 }
@@ -97,6 +101,14 @@ export class RateLimiter {
 				budget_expires_at INTEGER NOT NULL,
 				credits_used INTEGER NOT NULL DEFAULT 0
 			);
+
+			CREATE TABLE IF NOT EXISTS pdf_downloads (
+				id INTEGER PRIMARY KEY AUTOINCREMENT,
+				session_token TEXT NOT NULL,
+				downloaded_at INTEGER NOT NULL
+			);
+			CREATE INDEX IF NOT EXISTS idx_pdf_downloads_session_time
+				ON pdf_downloads (session_token, downloaded_at);
 
 			CREATE TABLE IF NOT EXISTS issued_challenges (
 				challenge_id TEXT PRIMARY KEY,
@@ -353,6 +365,53 @@ export class RateLimiter {
 		return txn.immediate();
 	}
 
+	// --- PDF daily limit ---
+
+	checkPdfDailyLimit(authHeader: string | undefined): PdfDailyLimitResult {
+		const token = this.parseToken(authHeader);
+		if (token === null) {
+			return { allowed: true, remaining: MAX_PDF_DOWNLOADS_PER_DAY };
+		}
+
+		const now = Date.now();
+		const windowStart = now - PDF_DOWNLOAD_WINDOW_MS;
+
+		const count = this.countPdfDownloads(token, windowStart);
+
+		if (count < MAX_PDF_DOWNLOADS_PER_DAY) {
+			return { allowed: true, remaining: MAX_PDF_DOWNLOADS_PER_DAY - count };
+		}
+
+		const oldestRow = this.db.prepare(`SELECT downloaded_at FROM pdf_downloads WHERE session_token = ? AND downloaded_at >= ? ORDER BY downloaded_at ASC LIMIT 1`).get(token, windowStart);
+		const oldestDownloadedAt = isRecord(oldestRow) && typeof oldestRow.downloaded_at === "number" ? oldestRow.downloaded_at : now;
+		const retryAfterMs = oldestDownloadedAt + PDF_DOWNLOAD_WINDOW_MS - now;
+
+		return { allowed: false, remaining: 0, retryAfterMs: Math.max(retryAfterMs, 0) };
+	}
+
+	recordPdfDownload(authHeader: string | undefined): number {
+		const token = this.parseToken(authHeader);
+		if (token === null) {
+			return MAX_PDF_DOWNLOADS_PER_DAY;
+		}
+
+		const now = Date.now();
+		this.db.prepare(`INSERT INTO pdf_downloads (session_token, downloaded_at) VALUES (?, ?)`).run(token, now);
+
+		const windowStart = now - PDF_DOWNLOAD_WINDOW_MS;
+		const count = this.countPdfDownloads(token, windowStart);
+
+		return Math.max(MAX_PDF_DOWNLOADS_PER_DAY - count, 0);
+	}
+
+	private countPdfDownloads(token: string, windowStart: number): number {
+		const row = this.db.prepare(`SELECT COUNT(*) AS cnt FROM pdf_downloads WHERE session_token = ? AND downloaded_at >= ?`).get(token, windowStart);
+		if (isRecord(row) && typeof row.cnt === "number") {
+			return row.cnt;
+		}
+		return 0;
+	}
+
 	// --- Cleanup ---
 
 	// Cleanup disabled by default: keeping session and challenge data around
@@ -368,6 +427,7 @@ export class RateLimiter {
 		this.db.prepare(`DELETE FROM session_tokens WHERE last_used_at < ?`).run(now - SESSION_RETENTION_MS);
 		this.db.prepare(`DELETE FROM issued_challenges WHERE expires_at < ?`).run(now - CHALLENGE_RETENTION_MS);
 		this.db.prepare(`DELETE FROM issued_challenges WHERE consumed_at IS NOT NULL AND consumed_at < ?`).run(now - CHALLENGE_RETENTION_MS);
+		this.db.prepare(`DELETE FROM pdf_downloads WHERE downloaded_at < ?`).run(now - PDF_DOWNLOAD_WINDOW_MS);
 	}
 }
 

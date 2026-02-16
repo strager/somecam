@@ -141,11 +141,22 @@ Challenge scope:
 
 ## Report Page Behavior
 
-1. Show informational text for self-moderation (for example: "PDF downloads are limited to 3 per day.").
-   - Warning: This limit is not enforced currently.
+1. Show informational text: "PDF downloads are limited to 3 per day." After a download, show "N of 3 PDF downloads remaining today."
 2. User clicks download.
-3. If endpoint returns `429 challenge_required`, run solve -> `/api/session/verify` -> retry once.
-4. Do not display numeric budget values.
+3. Server checks the rolling 24-hour daily limit (max 3 successful PDF downloads). If exceeded, returns `429` with `code: "daily_limit_exceeded"` and a `Retry-After` header (seconds). The UI shows "You've reached the daily download limit. Try again in X hours." and disables the button.
+4. If the daily limit has not been reached, the normal budget check runs. If the endpoint returns `429 challenge_required`, run solve -> `/api/session/verify` -> retry once.
+5. On success, the `X-SoMeCaM-PDF-Downloads-Remaining` header indicates remaining downloads.
+6. Do not display numeric budget values.
+
+## PDF Daily Limit
+
+PDF downloads are limited to 3 per rolling 24-hour window per session.
+
+- **Storage:** `pdf_downloads` table (separate from budget model).
+- **Check order:** Daily limit is checked **before** the budget check. This avoids wasting budget credits or forcing a PoW challenge when the limit is already hit.
+- **Counting rule:** The daily limit increments only after a successful PDF generation (`200`). Failed attempts (`400`/`500`/`502`) do not consume the daily download quota.
+- **Headers:** `X-SoMeCaM-PDF-Downloads-Remaining` is included on 200, 429 (daily limit), 500, and 502 responses from `/api/report-pdf`. `Retry-After` is included on `daily_limit_exceeded` 429 responses.
+- **Circumvention:** Creating a new session resets the daily limit. This is acceptable — the limit prevents casual misuse, not denial-of-service attacks. PoW challenges still provide the DoS protection layer.
 
 ## SQLite Schema (Proposed)
 
@@ -164,6 +175,14 @@ CREATE TABLE issued_challenges (
   expires_at INTEGER NOT NULL,
   consumed_at INTEGER
 );
+
+CREATE TABLE pdf_downloads (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  session_token TEXT NOT NULL,
+  downloaded_at INTEGER NOT NULL
+);
+CREATE INDEX idx_pdf_downloads_session_time
+  ON pdf_downloads (session_token, downloaded_at);
 ```
 
 Retention:
@@ -202,6 +221,7 @@ Suggested machine-readable codes:
 - `challenge_required`
 - `challenge_invalid`
 - `challenge_replayed`
+- `daily_limit_exceeded`
 - `session_invalid`
 - `internal_error`
 
@@ -210,7 +230,7 @@ Suggested machine-readable codes:
 - initial challenge: +100 credits, high challenge difficulty
 - refresh challenge: +100 credits, high challenge difficulty
 - session has upper limit of 150 credits
-- `/api/report-pdf`: -100 credits
+- `/api/report-pdf`: -100 credits (max 3 downloads per rolling 24 hours)
 - `/api/summarize`, `/api/check-answer-depth`, `/api/infer-answers`: -5 credits
 
 ## Risks and Tradeoffs
