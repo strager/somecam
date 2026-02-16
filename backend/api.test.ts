@@ -332,6 +332,28 @@ describe("API", () => {
 		);
 	});
 
+	it("returns 400 for POST /api/report-html with empty body", async () => {
+		const token = await obtainSessionToken(baseUrl);
+		const response = await fetch(`${baseUrl}/api/report-html`, {
+			method: "POST",
+			headers: { "Content-Type": "text/plain", Authorization: `Bearer ${token}` },
+			body: "",
+		});
+		expect(response.status).toBe(400);
+		expect(response.headers.get("content-type")).toContain("application/problem+json");
+	});
+
+	it("returns 400 for POST /api/report-html with invalid session data", async () => {
+		const token = await obtainSessionToken(baseUrl);
+		const response = await fetch(`${baseUrl}/api/report-html`, {
+			method: "POST",
+			headers: { "Content-Type": "text/plain", Authorization: `Bearer ${token}` },
+			body: "not valid json",
+		});
+		expect(response.status).toBe(400);
+		expect(response.headers.get("content-type")).toContain("application/problem+json");
+	});
+
 	it("returns 400 for POST /api/report-pdf with empty body", async () => {
 		const token = await obtainSessionToken(baseUrl);
 		const savedKey = process.env.DOCRAPTOR_API_KEY;

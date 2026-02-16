@@ -20,35 +20,43 @@ const reports = ref<CardReport[]>([]);
 const downloading = ref(false);
 const downloadError = ref("");
 
-async function downloadPdf(): Promise<void> {
-	capture("pdf_download_initiated", { session_id: sessionId });
+async function downloadReport(endpoint: string, filename: string): Promise<void> {
 	downloading.value = true;
 	downloadError.value = "";
 
 	try {
 		const body = exportSessionData(sessionId);
-		const response = await budgetedFetch("/api/report-pdf", {
+		const response = await budgetedFetch(endpoint, {
 			method: "POST",
 			headers: { "Content-Type": "text/plain" },
 			body,
 		});
 
 		if (!response.ok) {
-			throw new Error(`PDF generation failed (${response.status.toString()})`);
+			throw new Error(`Report generation failed (${response.status.toString()})`);
 		}
 
 		const blob = await response.blob();
 		const url = URL.createObjectURL(blob);
 		const a = document.createElement("a");
 		a.href = url;
-		a.download = "somecam-report.pdf";
+		a.download = filename;
 		a.click();
 		URL.revokeObjectURL(url);
 	} catch (error) {
-		downloadError.value = error instanceof Error ? error.message : "PDF download failed.";
+		downloadError.value = error instanceof Error ? error.message : "Download failed.";
 	} finally {
 		downloading.value = false;
 	}
+}
+
+async function downloadPdf(): Promise<void> {
+	capture("pdf_download_initiated", { session_id: sessionId });
+	await downloadReport("/api/report-pdf", "somecam-report.pdf");
+}
+
+async function downloadHtml(): Promise<void> {
+	await downloadReport("/api/report-html", "somecam-report.html");
 }
 
 onMounted(() => {
@@ -99,8 +107,10 @@ onMounted(() => {
 	<ReportContent :reports="reports">
 		<template #header-actions>
 			<AppButton variant="primary" class="download-btn" :disabled="downloading" @click="downloadPdf">
-				{{ downloading ? "Generating PDF…" : "Download PDF" }}
+				{{ downloading ? "Generating…" : "Download PDF" }}
 			</AppButton>
+			<!-- For development only: -->
+			<AppButton v-if="false" variant="secondary" class="download-btn" :disabled="downloading" @click="downloadHtml">Download HTML</AppButton>
 			<p v-if="downloadError !== ''" class="download-error">{{ downloadError }}</p>
 		</template>
 	</ReportContent>

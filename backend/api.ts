@@ -501,6 +501,30 @@ api.register({
 			};
 		}
 	},
+	postReportHtml: async (context: Context, req: ExpressRequest, res: Response): Promise<void> => {
+		const sessionExport: unknown = req.body;
+		if (typeof sessionExport !== "string" || sessionExport === "") {
+			res
+				.status(400)
+				.type("application/problem+json")
+				.send(JSON.stringify(createProblemDetails(400, "Bad Request", "Request body must be a non-empty session export string.")));
+			return;
+		}
+
+		let html: string;
+		try {
+			html = await renderReportHtml(req.app.locals.vite, sessionExport);
+		} catch (error) {
+			const detail = error instanceof Error ? error.message : "Invalid session data.";
+			res
+				.status(400)
+				.type("application/problem+json")
+				.send(JSON.stringify(createProblemDetails(400, "Bad Request", detail)));
+			return;
+		}
+
+		res.status(200).type("text/html").setHeader("Content-Disposition", 'attachment; filename="somecam-report.html"').send(html);
+	},
 	postReportPdf: async (context: Context, req: ExpressRequest, res: Response): Promise<void> => {
 		const budgetBlock = await checkBudget(context, req);
 		if (budgetBlock !== null) {
