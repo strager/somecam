@@ -10,6 +10,8 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
+import type { ModuleNode, ViteDevServer } from "vite";
+
 import type { CardReport, QuestionReport } from "../shared/report-types.ts";
 import { EXPLORE_QUESTIONS } from "../shared/explore-questions.ts";
 import { MEANING_CARDS } from "../shared/meaning-cards.ts";
@@ -25,23 +27,6 @@ let cachedFontCss: string | undefined;
 
 function isPdfEntryModule(mod: unknown): mod is PdfEntryModule {
 	return typeof mod === "object" && mod !== null && "renderPdfHtml" in mod && typeof mod.renderPdfHtml === "function";
-}
-
-interface ModuleNode {
-	url: string;
-	importedModules: Set<ModuleNode>;
-}
-
-interface TransformResult {
-	code: string;
-}
-
-interface ViteDevServer {
-	ssrLoadModule: (url: string) => Promise<unknown>;
-	transformRequest: (url: string) => Promise<TransformResult | null>;
-	moduleGraph: {
-		getModuleByUrl: (url: string) => Promise<ModuleNode | undefined>;
-	};
 }
 
 function isViteDevServer(obj: unknown): obj is ViteDevServer {
