@@ -180,6 +180,12 @@ function acceptGuardrail(): void {
 }
 
 async function submitAnswer(): Promise<void> {
+	const focusedAtStart = document.activeElement;
+	function shouldAutoFocus(): boolean {
+		const current = document.activeElement;
+		return current === focusedAtStart || current === document.body || current === null;
+	}
+
 	if (depthCheckShown.value) {
 		acceptGuardrail();
 		persistEntries();
@@ -187,6 +193,14 @@ async function submitAnswer(): Promise<void> {
 		depthCheckFollowUp.value = "";
 		applyInferAndAdvance(pendingInferResult.value ?? new Map<string, string>(), remainingQuestionIds());
 		pendingInferResult.value = null;
+		void nextTick(() => {
+			if (!shouldAutoFocus()) return;
+			if (allAnswered.value) {
+				freeformTextarea.value?.focus();
+			} else {
+				activeTextarea.value?.focus();
+			}
+		});
 		return;
 	}
 
@@ -267,7 +281,9 @@ async function submitAnswer(): Promise<void> {
 		depthCheckFollowUp.value = depthResult.followUpQuestion;
 		depthCheckShown.value = true;
 		void nextTick(() => {
-			activeTextarea.value?.focus();
+			if (shouldAutoFocus()) {
+				activeTextarea.value?.focus();
+			}
 		});
 		// Resolve infer in background so it's ready when user skips
 		void inferPromise.then((result) => {
@@ -280,6 +296,14 @@ async function submitAnswer(): Promise<void> {
 	inferring.value = false;
 
 	applyInferAndAdvance(inferResult, remaining);
+	void nextTick(() => {
+		if (!shouldAutoFocus()) return;
+		if (allAnswered.value) {
+			freeformTextarea.value?.focus();
+		} else {
+			activeTextarea.value?.focus();
+		}
+	});
 }
 
 function applyInferAndAdvance(inferredMap: Map<string, string>, remaining: string[]): void {
