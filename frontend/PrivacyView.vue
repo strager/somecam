@@ -1,0 +1,100 @@
+<script setup lang="ts">
+</script>
+
+<template>
+	<main>
+		<nav class="back-nav">
+			<router-link to="/">&larr; Back to home</router-link>
+		</nav>
+
+		<h1>Privacy</h1>
+
+		<section>
+			<h2>Your data stays in your browser</h2>
+			<p>Your card selections, answers, and session data are saved in your browser's local storage. There are no accounts or logins; your data belongs to you. They are never stored permanently on our servers.</p>
+		</section>
+
+		<section>
+			<h2>Third-party services</h2>
+			<p>SoMeCaM uses third-party services to provide its features. Here is what each service receives and why.</p>
+
+			<h3>Vultr</h3>
+			<p><a href="https://www.vultr.com/" rel="external">Vultr</a> provides the server infrastructure that hosts SoMeCaM.</p>
+
+			<h3>Grok</h3>
+			<p><a href="https://x.ai/" rel="external">Grok by xAI</a> powers the AI-assisted features such as summarization during the exploration phase. When you use these features, the prompts and your selected card information are sent to Grok to generate responses. No other personal data is shared.</p>
+			<p><b>Storage:</b> Grok stores your data temporarily. "API requests and responses are temporarily stored on our servers for 30 days in case they need to be audited for potential abuse or misuse. This data is automatically deleted after 30 days."</p>
+			<p><b>Training:</b> Grok does not train its AI models on your data.</p>
+
+			<h3>DocRaptor</h3>
+			<p><a href="https://docraptor.com/" rel="external">DocRaptor</a> converts your report into a downloadable PDF. When you download a PDF report, the rendered report HTML is sent to DocRaptor's API for conversion. This includes the card names and any answers you wrote during exploration.</p>
+			<p><b>Storage:</b> DocRaptor does not store your data. We use the "As short as possible" Data Retention Time. "[DocRaptor] will delete your input immediately after it is used. [DocRaptor] will delete your finished document as soon as you download it."</p>
+
+			<h3>PostHog</h3>
+			<p><a href="https://posthog.com/" rel="external">PostHog</a> provides product analytics so we can understand how people use SoMeCaM and improve the experience. We collect and store:</p>
+			<ul>
+				<li>Page view events with route names</li>
+				<li>Aggregate card counts (e.g. how many cards were agreed/disagreed, kept/removed)</li>
+				<li>Interaction timing (e.g. time spent on a card, answer length)</li>
+				<li>Phase completion events</li>
+			</ul>
+			<p><b>Storage:</b> This data is stored in PostHog for at least 7 days. PostHog does <em>not</em> receive or store which specific cards you choose, the text of your answers, or any personally identifiable information.</p>
+		</section>
+	</main>
+</template>
+
+<style scoped>
+main {
+	margin: var(--space-12) auto;
+	max-width: 36rem;
+	padding: 0 var(--space-6);
+}
+
+.back-nav {
+	margin-bottom: var(--space-8);
+}
+
+.back-nav a {
+	font-size: var(--text-sm);
+	color: var(--color-gray-600);
+}
+
+.back-nav a:hover {
+	color: var(--color-black);
+}
+
+h1 {
+	margin: 0 0 var(--space-8);
+}
+
+h2 {
+	font-size: var(--text-2xl);
+	font-weight: 600;
+	margin: 0 0 var(--space-2);
+}
+
+h3 {
+	font-size: var(--text-lg);
+	font-weight: 600;
+	margin: var(--space-6) 0 var(--space-1);
+}
+
+section {
+	margin-bottom: var(--space-8);
+}
+
+section p {
+	line-height: var(--leading-relaxed);
+	margin: 0 0 var(--space-3);
+}
+
+section ul {
+	line-height: var(--leading-relaxed);
+	margin: var(--space-2) 0 0;
+	padding-left: var(--space-6);
+}
+
+section li {
+	margin-bottom: var(--space-1);
+}
+</style>

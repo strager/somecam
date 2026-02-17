@@ -131,7 +131,7 @@ function onLoadFile(): void {
 
 		<section>
 			<h2>Your privacy</h2>
-			<p>Your data is never stored on our servers. Your responses are saved locally in your browser so you can return to them later.</p>
+			<p>Your data is never stored on our servers. Your responses are saved locally in your browser so you can return to them later. <router-link to="/privacy">Learn more</router-link></p>
 		</section>
 
 		<section class="sessions">

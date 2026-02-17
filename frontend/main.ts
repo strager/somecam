@@ -11,6 +11,7 @@ import FindMeaningPrioritizeView from "./FindMeaningPrioritizeView.vue";
 import FindMeaningView from "./FindMeaningView.vue";
 import HomeView from "./HomeView.vue";
 import LlmTestView from "./LlmTestView.vue";
+import PrivacyView from "./PrivacyView.vue";
 import ReportView from "./ReportView.vue";
 import StyleGuideView from "./StyleGuideView.vue";
 
@@ -57,6 +58,11 @@ const router = createRouter({
 			path: "/:sessionId/explore/:meaningId",
 			name: "exploreMeaning",
 			component: ExploreMeaningView,
+		},
+		{
+			path: "/privacy",
+			name: "privacy",
+			component: PrivacyView,
 		},
 		{
 			path: "/llm-test",
