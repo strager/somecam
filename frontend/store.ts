@@ -7,7 +7,6 @@ const LLM_TEST_KEY = "somecam-llm-test";
 const PERSIST_REQUESTED_KEY = "somecam-persist-requested";
 const RATE_LIMIT_SESSION_KEY = "somecam-api-session-id";
 
-const LEGACY_KEYS = ["somecam-progress", "somecam-narrowdown", "somecam-chosen", "somecam-explore", "somecam-summaries", "somecam-freeform"];
 const SESSION_DATA_SUFFIXES = ["progress", "narrowdown", "chosen", "explore", "summaries", "freeform"] as const;
 
 const DEFAULT_QUESTION_ID = EXPLORE_QUESTIONS[0]?.id ?? "";
@@ -121,37 +120,8 @@ function saveSessionsMeta(sessions: SessionMeta[]): void {
 	localStorage.setItem(SESSIONS_KEY, JSON.stringify(sessions));
 }
 
-function hasLegacyData(): boolean {
-	return LEGACY_KEYS.some((key) => localStorage.getItem(key) !== null);
-}
-
-function migrateToSessions(): void {
-	const id = generateUUID();
-	for (const suffix of SESSION_DATA_SUFFIXES) {
-		const legacyKey = `somecam-${suffix}`;
-		const raw = localStorage.getItem(legacyKey);
-		if (raw !== null) {
-			localStorage.setItem(`somecam-${id}-${suffix}`, raw);
-			localStorage.removeItem(legacyKey);
-		}
-	}
-	const now = new Date().toISOString();
-	const meta: SessionMeta = {
-		id,
-		name: formatSessionDate(new Date()),
-		createdAt: now,
-		lastUpdatedAt: now,
-	};
-	saveSessionsMeta([meta]);
-	localStorage.setItem(ACTIVE_SESSION_KEY, id);
-}
-
 export function ensureSessionsInitialized(): void {
 	if (localStorage.getItem(SESSIONS_KEY) !== null) {
-		return;
-	}
-	if (hasLegacyData()) {
-		migrateToSessions();
 		return;
 	}
 	const id = generateUUID();
@@ -623,10 +593,7 @@ export function hasProgressData(sessionId: string): boolean {
 
 // --- Export / Import ---
 
-const EXPORT_VERSION_V1 = "somecam-v1";
 const EXPORT_VERSION_V2 = "somecam-v2";
-
-const LEGACY_V1_KEYS = ["somecam-progress", "somecam-narrowdown", "somecam-chosen", "somecam-explore", "somecam-summaries", "somecam-freeform", "somecam-llm-test"];
 
 export function exportProgressData(): string {
 	const sessions = loadSessionsMeta();
@@ -669,10 +636,6 @@ export function importProgressData(json: string): ImportProgressStats {
 		throw new Error("Invalid progress data: expected an object");
 	}
 	const obj = parsed;
-
-	if (obj.version === EXPORT_VERSION_V1) {
-		return importV1Data(obj);
-	}
 
 	if (obj.version !== EXPORT_VERSION_V2) {
 		throw new Error(`Invalid progress data: unsupported version "${String(obj.version)}"`);
@@ -725,40 +688,6 @@ export function importProgressData(json: string): ImportProgressStats {
 
 	saveSessionsMeta(existingSessions);
 	return stats;
-}
-
-function importV1Data(obj: Record<string, unknown>): ImportProgressStats {
-	ensureSessionsInitialized();
-	const id = generateUUID();
-
-	for (const suffix of SESSION_DATA_SUFFIXES) {
-		const legacyKey = `somecam-${suffix}`;
-		if (legacyKey in obj) {
-			localStorage.setItem(`somecam-${id}-${suffix}`, JSON.stringify(obj[legacyKey]));
-		}
-	}
-
-	// Also import llm-test if present (global key)
-	if (LEGACY_V1_KEYS.includes("somecam-llm-test") && "somecam-llm-test" in obj) {
-		localStorage.setItem(LLM_TEST_KEY, JSON.stringify(obj["somecam-llm-test"]));
-	}
-
-	const now = new Date().toISOString();
-	const meta: SessionMeta = {
-		id,
-		name: formatSessionDate(new Date()),
-		createdAt: now,
-		lastUpdatedAt: now,
-	};
-	const sessions = loadSessionsMeta();
-	sessions.push(meta);
-	saveSessionsMeta(sessions);
-	localStorage.setItem(ACTIVE_SESSION_KEY, id);
-	return {
-		sessions: 1,
-		finalSessionsAdded: 1,
-		sessionsOverridden: 0,
-	};
 }
 
 export function saveProgressFile(): void {

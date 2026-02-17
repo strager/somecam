@@ -618,41 +618,6 @@ describe("exportProgressData/importProgressData", () => {
 		expect(secondSession.data.chosen).toEqual(["community"]);
 	});
 
-	it("importProgressData v1 creates a new session", () => {
-		saveChosenCardIds(sid(), ["existing-card"]);
-		expect(listSessions()).toHaveLength(1);
-
-		const v1Data = JSON.stringify({
-			version: "somecam-v1",
-			"somecam-chosen": ["self-knowledge", "community"],
-			"somecam-freeform": { "self-knowledge": "notes" },
-		});
-
-		importProgressData(v1Data);
-
-		const sessionsAfter = listSessions();
-		expect(sessionsAfter).toHaveLength(2);
-		expect(loadChosenCardIds(sid())).toEqual(["self-knowledge", "community"]);
-		expect(loadFreeformNotes(sid())).toEqual({ "self-knowledge": "notes" });
-	});
-
-	it("importProgressData v1 imports llm-test to global key", () => {
-		const v1Data = JSON.stringify({
-			version: "somecam-v1",
-			"somecam-llm-test": {
-				cardId: "self-knowledge",
-				rows: [{ questionId: "interpretation", answer: "test" }],
-			},
-		});
-
-		importProgressData(v1Data);
-
-		expect(loadLlmTestState()).toEqual({
-			cardId: "self-knowledge",
-			rows: [{ questionId: "interpretation", answer: "test" }],
-		});
-	});
-
 	it("importProgressData v2 merges sessions by UUID", () => {
 		saveChosenCardIds(sid(), ["self-knowledge"]);
 		const currentId = getActiveSessionId();
@@ -765,127 +730,6 @@ describe("exportProgressData/importProgressData", () => {
 		expect(() => {
 			importProgressData(JSON.stringify({ "somecam-chosen": [] }));
 		}).toThrow(/version/);
-	});
-
-	it("importProgressData v1 restores all data types", () => {
-		const input = JSON.stringify({
-			version: "somecam-v1",
-			"somecam-progress": {
-				shuffledCardIds: ["self-knowledge", "community", "challenge"],
-				swipeHistory: [
-					{ cardId: "self-knowledge", direction: "agree" },
-					{ cardId: "community", direction: "disagree" },
-				],
-			},
-			"somecam-narrowdown": {
-				cardIds: ["self-knowledge", "challenge"],
-				swipeHistory: [{ cardId: "challenge", direction: "unsure" }],
-			},
-			"somecam-chosen": ["self-knowledge", "challenge"],
-			"somecam-explore": {
-				"self-knowledge": [
-					{
-						questionId: "interpretation",
-						userAnswer: "It means knowing yourself",
-						prefilledAnswer: "",
-						submitted: true,
-						guardrailText: "Can you elaborate?",
-						submittedAfterGuardrail: true,
-					},
-					{
-						questionId: "importance",
-						userAnswer: "Very important to me",
-						prefilledAnswer: "AI suggestion",
-						submitted: true,
-					},
-				],
-				challenge: [
-					{
-						questionId: "interpretation",
-						userAnswer: "",
-						prefilledAnswer: "",
-						submitted: false,
-					},
-				],
-			},
-			"somecam-summaries": {
-				"self-knowledge:interpretation": {
-					answer: "It means knowing yourself",
-					summary: "Self-awareness and introspection",
-				},
-			},
-			"somecam-freeform": {
-				"self-knowledge": "Extra thoughts about self-knowledge",
-			},
-			"somecam-llm-test": {
-				cardId: "self-knowledge",
-				rows: [
-					{ questionId: "interpretation", answer: "test answer" },
-					{ questionId: "importance", answer: "test answer 2" },
-				],
-			},
-		});
-
-		importProgressData(input);
-
-		expect(loadSwipeProgress(sid())).toEqual({
-			shuffledCardIds: ["self-knowledge", "community", "challenge"],
-			swipeHistory: [
-				{ cardId: "self-knowledge", direction: "agree" },
-				{ cardId: "community", direction: "disagree" },
-			],
-		});
-		expect(loadPrioritize(sid())).toEqual({
-			cardIds: ["self-knowledge", "challenge"],
-			swipeHistory: [{ cardId: "challenge", direction: "unsure" }],
-		});
-		expect(loadChosenCardIds(sid())).toEqual(["self-knowledge", "challenge"]);
-		expect(loadExploreDataFull(sid())).toEqual({
-			"self-knowledge": [
-				{
-					questionId: "interpretation",
-					userAnswer: "It means knowing yourself",
-					prefilledAnswer: "",
-					submitted: true,
-					guardrailText: "Can you elaborate?",
-					submittedAfterGuardrail: true,
-				},
-				{
-					questionId: "importance",
-					userAnswer: "Very important to me",
-					prefilledAnswer: "AI suggestion",
-					submitted: true,
-					guardrailText: "",
-					submittedAfterGuardrail: false,
-				},
-			],
-			challenge: [
-				{
-					questionId: "interpretation",
-					userAnswer: "",
-					prefilledAnswer: "",
-					submitted: false,
-					guardrailText: "",
-					submittedAfterGuardrail: false,
-				},
-			],
-		});
-		expect(loadSummaryCache(sid())).toEqual({
-			"self-knowledge:interpretation": {
-				answer: "It means knowing yourself",
-				summary: "Self-awareness and introspection",
-			},
-		});
-		expect(loadFreeformNotes(sid())).toEqual({
-			"self-knowledge": "Extra thoughts about self-knowledge",
-		});
-		expect(loadLlmTestState()).toEqual({
-			cardId: "self-knowledge",
-			rows: [
-				{ questionId: "interpretation", answer: "test answer" },
-				{ questionId: "importance", answer: "test answer 2" },
-			],
-		});
 	});
 });
 
@@ -1051,29 +895,6 @@ describe("session data isolation", () => {
 		expect(loadChosenCardIds(sid())).toBeNull();
 		switchSession(firstId);
 		expect(loadChosenCardIds(sid())).toEqual(["self-knowledge"]);
-	});
-});
-
-describe("migration from legacy data", () => {
-	it("migrates legacy keys into a new session", () => {
-		// Reset: remove sessions metadata to simulate pre-sessions state
-		localStorage.removeItem("somecam-sessions");
-		localStorage.removeItem("somecam-active-session");
-
-		// Write legacy keys directly
-		localStorage.setItem("somecam-chosen", JSON.stringify(["self-knowledge"]));
-		localStorage.setItem("somecam-freeform", JSON.stringify({ "self-knowledge": "notes" }));
-
-		ensureSessionsInitialized();
-
-		// Legacy keys should be removed
-		expect(localStorage.getItem("somecam-chosen")).toBeNull();
-		expect(localStorage.getItem("somecam-freeform")).toBeNull();
-
-		// Data should be accessible through session-scoped functions
-		expect(loadChosenCardIds(sid())).toEqual(["self-knowledge"]);
-		expect(loadFreeformNotes(sid())).toEqual({ "self-knowledge": "notes" });
-		expect(listSessions()).toHaveLength(1);
 	});
 });
 
