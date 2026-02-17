@@ -465,7 +465,7 @@ export function loadExploreDataFull(sessionId: string): ExploreDataFull | null {
 			}
 			fullEntries.push(fullEntry);
 		}
-		const nonBlank = fullEntries.filter((e) => !e.submitted || e.userAnswer.trim() !== "");
+		const nonBlank = fullEntries.filter((e) => e.userAnswer.trim() !== "");
 		result[cardId] = nonBlank.length > 0 ? nonBlank : fullEntries.slice(0, 1);
 	}
 
