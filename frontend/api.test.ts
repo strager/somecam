@@ -1,7 +1,7 @@
 // @vitest-environment node
 
 import { createChallenge } from "altcha-lib";
-import { JSDOM } from "jsdom";
+import { Window } from "happy-dom";
 import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
@@ -39,12 +39,12 @@ async function makeChallenge(): Promise<{
 	};
 }
 
-let currentDom: JSDOM | null = null;
+let currentWindow: Window | null = null;
 
-function setGlobalDom(dom: JSDOM): void {
-	Object.defineProperty(globalThis, "window", { value: dom.window, configurable: true });
-	Object.defineProperty(globalThis, "document", { value: dom.window.document, configurable: true });
-	Object.defineProperty(globalThis, "localStorage", { value: dom.window.localStorage, configurable: true });
+function setGlobalDom(win: Window): void {
+	Object.defineProperty(globalThis, "window", { value: win, configurable: true });
+	Object.defineProperty(globalThis, "document", { value: win.document, configurable: true });
+	Object.defineProperty(globalThis, "localStorage", { value: win.localStorage, configurable: true });
 }
 
 const server = setupServer();
@@ -63,14 +63,14 @@ beforeAll(() => {
 });
 
 beforeEach(() => {
-	currentDom = new JSDOM("", { url: "http://localhost" });
-	setGlobalDom(currentDom);
+	currentWindow = new Window({ url: "http://localhost" });
+	setGlobalDom(currentWindow);
 });
 
 afterEach(() => {
 	server.resetHandlers();
-	currentDom?.window.close();
-	currentDom = null;
+	currentWindow?.close();
+	currentWindow = null;
 });
 
 afterAll(() => {

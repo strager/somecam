@@ -1,6 +1,6 @@
 // @vitest-environment node
 
-import { JSDOM } from "jsdom";
+import { Window } from "happy-dom";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { clearAllProgress, createSession, deleteSession, ensureSessionsInitialized, exportProgressData, formatSessionDate, getActiveSessionId, hasProgressData, importProgressData, listSessions, loadChosenCardIds, loadExploreData, loadExploreDataFull, loadFreeformNotes, loadLlmTestState, loadPrioritize, loadSummaryCache, loadSwipeProgress, removePrioritize, renameSession, saveChosenCardIds, saveExploreData, saveFreeformNotes, saveLlmTestState, savePrioritize, saveSummaryCache, saveSwipeProgress, switchSession } from "./store.ts";
@@ -12,32 +12,32 @@ import { EXPLORE_QUESTIONS } from "../shared/explore-questions.ts";
 
 const DEFAULT_QUESTION_ID = EXPLORE_QUESTIONS[0].id;
 
-let currentDom: JSDOM | null = null;
+let currentWindow: Window | null = null;
 
-function setGlobalDom(dom: JSDOM): void {
+function setGlobalDom(win: Window): void {
 	Object.defineProperty(globalThis, "window", {
-		value: dom.window,
+		value: win,
 		configurable: true,
 	});
 	Object.defineProperty(globalThis, "document", {
-		value: dom.window.document,
+		value: win.document,
 		configurable: true,
 	});
 	Object.defineProperty(globalThis, "localStorage", {
-		value: dom.window.localStorage,
+		value: win.localStorage,
 		configurable: true,
 	});
 }
 
 beforeEach(() => {
-	currentDom = new JSDOM("", { url: "http://localhost" });
-	setGlobalDom(currentDom);
+	currentWindow = new Window({ url: "http://localhost" });
+	setGlobalDom(currentWindow);
 	ensureSessionsInitialized();
 });
 
 afterEach(() => {
-	currentDom?.window.close();
-	currentDom = null;
+	currentWindow?.close();
+	currentWindow = null;
 });
 
 function activeKey(suffix: string): string {
