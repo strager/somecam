@@ -28,6 +28,8 @@ const depthCheckFollowUp = ref("");
 const depthCheckShown = ref(false);
 const pendingInferResult = ref<Map<string, string> | null>(null);
 const activeTextarea = ref<InstanceType<typeof ExploreTextarea> | null>(null);
+const entryTextareas: (InstanceType<typeof ExploreTextarea> | null)[] = [];
+const freeformTextarea = ref<InstanceType<typeof ExploreTextarea> | null>(null);
 const freeformNote = ref("");
 const questionStartTimeMs = ref(performance.now());
 const submittedAnswerSnapshots = ref<Map<string, string>>(new Map());
@@ -366,10 +368,20 @@ function finishExploring(): void {
 	void router.push({ name: "explore", params: { sessionId } });
 }
 
-function onKeydown(event: KeyboardEvent): void {
-	if (event.key === "Enter" && event.shiftKey) {
-		event.preventDefault();
+function onKeydown(index: number | null, event: KeyboardEvent): void {
+	if (!(event.key === "Enter" && event.shiftKey)) return;
+	event.preventDefault();
+	if (index === editingEntryIndex.value) {
 		void submitAnswer();
+	} else if (index !== null) {
+		const next = entryTextareas[index + 1] ?? null;
+		if (next !== null) {
+			next.focus();
+		} else if (allAnswered.value) {
+			freeformTextarea.value?.focus();
+		}
+	} else {
+		finishExploring();
 	}
 }
 
@@ -454,6 +466,7 @@ onMounted(() => {
 				:id="`q-${entry.questionId}`"
 				:ref="
 					(el: any) => {
+						entryTextareas[index] = el;
 						if (index === editingEntryIndex) activeTextarea = el;
 					}
 				"
@@ -463,7 +476,7 @@ onMounted(() => {
 				:placeholder="index === editingEntryIndex ? 'Type your reflection here...' : ''"
 				@update:model-value="index === editingEntryIndex ? debouncedPersist() : onAnsweredEntryInput(entry)"
 				@blur="index === editingEntryIndex ? persistEntries() : onAnsweredEntryBlur(entry)"
-				@keydown="index === editingEntryIndex ? onKeydown($event) : undefined"
+				@keydown="onKeydown(index, $event)"
 			/>
 			<template v-if="index === editingEntryIndex">
 				<p v-if="depthCheckShown" class="depth-follow-up">
@@ -482,7 +495,7 @@ onMounted(() => {
 
 		<div v-if="allAnswered && !inferring && !depthCheckShown" class="card-hrule">
 			<label for="freeform-notes">Additional notes about this source of meaning</label>
-			<ExploreTextarea id="freeform-notes" v-model="freeformNote" :rows="5" placeholder="Any other thoughts you'd like to capture (optional)" @update:model-value="debouncedFreeformPersist" @blur="persistFreeform()" />
+			<ExploreTextarea id="freeform-notes" ref="freeformTextarea" v-model="freeformNote" :rows="5" placeholder="Any other thoughts you'd like to capture (optional)" @update:model-value="debouncedFreeformPersist" @blur="persistFreeform()" @keydown="onKeydown(null, $event)" />
 		</div>
 
 		<AppButton variant="secondary" class="finish-btn" @click="finishExploring">Finish exploring</AppButton>
