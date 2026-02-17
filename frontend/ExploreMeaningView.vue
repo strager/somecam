@@ -9,7 +9,6 @@ import ExploreTextarea from "./ExploreTextarea.vue";
 import { useStringParam } from "./route-utils.ts";
 import type { ExploreEntryFull } from "./store.ts";
 import { loadChosenCardIds, loadExploreDataFull, loadFreeformNotes, requestStoragePersistence, saveExploreData, saveFreeformNotes } from "./store.ts";
-import type { ExploreQuestion } from "../shared/explore-questions.ts";
 import { EXPLORE_QUESTIONS } from "../shared/explore-questions.ts";
 import type { MeaningCard } from "../shared/meaning-cards.ts";
 import { MEANING_CARDS } from "../shared/meaning-cards.ts";
@@ -50,46 +49,7 @@ const editingEntryIndex = computed(() => {
 	return idx < entries.value.length ? idx : -1;
 });
 
-const currentAnswer = computed({
-	get: () => {
-		const idx = editingEntryIndex.value;
-		return idx >= 0 ? entries.value[idx].userAnswer : "";
-	},
-	set: (val: string) => {
-		const idx = editingEntryIndex.value;
-		if (idx >= 0) {
-			entries.value[idx].userAnswer = val;
-		}
-	},
-});
-
-const activeQuestion = computed<ExploreQuestion | undefined>(() => {
-	const idx = activeIndex.value;
-	if (idx >= entries.value.length) return undefined;
-	return questionsById.get(entries.value[idx].questionId);
-});
-
-const displayedQuestion = computed<ExploreQuestion | undefined>(() => {
-	if (activeQuestion.value !== undefined) return activeQuestion.value;
-	if (!depthCheckShown.value) return undefined;
-	const last = entries.value.at(-1);
-	if (last === undefined) return undefined;
-	return questionsById.get(last.questionId);
-});
-
-const answeredEntries = computed(() => {
-	const submitted = entries.value.filter((e) => e.submitted);
-	if (depthCheckShown.value && submitted.length > 0) {
-		return submitted.slice(0, -1);
-	}
-	return submitted;
-});
-
-const activeEntryPrefilled = computed(() => {
-	const idx = activeIndex.value;
-	if (idx >= entries.value.length) return false;
-	return entries.value[idx].prefilledAnswer !== "";
-});
+const prefilledQuestionIds = ref<Set<string>>(new Set());
 
 const allAnswered = computed(() => {
 	return entries.value.length === EXPLORE_QUESTIONS.length && entries.value.every((e) => e.submitted);
@@ -231,7 +191,7 @@ async function submitAnswer(): Promise<void> {
 	const idx = activeIndex.value;
 	if (idx >= entries.value.length) return;
 
-	const answerText = currentAnswer.value.trim();
+	const answerText = entries.value[idx].userAnswer.trim();
 	if (answerText === "") return;
 
 	const questionId = entries.value[idx].questionId;
@@ -260,6 +220,7 @@ async function submitAnswer(): Promise<void> {
 
 	entries.value[idx].userAnswer = answerText;
 	entries.value[idx].submitted = true;
+	prefilledQuestionIds.value.delete(questionId);
 	trackSubmittedSnapshot(questionId, answerText);
 	persistEntries();
 
@@ -350,6 +311,9 @@ function applyInferAndAdvance(inferredMap: Map<string, string>, remaining: strin
 		guardrailText: "",
 		submittedAfterGuardrail: false,
 	});
+	if (nextPrefill !== "") {
+		prefilledQuestionIds.value.add(nextQuestionId);
+	}
 	persistEntries();
 	markQuestionStartNow();
 }
@@ -449,8 +413,11 @@ onMounted(() => {
 			const idx = activeIndex.value;
 			if (idx < entries.value.length) {
 				const entry = entries.value[idx];
-				if (entry.userAnswer === "" && entry.prefilledAnswer !== "") {
-					entry.userAnswer = entry.prefilledAnswer;
+				if (entry.prefilledAnswer !== "") {
+					prefilledQuestionIds.value.add(entry.questionId);
+					if (entry.userAnswer === "") {
+						entry.userAnswer = entry.prefilledAnswer;
+					}
 				}
 				markQuestionStartNow();
 			}
@@ -477,32 +444,40 @@ onMounted(() => {
 			</div>
 		</header>
 
-		<div v-for="entry in answeredEntries" :key="entry.questionId" class="card-hrule">
+		<div v-for="(entry, index) in entries" :key="entry.questionId" class="card-hrule">
 			<label :for="`q-${entry.questionId}`"
 				><q>{{ card.description }}</q
 				><br />{{ questionsById.get(entry.questionId)?.text }}</label
 			>
-			<ExploreTextarea :id="`q-${entry.questionId}`" v-model="entry.userAnswer" variant="answered" :rows="3" @update:model-value="onAnsweredEntryInput(entry)" @blur="onAnsweredEntryBlur(entry)" />
+			<p v-if="prefilledQuestionIds.has(entry.questionId)" class="prefill-hint"><em>This answer was pre-filled based on your previous responses. Feel free to edit it.</em></p>
+			<ExploreTextarea
+				:id="`q-${entry.questionId}`"
+				:ref="
+					(el: any) => {
+						if (index === editingEntryIndex) activeTextarea = el;
+					}
+				"
+				v-model="entry.userAnswer"
+				:variant="index === editingEntryIndex ? undefined : 'answered'"
+				:rows="index === editingEntryIndex ? 5 : 3"
+				:placeholder="index === editingEntryIndex ? 'Type your reflection here...' : ''"
+				@update:model-value="index === editingEntryIndex ? debouncedPersist() : onAnsweredEntryInput(entry)"
+				@blur="index === editingEntryIndex ? persistEntries() : onAnsweredEntryBlur(entry)"
+				@keydown="index === editingEntryIndex ? onKeydown($event) : undefined"
+			/>
+			<template v-if="index === editingEntryIndex">
+				<p v-if="depthCheckShown" class="depth-follow-up">
+					<em>{{ depthCheckFollowUp }}</em>
+				</p>
+				<AppButton variant="primary" class="submit-btn" :disabled="!depthCheckShown && entry.userAnswer.trim() === ''" @click="submitAnswer">Next</AppButton>
+				<p v-if="depthCheckShown" class="hint">Press Next to continue as-is, or edit your answer above</p>
+				<p v-else class="hint">Shift + Enter to submit</p>
+			</template>
 		</div>
 
 		<div v-if="inferring" class="inferring-indicator">
 			<span class="spinner"></span>
 			<span>Thinking about your next question...</span>
-		</div>
-
-		<div v-else-if="displayedQuestion && (!allAnswered || depthCheckShown)" class="card-hrule">
-			<label for="active-question"
-				><q>{{ card.description }}</q
-				><br />{{ displayedQuestion.text }}</label
-			>
-			<p v-if="activeEntryPrefilled" class="prefill-hint"><em>This answer was pre-filled based on your previous responses. Feel free to edit it.</em></p>
-			<ExploreTextarea id="active-question" ref="activeTextarea" v-model="currentAnswer" :rows="5" placeholder="Type your reflection here..." @update:model-value="debouncedPersist" @blur="persistEntries()" @keydown="onKeydown" />
-			<p v-if="depthCheckShown" class="depth-follow-up">
-				<em>{{ depthCheckFollowUp }}</em>
-			</p>
-			<AppButton variant="primary" class="submit-btn" :disabled="!depthCheckShown && currentAnswer.trim() === ''" @click="submitAnswer">Next</AppButton>
-			<p v-if="depthCheckShown" class="hint">Press Next to continue as-is, or edit your answer above</p>
-			<p v-else class="hint">Shift + Enter to submit</p>
 		</div>
 
 		<div v-if="allAnswered && !inferring && !depthCheckShown" class="card-hrule">
