@@ -26,6 +26,7 @@ const entries = ref<ExploreEntryFull[]>([]);
 const inferring = ref(false);
 const depthCheckFollowUp = ref("");
 const depthCheckShown = ref(false);
+const awaitingGuardrail = ref(false);
 const pendingInferResult = ref<Map<string, string> | null>(null);
 const activeTextarea = ref<InstanceType<typeof ExploreTextarea> | null>(null);
 const entryTextareas: (InstanceType<typeof ExploreTextarea> | null)[] = [];
@@ -180,6 +181,8 @@ function acceptGuardrail(): void {
 }
 
 async function submitAnswer(): Promise<void> {
+	if (awaitingGuardrail.value) return;
+
 	const focusedAtStart = document.activeElement;
 	function shouldAutoFocus(): boolean {
 		const current = document.activeElement;
@@ -255,11 +258,16 @@ async function submitAnswer(): Promise<void> {
 
 	inferring.value = remaining.length > 0;
 
+	awaitingGuardrail.value = true;
 	const depthResult = await fetchAnswerDepthCheck({
 		cardId,
 		questionId,
 		answer: answerText,
-	}).catch(() => ({ sufficient: true, followUpQuestion: "" }));
+	})
+		.catch(() => ({ sufficient: true, followUpQuestion: "" }))
+		.finally(() => {
+			awaitingGuardrail.value = false;
+		});
 	capture("depth_check_triggered", {
 		session_id: sessionId,
 		card_id: cardId,
@@ -506,7 +514,7 @@ onMounted(() => {
 				<p v-if="depthCheckShown" class="depth-follow-up">
 					<em>{{ depthCheckFollowUp }}</em>
 				</p>
-				<AppButton variant="primary" class="submit-btn" :disabled="!depthCheckShown && entry.userAnswer.trim() === ''" @click="submitAnswer">Next</AppButton>
+				<AppButton variant="primary" class="submit-btn" :disabled="awaitingGuardrail || (!depthCheckShown && entry.userAnswer.trim() === '')" @click="submitAnswer">Next</AppButton>
 				<p v-if="depthCheckShown" class="hint">Press Next to continue as-is, or edit your answer above</p>
 				<p v-else class="hint">Shift + Enter to submit</p>
 			</template>
@@ -516,8 +524,12 @@ onMounted(() => {
 			<span class="spinner"></span>
 			<span>Thinking about your next question...</span>
 		</div>
+		<div v-else-if="awaitingGuardrail" class="inferring-indicator">
+			<span class="spinner"></span>
+			<span>Checking your answer...</span>
+		</div>
 
-		<div v-if="allAnswered && !inferring && !depthCheckShown" class="card-hrule">
+		<div v-if="allAnswered && !inferring && !depthCheckShown && !awaitingGuardrail" class="card-hrule">
 			<label for="freeform-notes">Additional notes about this source of meaning</label>
 			<ExploreTextarea id="freeform-notes" ref="freeformTextarea" v-model="freeformNote" :rows="5" placeholder="Any other thoughts you'd like to capture (optional)" @update:model-value="debouncedFreeformPersist" @blur="persistFreeform()" @keydown="onKeydown(null, $event)" />
 		</div>
