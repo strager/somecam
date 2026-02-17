@@ -1,6 +1,7 @@
-import express, { type Request, type Router } from "express";
+import express, { type Router } from "express";
 
 import { ANALYTICS_PROXY_TOKEN } from "../shared/analytics-config.ts";
+import { firstHeaderValue, isAllowedOrigin, requestHost, requestProtocol, shouldCheckOrigin } from "./origin-check.ts";
 
 const POSTHOG_API_HOST = "us.i.posthog.com";
 const POSTHOG_ASSET_HOST = "us-assets.i.posthog.com";
@@ -11,24 +12,6 @@ const ALLOWED_RESPONSE_HEADERS = new Set(["cache-control", "content-length", "co
 
 const ALLOWED_POST_PATHS = new Set(["/batch", "/batch/", "/capture", "/capture/", "/decide", "/decide/", "/e", "/e/", "/flags", "/flags/", "/s", "/s/"]);
 const ALLOWED_GET_PATHS = new Set(["/flags", "/flags/"]);
-
-function firstHeaderValue(value: string | string[] | undefined): string | undefined {
-	if (Array.isArray(value)) {
-		return value[0];
-	}
-	return value;
-}
-
-function firstCommaSeparatedValue(value: string | undefined): string | undefined {
-	if (value === undefined) {
-		return undefined;
-	}
-	const first = value
-		.split(",")
-		.map((part) => part.trim())
-		.find((part) => part.length > 0);
-	return first;
-}
 
 export function resolvePosthogHost(pathname: string): string {
 	return pathname.startsWith("/static/") || pathname.startsWith("/array/") ? POSTHOG_ASSET_HOST : POSTHOG_API_HOST;
@@ -45,72 +28,6 @@ export function isAllowedEndpoint(method: string, pathname: string): boolean {
 		return ALLOWED_GET_PATHS.has(pathname);
 	}
 	return false;
-}
-
-export function requestHost(req: Request): string | undefined {
-	const forwardedHost = firstCommaSeparatedValue(firstHeaderValue(req.headers["x-forwarded-host"]));
-	if (forwardedHost !== undefined && forwardedHost.length > 0) {
-		return forwardedHost;
-	}
-	const host = firstHeaderValue(req.headers.host);
-	if (host === undefined || host.length === 0) {
-		return undefined;
-	}
-	return host;
-}
-
-export function requestProtocol(req: Request): "http" | "https" {
-	const forwardedProto = firstCommaSeparatedValue(firstHeaderValue(req.headers["x-forwarded-proto"]));
-	if (forwardedProto === "https" || forwardedProto === "http") {
-		return forwardedProto;
-	}
-	return req.protocol === "https" ? "https" : "http";
-}
-
-export function expectedOrigin(req: Request): string | undefined {
-	const host = requestHost(req);
-	if (host === undefined) {
-		return undefined;
-	}
-	return `${requestProtocol(req)}://${host}`;
-}
-
-export function originFromUrlHeader(value: string | string[] | undefined): string | undefined {
-	const raw = firstHeaderValue(value);
-	if (raw === undefined || raw.length === 0 || raw === "null") {
-		return undefined;
-	}
-	try {
-		return new URL(raw).origin;
-	} catch {
-		return undefined;
-	}
-}
-
-export function isAllowedOrigin(req: Request): boolean {
-	const expected = expectedOrigin(req);
-	if (expected === undefined) {
-		return false;
-	}
-
-	const origin = originFromUrlHeader(req.headers.origin);
-	if (origin !== undefined) {
-		return origin === expected;
-	}
-
-	const refererOrigin = originFromUrlHeader(req.headers.referer);
-	if (refererOrigin !== undefined) {
-		return refererOrigin === expected;
-	}
-
-	return false;
-}
-
-export function shouldCheckOrigin(method: string, pathname: string): boolean {
-	if (pathname.startsWith("/static/")) {
-		return false;
-	}
-	return method !== "GET" && method !== "HEAD";
 }
 
 export function copyRequestHeaders(headers: Record<string, string | string[] | undefined>): Headers {
@@ -199,6 +116,7 @@ export function sanitizeResponseHeaders(headers: Headers): Headers {
 export function createAnalyticsHandler(): Router {
 	const router = express.Router();
 	const apiKey = process.env.POSTHOG_KEY;
+	const configuredOrigin = process.env.ORIGIN;
 
 	if (apiKey === undefined || apiKey === "") {
 		let warned = false;
@@ -223,7 +141,7 @@ export function createAnalyticsHandler(): Router {
 				return;
 			}
 
-			if (shouldCheckOrigin(method, pathname) && !isAllowedOrigin(req)) {
+			if (shouldCheckOrigin(method) && !isAllowedOrigin(req, configuredOrigin)) {
 				res.status(403).end();
 				return;
 			}

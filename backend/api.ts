@@ -4,6 +4,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import type { AppConfig } from "./config.ts";
+import { isAllowedOrigin, shouldCheckOrigin } from "./origin-check.ts";
 import { callDocRaptor, renderReportHtml } from "./pdf-report.ts";
 import { ChallengeError, MAX_PDF_DOWNLOADS_PER_DAY, type RateLimiter } from "./rate-limit.ts";
 import { createChatCompletion } from "./xai-client.ts";
@@ -689,8 +690,23 @@ export async function createApiMiddleware(config?: AppConfig, limiter?: RateLimi
 
 	validateBudgetCosts();
 
+	const configuredOrigin = process.env.ORIGIN;
+
 	return async (req: ExpressRequest, res: Response, next): Promise<void> => {
 		try {
+			if (shouldCheckOrigin(req.method) && !isAllowedOrigin(req, configuredOrigin)) {
+				res
+					.status(403)
+					.type("application/problem+json")
+					.send(
+						JSON.stringify({
+							...createProblemDetails(403, "Forbidden", "Origin not allowed."),
+							code: "origin_not_allowed",
+						}),
+					);
+				return;
+			}
+
 			const result: unknown = await api.handleRequest(toOpenApiRequest(req), req, res);
 			if (res.headersSent) {
 				return;

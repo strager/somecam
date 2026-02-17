@@ -7,6 +7,9 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from
 
 import { createAnalyticsHandler } from "./posthog-proxy.ts";
 
+const TEST_ORIGIN = "http://test.local";
+process.env.ORIGIN = TEST_ORIGIN;
+
 let lastUpstreamRequest: Request | undefined;
 
 const mswServer = setupServer(
@@ -102,8 +105,7 @@ describe("posthog proxy integration", () => {
 		const res = await fetch(`${baseUrl}/capture`, {
 			method: "POST",
 			headers: {
-				host: "127.0.0.1",
-				origin: baseUrl,
+				origin: TEST_ORIGIN,
 				"content-type": "application/json",
 			},
 			body: JSON.stringify({ event: "test" }),
@@ -122,7 +124,6 @@ describe("posthog proxy integration", () => {
 		const res = await fetch(`${baseUrl}/capture`, {
 			method: "POST",
 			headers: {
-				host: "127.0.0.1",
 				origin: "http://evil.example.com",
 				"content-type": "application/json",
 			},
@@ -188,7 +189,7 @@ describe("posthog proxy integration", () => {
 		const res = await fetch(`${baseUrl}/static/array.js`, {
 			method: "POST",
 			headers: {
-				origin: baseUrl,
+				origin: TEST_ORIGIN,
 			},
 		});
 
@@ -226,7 +227,7 @@ describe("posthog proxy integration", () => {
 		const res = await fetch(`${baseUrl}/capture`, {
 			method: "POST",
 			headers: {
-				origin: baseUrl,
+				origin: TEST_ORIGIN,
 				"content-type": "application/json",
 			},
 			body,
@@ -248,7 +249,7 @@ describe("posthog proxy integration", () => {
 		const res = await fetch(`${baseUrl}/capture`, {
 			method: "POST",
 			headers: {
-				origin: baseUrl,
+				origin: TEST_ORIGIN,
 				"content-type": "application/json",
 			},
 			body: JSON.stringify({ event: "test" }),
@@ -266,7 +267,7 @@ describe("posthog proxy integration", () => {
 		const res = await fetch(`${baseUrl}/e/`, {
 			method: "POST",
 			headers: {
-				origin: baseUrl,
+				origin: TEST_ORIGIN,
 				"content-type": "application/json",
 			},
 			body,
@@ -287,7 +288,7 @@ describe("posthog proxy integration", () => {
 		const res = await fetch(`${baseUrl}/flags/`, {
 			method: "POST",
 			headers: {
-				origin: baseUrl,
+				origin: TEST_ORIGIN,
 				"content-type": "application/json",
 			},
 			body,
@@ -305,7 +306,7 @@ describe("posthog proxy integration", () => {
 		const res = await fetch(`${baseUrl}/flags/`, {
 			method: "POST",
 			headers: {
-				origin: baseUrl,
+				origin: TEST_ORIGIN,
 				"content-type": "application/json",
 			},
 			body,
@@ -321,7 +322,7 @@ describe("posthog proxy integration", () => {
 		const res = await fetch(`${baseUrl}/e/`, {
 			method: "POST",
 			headers: {
-				origin: baseUrl,
+				origin: TEST_ORIGIN,
 				"content-type": "text/plain",
 			},
 			body: "not json",
@@ -338,13 +339,13 @@ describe("posthog proxy integration", () => {
 		expect(lastUpstreamRequest).toBeDefined();
 	});
 
-	it("uses x-forwarded-host and x-forwarded-proto for origin check", async () => {
+	it("forwards x-forwarded-host and x-forwarded-proto to upstream", async () => {
 		const res = await fetch(`${baseUrl}/capture`, {
 			method: "POST",
 			headers: {
 				"x-forwarded-host": "public.example.com",
 				"x-forwarded-proto": "https",
-				origin: "https://public.example.com",
+				origin: TEST_ORIGIN,
 				"content-type": "application/json",
 			},
 			body: JSON.stringify({ event: "test" }),
@@ -352,5 +353,7 @@ describe("posthog proxy integration", () => {
 
 		expect(res.status).toBe(200);
 		expect(lastUpstreamRequest).toBeDefined();
+		expect(lastUpstreamRequest!.headers.get("x-forwarded-host")).toBe("public.example.com");
+		expect(lastUpstreamRequest!.headers.get("x-forwarded-proto")).toBe("https");
 	});
 });
