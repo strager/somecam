@@ -1,5 +1,6 @@
 import { EXPLORE_QUESTIONS } from "../shared/explore-questions.ts";
 import type { SwipeDirection } from "../shared/meaning-cards.ts";
+import { capture } from "./analytics.ts";
 
 const SESSIONS_KEY = "somecam-sessions";
 const ACTIVE_SESSION_KEY = "somecam-active-session";
@@ -15,16 +16,6 @@ export interface ImportProgressStats {
 	sessions: number;
 	finalSessionsAdded: number;
 	sessionsOverridden: number;
-}
-
-function captureAnalyticsEvent(event: string, properties?: Record<string, unknown>): void {
-	void import("./analytics.ts")
-		.then(({ capture }) => {
-			capture(event, properties);
-		})
-		.catch(() => {
-			// no-op: analytics should never break app behavior
-		});
 }
 
 function importErrorType(error: unknown): string {
@@ -715,7 +706,7 @@ export function importProgressData(json: string): ImportProgressStats {
 export function saveProgressFile(): void {
 	const sessions = loadSessionsMeta().length;
 	const json = exportProgressData();
-	captureAnalyticsEvent("sessions_exported", { sessions });
+	capture("sessions_exported", { sessions });
 	const blob = new Blob([json], { type: "application/json" });
 	const url = URL.createObjectURL(blob);
 	const a = document.createElement("a");
@@ -730,13 +721,13 @@ export function requestStoragePersistence(sessionId: string): void {
 		sessionStorage.setItem(PERSIST_REQUESTED_KEY, "1");
 		void navigator.storage.persist().then(
 			(granted) => {
-				captureAnalyticsEvent("storage_persistence_result", {
+				capture("storage_persistence_result", {
 					session_id: sessionId,
 					granted,
 				});
 			},
 			() => {
-				captureAnalyticsEvent("storage_persistence_result", {
+				capture("storage_persistence_result", {
 					session_id: sessionId,
 					granted: false,
 				});
@@ -763,7 +754,7 @@ export function loadProgressFile(): Promise<void> {
 		input.addEventListener("change", () => {
 			const file = input.files?.[0];
 			if (file === undefined) {
-				captureAnalyticsEvent("sessions_import_cancelled");
+				capture("sessions_import_cancelled");
 				resolve();
 				return;
 			}
@@ -771,19 +762,19 @@ export function loadProgressFile(): Promise<void> {
 				(text) => {
 					try {
 						const stats = importProgressData(text);
-						captureAnalyticsEvent("sessions_imported", {
+						capture("sessions_imported", {
 							sessions: stats.sessions,
 							final_sessions_added: stats.finalSessionsAdded,
 							sessions_overridden: stats.sessionsOverridden,
 						});
 						resolve();
 					} catch (error) {
-						captureAnalyticsEvent("sessions_import_failed", { error_type: importErrorType(error) });
+						capture("sessions_import_failed", { error_type: importErrorType(error) });
 						reject(error instanceof Error ? error : new Error(String(error)));
 					}
 				},
 				(error: unknown) => {
-					captureAnalyticsEvent("sessions_import_failed", { error_type: "file_read_error" });
+					capture("sessions_import_failed", { error_type: "file_read_error" });
 					reject(error instanceof Error ? error : new Error(String(error)));
 				},
 			);
