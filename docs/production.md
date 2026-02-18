@@ -17,6 +17,17 @@ The playbook builds the frontend locally (`npm run build`), rsyncs the
 necessary files to the server, installs production dependencies, and
 restarts the service if anything changed.
 
+## Running production mode locally
+
+```sh
+npm ci
+npm run build
+npm ci --omit=dev  # Optional.
+NODE_ENV=production PORT=3011 node --env-file-if-exists=.env.prod backend/main.ts
+```
+
+Then open <http://localhost:3011/>.
+
 ## Logs
 
 SSH into the server and use `journalctl`:
