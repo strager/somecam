@@ -10,10 +10,8 @@ import FindMeaningManualView from "./FindMeaningManualView.vue";
 import FindMeaningPrioritizeView from "./FindMeaningPrioritizeView.vue";
 import FindMeaningView from "./FindMeaningView.vue";
 import HomeView from "./HomeView.vue";
-import LlmTestView from "./LlmTestView.vue";
 import PrivacyView from "./PrivacyView.vue";
 import ReportView from "./ReportView.vue";
-import StyleGuideView from "./StyleGuideView.vue";
 
 const router = createRouter({
 	history: createWebHistory(),
@@ -67,12 +65,12 @@ const router = createRouter({
 		{
 			path: "/llm-test",
 			name: "llmTest",
-			component: LlmTestView,
+			component: () => import("./LlmTestView.vue"),
 		},
 		{
 			path: "/style-guide",
 			name: "styleGuide",
-			component: StyleGuideView,
+			component: () => import("./StyleGuideView.vue"),
 		},
 	],
 });
