@@ -68,24 +68,62 @@ localStorage and included in the downloadable report above the five Q&A blocks.
 The user can leave the field empty and click **Finish exploring** to return to
 the sources-of-meaning overview.
 
-## Answer depth check
+## Answer reflection (guardrail and thought bubble)
 
 After the user submits an answer, the app fires two requests in parallel: the
-existing infer-answers call and a new **check-answer-depth** call. The depth
-check asks an LLM whether the answer shows personal engagement rather than a
-dismissive or throwaway response. If the answer is clearly low-effort, a
-follow-up question is displayed inline — styled in amber to
-distinguish it from the regular green questions — nudging the user toward deeper
-reflection.
+existing infer-answers call and a **reflect-on-answer** call. The reflection
+endpoint returns one of three outcomes:
 
-The user can edit their answer in response to the follow-up, or simply press
-**Next** again to skip the guardrail and continue to the next question. The
-guardrail never blocks progress.
+- **guardrail** — the answer is dismissive, vague, or dodges the question.
+- **thought bubble** — the answer is substantive, and the LLM has a Socratic
+  follow-up question that might deepen the user's thinking.
+- **none** — the answer is substantive and no follow-up is warranted.
 
-If the depth-check request fails (network error, API error, unparseable
+### When "none" is returned
+
+The app advances to the next question immediately (or shows a pre-filled
+question from the infer-answers call). No follow-up is displayed.
+
+### When a guardrail is returned
+
+A follow-up question is displayed inline, styled in amber to distinguish it
+from regular questions. The guardrail never blocks progress.
+
+If the user edits their answer and presses **Next**, the guardrail disappears
+and the app fires the reflect-on-answer call a second time. This second call
+can return a thought bubble or none, but never a second guardrail for the same
+question.
+
+If the user presses **Next** without editing their answer, the guardrail
+disappears and the app advances to the next question. No second
+reflect-on-answer call is made.
+
+### When a thought bubble is returned
+
+A follow-up question is displayed as a thought bubble — visually distinct from
+both the amber guardrail and the regular green questions. The thought bubble is
+a Socratic prompt: it references something the user wrote and invites them to
+think further (e.g. "You mentioned routine — what happens on days when that
+breaks?").
+
+The thought bubble is static once shown. The user can edit their answer in
+response, or ignore it. Pressing **Next** dismisses the thought bubble and
+advances to the next question. No further reflect-on-answer call is made after
+a thought bubble.
+
+### Maximum presses of Next per question
+
+The most **Next** presses for a single question is three: once to submit the
+answer (triggering a guardrail), once to resubmit after editing (triggering a
+thought bubble), and once to advance. In the common case the user presses
+**Next** once or twice.
+
+### Failure handling
+
+If the reflect-on-answer request fails (network error, API error, unparseable
 response), the app fails open: it treats the answer as sufficient and advances
-normally. This ensures the depth check is purely additive and never degrades the
-core explore experience.
+normally. This ensures the reflection step is purely additive and never
+degrades the core explore experience.
 
 ## Using "Stop Exploring" for early exit
 
