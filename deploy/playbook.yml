@@ -73,6 +73,8 @@
       ansible.builtin.command:
         cmd: "{{ node_dir }}/bin/npm ci --omit=dev"
         chdir: /home/somecam/app
+      environment:
+        PATH: "{{ node_dir }}/bin:{{ ansible_env.PATH }}"
       become: true
       become_user: somecam
       notify: Restart somecam
