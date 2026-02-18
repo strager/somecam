@@ -358,7 +358,7 @@ label {
 	font-weight: 400;
 }
 
-input,
+input:not([type="checkbox"]):not([type="radio"]),
 textarea {
 	width: 100%;
 	font-family: var(--font-body);
@@ -375,13 +375,13 @@ textarea {
 		box-shadow 0.08s ease;
 }
 
-input:focus,
+input:not([type="checkbox"]):not([type="radio"]):focus,
 textarea:focus {
 	border-bottom-color: var(--color-green-600);
 	box-shadow: inset 1px 0 0 0 var(--color-green-600);
 }
 
-input::placeholder,
+input:not([type="checkbox"]):not([type="radio"])::placeholder,
 textarea::placeholder {
 	color: var(--color-gray-400);
 	font-style: italic;
@@ -403,7 +403,7 @@ textarea {
 	box-shadow: inset 1px 0 0 0 var(--color-error);
 }
 
-input:disabled,
+input:not([type="checkbox"]):not([type="radio"]):disabled,
 textarea:disabled {
 	color: var(--color-gray-400);
 	cursor: not-allowed;

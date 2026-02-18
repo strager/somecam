@@ -23,7 +23,8 @@ defineProps<{
 		<section class="summary-section">
 			<h2>What is meaningful to me?</h2>
 			<div v-for="report in reports" :key="report.card.id" class="report-card">
-				<h4>{{ report.card.description }}</h4>
+				<h4>{{ report.card.source }}</h4>
+				<p class="summary-statements">{{ report.selectedStatements.length > 0 ? report.selectedStatements.join("; ") : report.card.description }}</p>
 				<p v-if="report.freeformSummary" class="freeform-summary">{{ report.freeformSummary }}</p>
 				<ul class="summary-list">
 					<template v-for="q in report.questions" :key="q.topic">
@@ -37,11 +38,18 @@ defineProps<{
 		<section class="detail-section">
 			<h2>Self reflections</h2>
 			<div v-for="report in reports" :key="report.card.id" class="report-card">
-				<h3>
-					{{ report.card.description }} <span class="source-label">({{ report.card.source }})</span>
-				</h3>
+				<h3>{{ report.card.source }}</h3>
 				<div v-if="report.freeformNote" class="qa-block">
 					<p class="qa-freeform-answer">{{ report.freeformNote }}</p>
+				</div>
+				<div class="qa-block">
+					<h4 class="qa-topic">Statements that resonate</h4>
+					<ul v-if="report.selectedStatements.length > 0" class="statement-list">
+						<li v-for="s in report.selectedStatements" :key="s">{{ s }}</li>
+					</ul>
+					<ul v-else class="statement-list">
+						<li>{{ report.card.description }}</li>
+					</ul>
 				</div>
 				<div v-for="q in report.questions" :key="q.topic" class="qa-block">
 					<h4 class="qa-topic">{{ q.question }}</h4>
@@ -95,17 +103,19 @@ section h2 {
 	margin: 32px 0 16px;
 }
 
-.source-label {
-	font-weight: 400;
-	color: #555555;
-}
-
 .summary-list {
 	margin-bottom: 0;
 }
 
 .summary-list li {
 	margin: 4px 0;
+	font-size: 16px;
+	line-height: 1.5;
+	color: #333333;
+}
+
+.summary-statements {
+	margin: 4px 0 0;
 	font-size: 16px;
 	line-height: 1.5;
 	color: #333333;
@@ -139,6 +149,18 @@ h4 {
 	font-size: 13px;
 	font-style: italic;
 	color: #737373;
+}
+
+.statement-list {
+	margin: 4px 0 0;
+	padding-left: 20px;
+}
+
+.statement-list li {
+	margin: 4px 0;
+	font-size: 16px;
+	line-height: 1.5;
+	color: #333333;
 }
 
 .summary-section .report-card {

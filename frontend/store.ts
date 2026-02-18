@@ -7,7 +7,7 @@ const LLM_TEST_KEY = "somecam-llm-test";
 const PERSIST_REQUESTED_KEY = "somecam-persist-requested";
 const RATE_LIMIT_SESSION_KEY = "somecam-api-session-id";
 
-const SESSION_DATA_SUFFIXES = ["progress", "narrowdown", "chosen", "explore", "summaries", "freeform"] as const;
+const SESSION_DATA_SUFFIXES = ["progress", "narrowdown", "chosen", "explore", "summaries", "freeform", "statements"] as const;
 
 const DEFAULT_QUESTION_ID = EXPLORE_QUESTIONS[0]?.id ?? "";
 
@@ -75,6 +75,7 @@ export type ExploreData = Record<string, ExploreEntry[]>;
 export type ExploreDataFull = Record<string, ExploreEntryFull[]>;
 export type SummaryCache = Record<string, { answer: string; summary: string }>;
 export type FreeformNotes = Partial<Record<string, string>>;
+export type StatementSelections = Partial<Record<string, string[]>>;
 
 interface LlmTestRow {
 	questionId: string;
@@ -274,6 +275,9 @@ function summariesKey(sessionId: string): string {
 }
 function freeformKey(sessionId: string): string {
 	return sessionKey(sessionId, "freeform");
+}
+function statementsKey(sessionId: string): string {
+	return sessionKey(sessionId, "statements");
 }
 
 // --- Internal helpers ---
@@ -518,6 +522,24 @@ export function loadFreeformNotes(sessionId: string): FreeformNotes {
 
 export function saveFreeformNotes(sessionId: string, notes: FreeformNotes): void {
 	localStorage.setItem(freeformKey(sessionId), JSON.stringify(notes));
+	touchSession(sessionId);
+}
+
+function isStatementSelections(value: unknown): value is StatementSelections {
+	if (!isObjectRecord(value)) return false;
+	for (const v of Object.values(value)) {
+		if (!isStringArray(v)) return false;
+	}
+	return true;
+}
+
+export function loadStatementSelections(sessionId: string): StatementSelections {
+	const parsed = parseJsonFromStorage(statementsKey(sessionId));
+	return isStatementSelections(parsed) ? parsed : {};
+}
+
+export function saveStatementSelections(sessionId: string, selections: StatementSelections): void {
+	localStorage.setItem(statementsKey(sessionId), JSON.stringify(selections));
 	touchSession(sessionId);
 }
 

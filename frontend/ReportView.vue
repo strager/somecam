@@ -8,9 +8,10 @@ import { budgetedFetch } from "./api.ts";
 import type { CardReport, QuestionReport } from "../shared/report-types.ts";
 import { capture } from "./analytics.ts";
 import { useStringParam } from "./route-utils.ts";
-import { exportSessionData, loadChosenCardIds, loadExploreData, loadFreeformNotes, loadSummaryCache, lookupCachedSummary } from "./store.ts";
+import { exportSessionData, loadChosenCardIds, loadExploreData, loadFreeformNotes, loadStatementSelections, loadSummaryCache, lookupCachedSummary } from "./store.ts";
 import { EXPLORE_QUESTIONS } from "../shared/explore-questions.ts";
 import { MEANING_CARDS } from "../shared/meaning-cards.ts";
+import { MEANING_STATEMENTS } from "../shared/meaning-statements.ts";
 
 const router = useRouter();
 const sessionId = useStringParam("sessionId");
@@ -164,6 +165,8 @@ onMounted(() => {
 		const exploreData = loadExploreData(sessionId) ?? {};
 		const summaryCache = loadSummaryCache(sessionId);
 		const freeformNotes = loadFreeformNotes(sessionId);
+		const statementSelections = loadStatementSelections(sessionId);
+		const statementTextById = new Map(MEANING_STATEMENTS.map((s) => [s.id, s.statement]));
 
 		for (const cardId of cardIds) {
 			const card = cardsById.get(cardId);
@@ -188,7 +191,10 @@ onMounted(() => {
 			const freeformNote = freeformNotes[cardId] ?? "";
 			const freeformSummary = lookupCachedSummary(summaryCache, cardId, freeformNote) ?? "";
 
-			reports.value.push({ card, questions, freeformNote, freeformSummary });
+			const selectedIds = statementSelections[cardId] ?? [];
+			const selectedStatements = selectedIds.map((id) => statementTextById.get(id)).filter((text): text is string => text !== undefined);
+
+			reports.value.push({ card, questions, selectedStatements, freeformNote, freeformSummary });
 		}
 		capture("report_viewed", { session_id: sessionId });
 	} catch {

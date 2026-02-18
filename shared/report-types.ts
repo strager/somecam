@@ -13,6 +13,7 @@ export interface QuestionReport {
 export interface CardReport {
 	card: MeaningCard;
 	questions: QuestionReport[];
+	selectedStatements: string[];
 	freeformNote: string;
 	freeformSummary: string;
 }

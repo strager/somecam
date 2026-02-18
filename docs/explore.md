@@ -46,6 +46,17 @@ into any prior answer to revise it; changes are saved automatically when the
 textarea loses focus. After the fifth and final answer is submitted, the
 free-form notes field appears.
 
+## Selecting meaning statements
+
+After answering all five questions, a checklist of meaning statements related to
+the current source of meaning appears. These statements come from the Sources of
+Meaning and Meaning in Life Questionnaire. The user checks any statements that
+resonate with them and clicks **Next** to continue.
+
+Selections are saved to localStorage (as statement IDs) and included in the
+downloadable report. Statement text is resolved from the shared
+`MEANING_STATEMENTS` data at display time.
+
 ## Additional notes (free-form)
 
 Once all five questions have been answered, a free-form textarea labelled

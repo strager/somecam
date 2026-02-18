@@ -15,6 +15,7 @@ import type { ModuleNode, ViteDevServer } from "vite";
 import type { CardReport, QuestionReport } from "../shared/report-types.ts";
 import { EXPLORE_QUESTIONS } from "../shared/explore-questions.ts";
 import { MEANING_CARDS } from "../shared/meaning-cards.ts";
+import { MEANING_STATEMENTS } from "../shared/meaning-statements.ts";
 
 interface PdfEntryModule {
 	renderPdfHtml: (fontCss: string, componentCss: string, reports: CardReport[]) => Promise<string>;
@@ -181,6 +182,17 @@ export function assembleReportData(sessionExportJson: string): CardReport[] {
 		}
 	}
 
+	const statementsRaw: unknown = data.statements;
+	const statementSelections: Record<string, string[]> = {};
+	if (isRecord(statementsRaw)) {
+		for (const [cardId, ids] of Object.entries(statementsRaw)) {
+			if (Array.isArray(ids) && ids.every((id): id is string => typeof id === "string")) {
+				statementSelections[cardId] = ids;
+			}
+		}
+	}
+	const statementTextById = new Map(MEANING_STATEMENTS.map((s) => [s.id, s.statement]));
+
 	const cardsById = new Map(MEANING_CARDS.map((c) => [c.id, c]));
 	const reports: CardReport[] = [];
 
@@ -214,7 +226,10 @@ export function assembleReportData(sessionExportJson: string): CardReport[] {
 		const cachedFreeform = summaries.get(`${cardId}:freeform`);
 		const freeformSummary = cachedFreeform?.answer === freeformNote ? cachedFreeform.summary : "";
 
-		reports.push({ card, questions, freeformNote, freeformSummary });
+		const selectedIds = statementSelections[cardId] ?? [];
+		const selectedStatements = selectedIds.map((id) => statementTextById.get(id)).filter((text): text is string => text !== undefined);
+
+		reports.push({ card, questions, selectedStatements, freeformNote, freeformSummary });
 	}
 
 	return reports;

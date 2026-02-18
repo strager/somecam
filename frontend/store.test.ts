@@ -3,7 +3,7 @@
 import { Window } from "happy-dom";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { clearAllProgress, createSession, deleteSession, ensureSessionsInitialized, exportProgressData, formatSessionDate, getActiveSessionId, hasProgressData, importProgressData, listSessions, loadChosenCardIds, loadExploreData, loadExploreDataFull, loadFreeformNotes, loadLlmTestState, loadPrioritize, loadSummaryCache, loadSwipeProgress, removePrioritize, renameSession, saveChosenCardIds, saveExploreData, saveFreeformNotes, saveLlmTestState, savePrioritize, saveSummaryCache, saveSwipeProgress, switchSession } from "./store.ts";
+import { clearAllProgress, createSession, deleteSession, ensureSessionsInitialized, exportProgressData, formatSessionDate, getActiveSessionId, hasProgressData, importProgressData, listSessions, loadChosenCardIds, loadExploreData, loadExploreDataFull, loadFreeformNotes, loadLlmTestState, loadPrioritize, loadStatementSelections, loadSummaryCache, loadSwipeProgress, removePrioritize, renameSession, saveChosenCardIds, saveExploreData, saveFreeformNotes, saveLlmTestState, savePrioritize, saveSummaryCache, saveStatementSelections, saveSwipeProgress, switchSession } from "./store.ts";
 
 function sid(): string {
 	return getActiveSessionId();
@@ -730,6 +730,83 @@ describe("exportProgressData/importProgressData", () => {
 		expect(() => {
 			importProgressData(JSON.stringify({ "somecam-chosen": [] }));
 		}).toThrow(/version/);
+	});
+});
+
+describe("loadStatementSelections/saveStatementSelections", () => {
+	it("returns {} when no data", () => {
+		expect(loadStatementSelections(sid())).toEqual({});
+	});
+
+	it("returns {} for corrupt JSON", () => {
+		localStorage.setItem(activeKey("statements"), "{bad");
+		expect(loadStatementSelections(sid())).toEqual({});
+	});
+
+	it("returns {} for non-object JSON", () => {
+		localStorage.setItem(activeKey("statements"), JSON.stringify("not-object"));
+		expect(loadStatementSelections(sid())).toEqual({});
+	});
+
+	it("returns {} when values are not string arrays", () => {
+		localStorage.setItem(activeKey("statements"), JSON.stringify({ card1: [1, 2] }));
+		expect(loadStatementSelections(sid())).toEqual({});
+	});
+
+	it("round-trips saved selections", () => {
+		saveStatementSelections(sid(), { "self-knowledge": ["6", "34"], community: ["78"] });
+		expect(loadStatementSelections(sid())).toEqual({ "self-knowledge": ["6", "34"], community: ["78"] });
+	});
+
+	it("exportProgressData includes statements data", () => {
+		saveChosenCardIds(sid(), ["self-knowledge"]);
+		saveStatementSelections(sid(), { "self-knowledge": ["6", "34"] });
+
+		const exported = JSON.parse(exportProgressData());
+		expect(exported.sessions[0].data.statements).toEqual({ "self-knowledge": ["6", "34"] });
+	});
+
+	it("importProgressData restores statements data", () => {
+		const currentId = getActiveSessionId();
+		const v2Data = JSON.stringify({
+			version: "somecam-v2",
+			sessions: [
+				{
+					id: currentId,
+					name: "Test",
+					createdAt: new Date().toISOString(),
+					data: {
+						chosen: ["self-knowledge"],
+						statements: { "self-knowledge": ["6", "34"] },
+					},
+				},
+			],
+		});
+
+		importProgressData(v2Data);
+		expect(loadStatementSelections(sid())).toEqual({ "self-knowledge": ["6", "34"] });
+	});
+
+	it("importProgressData clears statements when not present in import", () => {
+		saveStatementSelections(sid(), { "self-knowledge": ["6"] });
+		const currentId = getActiveSessionId();
+
+		const v2Data = JSON.stringify({
+			version: "somecam-v2",
+			sessions: [
+				{
+					id: currentId,
+					name: "Test",
+					createdAt: new Date().toISOString(),
+					data: {
+						chosen: ["self-knowledge"],
+					},
+				},
+			],
+		});
+
+		importProgressData(v2Data);
+		expect(loadStatementSelections(sid())).toEqual({});
 	});
 });
 

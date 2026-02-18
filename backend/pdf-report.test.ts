@@ -101,6 +101,30 @@ describe("assembleReportData", () => {
 		expect(() => assembleReportData(makeSessionExport({}))).toThrow("Session has no chosen cards.");
 	});
 
+	it("includes selected statements in report", () => {
+		const json = makeSessionExport({
+			chosen: ["self-knowledge"],
+			explore: {
+				"self-knowledge": [{ questionId: "interpretation", userAnswer: "Understanding myself", prefilledAnswer: "", submitted: true }],
+			},
+			statements: {
+				"self-knowledge": ["6", "34"],
+			},
+		});
+
+		const reports = assembleReportData(json);
+		expect(reports[0].selectedStatements).toEqual(["To understand myself and my behaviour is important for me", "Viewing myself critically is important to me"]);
+	});
+
+	it("returns empty selectedStatements when statements data is missing", () => {
+		const json = makeSessionExport({
+			chosen: ["self-knowledge"],
+		});
+
+		const reports = assembleReportData(json);
+		expect(reports[0].selectedStatements).toEqual([]);
+	});
+
 	it("includes freeform summary when cached answer matches", () => {
 		const json = makeSessionExport({
 			chosen: ["self-knowledge"],

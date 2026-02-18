@@ -8,10 +8,11 @@ import { capture } from "./analytics.ts";
 import ExploreTextarea from "./ExploreTextarea.vue";
 import { useStringParam } from "./route-utils.ts";
 import type { ExploreEntryFull } from "./store.ts";
-import { loadChosenCardIds, loadExploreDataFull, loadFreeformNotes, requestStoragePersistence, saveExploreData, saveFreeformNotes } from "./store.ts";
+import { loadChosenCardIds, loadExploreDataFull, loadFreeformNotes, loadStatementSelections, requestStoragePersistence, saveExploreData, saveFreeformNotes, saveStatementSelections } from "./store.ts";
 import { EXPLORE_QUESTIONS } from "../shared/explore-questions.ts";
 import type { MeaningCard } from "../shared/meaning-cards.ts";
 import { MEANING_CARDS } from "../shared/meaning-cards.ts";
+import { MEANING_STATEMENTS } from "../shared/meaning-statements.ts";
 
 const router = useRouter();
 
@@ -32,6 +33,8 @@ const activeTextarea = ref<InstanceType<typeof ExploreTextarea> | null>(null);
 const entryTextareas: (InstanceType<typeof ExploreTextarea> | null)[] = [];
 const freeformTextarea = ref<InstanceType<typeof ExploreTextarea> | null>(null);
 const freeformNote = ref("");
+const selectedStatementIds = ref<Set<string>>(new Set());
+const statementsConfirmed = ref(false);
 const questionStartTimeMs = ref(performance.now());
 const submittedAnswerSnapshots = ref<Map<string, string>>(new Map());
 const editedAfterSubmit = ref<Set<string>>(new Set());
@@ -59,6 +62,8 @@ const allAnswered = computed(() => {
 });
 
 const submittedCount = computed(() => entries.value.filter((e) => e.submitted).length);
+
+const cardStatements = computed(() => MEANING_STATEMENTS.filter((s) => s.meaningId === cardId));
 
 function markQuestionStartNow(): void {
 	questionStartTimeMs.value = performance.now();
@@ -129,6 +134,33 @@ function debouncedFreeformPersist(): void {
 		freeformPersistTimer = undefined;
 		persistFreeform();
 	}, 300);
+}
+
+function persistStatements(): void {
+	const selections = loadStatementSelections(sessionId);
+	selections[cardId] = [...selectedStatementIds.value];
+	saveStatementSelections(sessionId, selections);
+}
+
+function toggleStatement(id: string): void {
+	if (selectedStatementIds.value.has(id)) {
+		selectedStatementIds.value.delete(id);
+	} else {
+		selectedStatementIds.value.add(id);
+	}
+	// Force reactivity by replacing the Set
+	selectedStatementIds.value = new Set(selectedStatementIds.value);
+	if (statementsConfirmed.value) {
+		persistStatements();
+	}
+}
+
+function confirmStatements(): void {
+	statementsConfirmed.value = true;
+	persistStatements();
+	void nextTick(() => {
+		freeformTextarea.value?.focus();
+	});
 }
 
 function maybeTrackExplorePhaseCompleted(): void {
@@ -380,6 +412,7 @@ function finishExploring(): void {
 	}
 	persistEntries();
 	persistFreeform();
+	persistStatements();
 	const noteLength = freeformNote.value.trim().length;
 	if (noteLength > 0) {
 		capture("freeform_notes_added", {
@@ -439,6 +472,11 @@ onMounted(() => {
 		card.value = foundCard;
 		entries.value = cardEntries;
 		freeformNote.value = loadFreeformNotes(sessionId)[cardId] ?? "";
+		const savedSelections = loadStatementSelections(sessionId);
+		if (cardId in savedSelections) {
+			selectedStatementIds.value = new Set(savedSelections[cardId]);
+			statementsConfirmed.value = true;
+		}
 		submittedAnswerSnapshots.value = new Map(entries.value.filter((entry) => entry.submitted).map((entry) => [entry.questionId, entry.userAnswer]));
 
 		const lastEntry = entries.value[entries.value.length - 1];
@@ -530,6 +568,17 @@ onMounted(() => {
 		</div>
 
 		<div v-if="allAnswered && !inferring && !depthCheckShown && !awaitingGuardrail" class="card-hrule">
+			<h3 class="statements-heading">Which of these statements resonate with you?</h3>
+			<div class="statement-list">
+				<label v-for="s in cardStatements" :key="s.id" class="statement-row">
+					<input type="checkbox" :checked="selectedStatementIds.has(s.id)" class="statement-checkbox" @change="toggleStatement(s.id)" />
+					<span class="statement-text">{{ s.statement }}</span>
+				</label>
+			</div>
+			<AppButton v-if="!statementsConfirmed" variant="primary" class="submit-btn" @click="confirmStatements">Next</AppButton>
+		</div>
+
+		<div v-if="allAnswered && statementsConfirmed && !inferring && !depthCheckShown && !awaitingGuardrail" class="card-hrule">
 			<label for="freeform-notes">Additional notes about this source of meaning</label>
 			<ExploreTextarea id="freeform-notes" ref="freeformTextarea" v-model="freeformNote" :rows="5" placeholder="Any other thoughts you'd like to capture (optional)" @update:model-value="debouncedFreeformPersist" @blur="persistFreeform()" @keydown="onKeydown(null, $event)" />
 		</div>
@@ -622,6 +671,42 @@ label {
 	font-size: var(--text-sm);
 	color: var(--color-warning);
 	margin: 0 0 var(--space-2);
+}
+
+.statements-heading {
+	font-family: var(--font-heading);
+	font-size: var(--text-lg);
+	font-weight: 500;
+	color: var(--color-gray-800);
+	margin: 0 0 var(--space-4);
+}
+
+.statement-list {
+	display: flex;
+	flex-direction: column;
+	gap: 0.5rem;
+}
+
+.statement-row {
+	display: flex;
+	align-items: center;
+	gap: 0.75rem;
+	padding: 0.75rem 1rem;
+	background: var(--color-white);
+	cursor: pointer;
+	user-select: none;
+}
+
+.statement-checkbox {
+	width: 1.15rem;
+	height: 1.15rem;
+	flex-shrink: 0;
+	accent-color: var(--color-green-600);
+	cursor: pointer;
+}
+
+.statement-text {
+	font-size: 0.95rem;
 }
 
 .finish-btn {
