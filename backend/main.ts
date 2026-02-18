@@ -4,6 +4,7 @@ import url from "node:url";
 import express from "express";
 
 import { createApp } from "./app.ts";
+import { notifyReady } from "./systemd-notify.ts";
 
 const port = Number(process.env.PORT ?? "3011");
 const isProduction = process.env.NODE_ENV === "production";
@@ -38,6 +39,7 @@ async function main(): Promise<void> {
 	app.listen(port, () => {
 		const mode = isProduction ? "production" : "dev";
 		console.log(`SoMeCaM ${mode} server listening at http://localhost:${port.toString()}`);
+		void notifyReady();
 	});
 }
 
