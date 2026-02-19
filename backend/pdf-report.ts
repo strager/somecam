@@ -92,21 +92,16 @@ async function loadSsrModule(vite: unknown): Promise<{ module: PdfEntryModule; c
 interface FontSpec {
 	family: string;
 	file: string;
-	weight: number;
+	weight: string;
 	style: string;
 }
 
 const FONT_SPECS: FontSpec[] = [
-	{ family: "EB Garamond", file: "eb-garamond-400.woff2", weight: 400, style: "normal" },
-	{ family: "EB Garamond", file: "eb-garamond-500.woff2", weight: 500, style: "normal" },
-	{ family: "EB Garamond", file: "eb-garamond-600.woff2", weight: 600, style: "normal" },
-	{ family: "EB Garamond", file: "eb-garamond-700.woff2", weight: 700, style: "normal" },
-	{ family: "EB Garamond", file: "eb-garamond-400-italic.woff2", weight: 400, style: "italic" },
-	{ family: "EB Garamond", file: "eb-garamond-500-italic.woff2", weight: 500, style: "italic" },
-	{ family: "EB Garamond", file: "eb-garamond-600-italic.woff2", weight: 600, style: "italic" },
-	{ family: "PT Serif", file: "pt-serif-400.woff2", weight: 400, style: "normal" },
-	{ family: "PT Serif", file: "pt-serif-700.woff2", weight: 700, style: "normal" },
-	{ family: "PT Serif", file: "pt-serif-400-italic.woff2", weight: 400, style: "italic" },
+	{ family: "EB Garamond", file: "eb-garamond-variable.woff2", weight: "400 800", style: "normal" },
+	{ family: "EB Garamond", file: "eb-garamond-variable-italic.woff2", weight: "400 800", style: "italic" },
+	{ family: "PT Serif", file: "pt-serif-400.woff2", weight: "400", style: "normal" },
+	{ family: "PT Serif", file: "pt-serif-700.woff2", weight: "700", style: "normal" },
+	{ family: "PT Serif", file: "pt-serif-400-italic.woff2", weight: "400", style: "italic" },
 ];
 
 async function loadFontCss(): Promise<string> {
@@ -121,7 +116,7 @@ async function loadFontCss(): Promise<string> {
 		const filePath = path.join(fontsDir, spec.file);
 		const data = await fs.readFile(filePath);
 		const base64 = data.toString("base64");
-		declarations.push(`@font-face {\n` + `  font-family: "${spec.family}";\n` + `  font-style: ${spec.style};\n` + `  font-weight: ${spec.weight.toString()};\n` + `  src: url("data:font/woff2;base64,${base64}") format("woff2");\n` + `}`);
+		declarations.push(`@font-face {\n` + `  font-family: "${spec.family}";\n` + `  font-style: ${spec.style};\n` + `  font-weight: ${spec.weight};\n` + `  src: url("data:font/woff2;base64,${base64}") format("woff2");\n` + `}`);
 	}
 
 	cachedFontCss = declarations.join("\n");
