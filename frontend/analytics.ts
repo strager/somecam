@@ -1,6 +1,10 @@
 import type { Router } from "vue-router";
-import { posthog } from "posthog-js";
+import { PostHog } from "posthog-js-lite";
 import { ANALYTICS_PROXY_TOKEN } from "../shared/analytics-config.ts";
+
+const posthog = new PostHog(ANALYTICS_PROXY_TOKEN, {
+	host: "/api/a",
+});
 
 let initialized = false;
 
@@ -9,23 +13,24 @@ export function initAnalytics(router: Router): void {
 		return;
 	}
 
-	posthog.init(ANALYTICS_PROXY_TOKEN, {
-		api_host: "/api/a",
-		defaults: "2026-01-30",
-		capture_pageview: false, // We capture $pageview ourselves.
-		capture_pageleave: true,
-	});
 	Object.assign(window, { posthog });
+
+	document.addEventListener("visibilitychange", () => {
+		if (document.visibilityState === "hidden") {
+			capture("$pageleave");
+		}
+	});
 
 	router.afterEach((to) => {
 		const routeTemplate = to.matched.at(-1)?.path ?? to.path;
 		const sessionParam = to.params.sessionId;
 		const sessionId = typeof sessionParam === "string" ? sessionParam : undefined;
 
+		const routeName = typeof to.name === "string" ? to.name : undefined;
 		capture("$pageview", {
 			$current_url: window.location.href,
-			route_name: typeof to.name === "string" ? to.name : undefined,
 			route_template: routeTemplate,
+			...(routeName !== undefined ? { route_name: routeName } : {}),
 			...(sessionId !== undefined ? { session_id: sessionId } : {}),
 		});
 	});
@@ -33,7 +38,7 @@ export function initAnalytics(router: Router): void {
 	initialized = true;
 }
 
-export function capture(event: string, properties?: Record<string, unknown>): void {
+export function capture(event: string, properties?: Record<string, string | number | boolean>): void {
 	if (import.meta.env.MODE === "test") {
 		return;
 	}
