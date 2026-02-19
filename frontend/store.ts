@@ -60,6 +60,8 @@ export interface ExploreEntry {
 export interface ExploreEntryFull extends ExploreEntry {
 	guardrailText: string;
 	submittedAfterGuardrail: boolean;
+	thoughtBubbleText: string;
+	thoughtBubbleAcknowledged: boolean;
 }
 
 export type ExploreData = Record<string, ExploreEntry[]>;
@@ -320,12 +322,20 @@ function toExploreEntryFull(value: unknown): ExploreEntryFull | null {
 	const withOptional: ExploreEntry & {
 		guardrailText?: unknown;
 		submittedAfterGuardrail?: unknown;
+		thoughtBubbleText?: unknown;
+		thoughtBubbleAcknowledged?: unknown;
 	} = value;
 
 	if (withOptional.guardrailText !== undefined && typeof withOptional.guardrailText !== "string") {
 		return null;
 	}
 	if (withOptional.submittedAfterGuardrail !== undefined && typeof withOptional.submittedAfterGuardrail !== "boolean") {
+		return null;
+	}
+	if (withOptional.thoughtBubbleText !== undefined && typeof withOptional.thoughtBubbleText !== "string") {
+		return null;
+	}
+	if (withOptional.thoughtBubbleAcknowledged !== undefined && typeof withOptional.thoughtBubbleAcknowledged !== "boolean") {
 		return null;
 	}
 
@@ -336,6 +346,8 @@ function toExploreEntryFull(value: unknown): ExploreEntryFull | null {
 		submitted: withOptional.submitted,
 		guardrailText: withOptional.guardrailText ?? "",
 		submittedAfterGuardrail: withOptional.submittedAfterGuardrail ?? false,
+		thoughtBubbleText: withOptional.thoughtBubbleText ?? "",
+		thoughtBubbleAcknowledged: withOptional.thoughtBubbleAcknowledged ?? false,
 	};
 }
 

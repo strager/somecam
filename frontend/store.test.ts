@@ -291,6 +291,8 @@ describe("loadExploreDataFull", () => {
 					submitted: true,
 					guardrailText: "",
 					submittedAfterGuardrail: false,
+					thoughtBubbleText: "",
+					thoughtBubbleAcknowledged: false,
 				},
 			],
 		});
@@ -308,6 +310,8 @@ describe("loadExploreDataFull", () => {
 						submitted: true,
 						guardrailText: "Can you go deeper?",
 						submittedAfterGuardrail: true,
+						thoughtBubbleText: "What about X?",
+						thoughtBubbleAcknowledged: true,
 					},
 				],
 			}),
@@ -322,6 +326,8 @@ describe("loadExploreDataFull", () => {
 					submitted: true,
 					guardrailText: "Can you go deeper?",
 					submittedAfterGuardrail: true,
+					thoughtBubbleText: "What about X?",
+					thoughtBubbleAcknowledged: true,
 				},
 			],
 		});
@@ -356,6 +362,84 @@ describe("loadExploreDataFull", () => {
 						prefilledAnswer: "",
 						submitted: true,
 						submittedAfterGuardrail: "yes",
+					},
+				],
+			}),
+		);
+		expect(loadExploreDataFull(sid())).toBeNull();
+	});
+
+	it("preserves existing thoughtBubbleText", () => {
+		localStorage.setItem(
+			activeKey("explore"),
+			JSON.stringify({
+				"self-knowledge": [
+					{
+						questionId: "interpretation",
+						userAnswer: "answer",
+						prefilledAnswer: "",
+						submitted: true,
+						thoughtBubbleText: "What about your relationship with X?",
+					},
+				],
+			}),
+		);
+
+		const result = loadExploreDataFull(sid());
+		expect(result).not.toBeNull();
+		expect(result!["self-knowledge"][0].thoughtBubbleText).toBe("What about your relationship with X?");
+	});
+
+	it("preserves existing thoughtBubbleAcknowledged", () => {
+		localStorage.setItem(
+			activeKey("explore"),
+			JSON.stringify({
+				"self-knowledge": [
+					{
+						questionId: "interpretation",
+						userAnswer: "answer",
+						prefilledAnswer: "",
+						submitted: true,
+						thoughtBubbleAcknowledged: true,
+					},
+				],
+			}),
+		);
+
+		const result = loadExploreDataFull(sid());
+		expect(result).not.toBeNull();
+		expect(result!["self-knowledge"][0].thoughtBubbleAcknowledged).toBe(true);
+	});
+
+	it("returns null when thoughtBubbleText is not a string", () => {
+		localStorage.setItem(
+			activeKey("explore"),
+			JSON.stringify({
+				"self-knowledge": [
+					{
+						questionId: "interpretation",
+						userAnswer: "answer",
+						prefilledAnswer: "",
+						submitted: true,
+						thoughtBubbleText: 123,
+					},
+				],
+			}),
+		);
+		expect(loadExploreDataFull(sid())).toBeNull();
+	});
+
+	it("returns null when thoughtBubbleAcknowledged is not a boolean", () => {
+		localStorage.setItem(
+			activeKey("explore"),
+			JSON.stringify({
+				"self-knowledge": [
+					{
+						questionId: "interpretation",
+						userAnswer: "answer",
+						prefilledAnswer: "",
+						submitted: true,
+						thoughtBubbleAcknowledged: "yes",
 					},
 				],
 			}),

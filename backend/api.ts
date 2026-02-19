@@ -435,7 +435,7 @@ api.register({
 			};
 		}
 	},
-	postCheckAnswerDepth: async (context: Context, req: ExpressRequest): Promise<ApiResponse> => {
+	postReflectOnAnswer: async (context: Context, req: ExpressRequest): Promise<ApiResponse> => {
 		const budgetBlock = await checkBudget(context, req);
 		if (budgetBlock !== null) return budgetBlock;
 
@@ -443,27 +443,28 @@ api.register({
 			return {
 				statusCode: 500,
 				headers: problemJsonHeader,
-				body: createProblemDetails(500, "Internal Server Error", "AI depth check is not configured."),
+				body: createProblemDetails(500, "Internal Server Error", "AI reflection is not configured."),
 			};
 		}
 
-		const depthBody: unknown = context.request.requestBody;
-		if (typeof depthBody !== "object" || depthBody === null || !("cardId" in depthBody) || typeof depthBody.cardId !== "string" || !("questionId" in depthBody) || typeof depthBody.questionId !== "string" || !("answer" in depthBody) || typeof depthBody.answer !== "string") {
-			throw new Error("Invalid request body for postCheckAnswerDepth");
+		const reflectBody: unknown = context.request.requestBody;
+		if (typeof reflectBody !== "object" || reflectBody === null || !("cardId" in reflectBody) || typeof reflectBody.cardId !== "string" || !("questionId" in reflectBody) || typeof reflectBody.questionId !== "string" || !("answer" in reflectBody) || typeof reflectBody.answer !== "string") {
+			throw new Error("Invalid request body for postReflectOnAnswer");
 		}
-		const depthCardId = depthBody.cardId;
-		const questionId = depthBody.questionId;
-		const answer = depthBody.answer;
+		const reflectCardId = reflectBody.cardId;
+		const questionId = reflectBody.questionId;
+		const answer = reflectBody.answer;
+		const suppressGuardrail = "suppressGuardrail" in reflectBody && typeof reflectBody.suppressGuardrail === "boolean" ? reflectBody.suppressGuardrail : false;
 
 		const cardsById = new Map(MEANING_CARDS.map((c) => [c.id, c]));
 		const questionsById = new Map(EXPLORE_QUESTIONS.map((q) => [q.id, q]));
 
-		const card = cardsById.get(depthCardId);
+		const card = cardsById.get(reflectCardId);
 		if (card === undefined) {
 			return {
 				statusCode: 400,
 				headers: problemJsonHeader,
-				body: createProblemDetails(400, "Bad Request", `Unknown card ID: ${depthCardId}`),
+				body: createProblemDetails(400, "Bad Request", `Unknown card ID: ${reflectCardId}`),
 			};
 		}
 
@@ -476,6 +477,51 @@ api.register({
 			};
 		}
 
+		const responseFormat = {
+			type: "json_schema" as const,
+			json_schema: {
+				name: "reflect_on_answer",
+				strict: true,
+				schema: {
+					type: "object",
+					properties: {
+						type: {
+							type: "string",
+							enum: suppressGuardrail ? ["thought_bubble", "none"] : ["guardrail", "thought_bubble", "none"],
+						},
+						message: { type: "string" },
+					},
+					required: ["type", "message"],
+					additionalProperties: false,
+				},
+			},
+		};
+
+		const systemContent = suppressGuardrail
+			? `You are a reflective coach helping someone explore their sources of meaning. You have just read someone's answer to a reflective question.
+
+Classify the answer into one of two categories:
+
+1. "thought_bubble" — The answer is substantive and contains an interesting thread worth pulling on. Write a brief, warm Socratic follow-up question that references something the user actually wrote. The goal is to help them go deeper into their own thinking.
+
+2. "none" — The answer is fine as-is and no follow-up is warranted.
+
+If type is "thought_bubble", message should be the follow-up question. If type is "none", set message to "".`
+			: `You are a reflective coach helping someone explore their sources of meaning. You have just read someone's answer to a reflective question.
+
+Classify the answer into one of three categories:
+
+1. "guardrail" — The answer is dismissive, vague, evasive, or essentially empty. Examples: "I don't know", "Sure", "It's important to me", "Yes"/"No" with nothing else. Write a brief, warm follow-up nudge that encourages the person to share a bit more.
+
+2. "thought_bubble" — The answer is substantive and contains an interesting thread worth pulling on. Write a brief, warm Socratic follow-up question that references something the user actually wrote. The goal is to help them go deeper into their own thinking.
+
+3. "none" — The answer is substantive and no follow-up is warranted.
+
+When in doubt between "guardrail" and "none", lean toward "none". The guardrail is only for clearly throwaway responses.
+When in doubt between "thought_bubble" and "none", lean toward "thought_bubble". Offering a thoughtful follow-up is almost always welcome.
+
+If type is "guardrail" or "thought_bubble", message should be the follow-up question/nudge. If type is "none", set message to "".`;
+
 		try {
 			const content = await createChatCompletion({
 				apiKey: appConfig.xaiApiKey,
@@ -483,28 +529,44 @@ api.register({
 				messages: [
 					{
 						role: "system",
-						content: 'You are evaluating whether someone\'s answer to a reflective question shows personal engagement rather than a dismissive or throwaway response.\n\nA SUFFICIENT answer is anything that shows the person actually thought about the question. Even a few sentences are fine if they contain a personal perspective, a specific detail, or any sign of genuine reflection.\n\nAn INSUFFICIENT answer is one that is clearly dismissive, essentially empty, or shows no real engagement. Examples of insufficient answers:\n- "I don\'t know"\n- "Sure"\n- "It\'s important to me"\n- "Yes" / "No" with nothing else\n- "I picked this because I\'ve been thinking about how I spend too much time working and not enough with my family"\n- "It reminded me of when I used to volunteer at the food bank — I miss that feeling"\n- "Honestly I\'m not sure but I think it connects to wanting more control over my schedule"\n\nExamples of sufficient answers (for a question like "What did you have in mind when you chose this?"):\n- "I chose this because over the last couple of years I\'ve noticed that I feel most alive when I\'m learning something completely new. Last year I started taking ceramics classes and it reminded me how much I love being a beginner — that mix of frustration and excitement. I want more of that in my life."\n- "This one stood out because I\'ve always valued independence but lately I\'ve been questioning whether I take it too far. I tend to push people away when they offer help, and I\'m starting to realize that\'s not independence — it\'s stubbornness. My partner pointed this out recently and it really stuck with me."\n- "When I saw this card I immediately thought about my grandfather. He was someone who lived very simply but always seemed content. Growing up I didn\'t understand why he turned down a promotion that would have meant more money — he said he already had enough and the new role would take him away from his garden and his neighbors.\\n\\nNow that I\'m older and constantly chasing the next milestone at work, I think about him a lot. There\'s something about his approach that feels wise in a way I couldn\'t appreciate as a kid. He wasn\'t lazy or unambitious, he just had a clear sense of what mattered to him.\\n\\nI chose this card because I want to find that same clarity. I don\'t think I need to live exactly like he did, but I want to stop and figure out what \'enough\' looks like for me before I burn out trying to get more of everything."\n\nWhen in doubt, lean toward marking the answer as sufficient. The goal is to gently catch throwaway responses, not to grade the quality of someone\'s self-reflection.\n\nReturn a JSON object with two fields: "sufficient" (boolean) and "followUpQuestion" (string). If sufficient, set followUpQuestion to "". If insufficient, write a brief, warm follow-up question that nudges the person to share a bit more. Return ONLY the JSON object.',
+						content: systemContent,
 					},
 					{
 						role: "user",
 						content: `Card: ${card.source} — ${card.description}\nQuestion topic: ${question.topic}\nQuestion: ${question.text}\nAnswer: ${answer}`,
 					},
 				],
-				maxTokens: 150,
+				maxTokens: 200,
 				temperature: 0.7,
+				responseFormat,
 				debugPrompt: appConfig.debugPrompt,
 			});
 
 			try {
 				const parsed: unknown = JSON.parse(content);
 				if (typeof parsed !== "object" || parsed === null) {
-					return { statusCode: 200, body: { sufficient: true, followUpQuestion: "" } };
+					return { statusCode: 200, body: { type: "none", message: "" } };
 				}
-				const sufficient = "sufficient" in parsed && typeof parsed.sufficient === "boolean" ? parsed.sufficient : true;
-				const followUpQuestion = "followUpQuestion" in parsed && typeof parsed.followUpQuestion === "string" ? parsed.followUpQuestion : "";
-				return { statusCode: 200, body: { sufficient, followUpQuestion } };
+				let type = "type" in parsed && typeof parsed.type === "string" ? parsed.type : "none";
+				let message = "message" in parsed && typeof parsed.message === "string" ? parsed.message : "";
+
+				if (type !== "guardrail" && type !== "thought_bubble" && type !== "none") {
+					type = "none";
+					message = "";
+				}
+
+				if ((type === "guardrail" || type === "thought_bubble") && message.trim() === "") {
+					type = "none";
+					message = "";
+				}
+
+				if (type === "none") {
+					message = "";
+				}
+
+				return { statusCode: 200, body: { type, message } };
 			} catch {
-				return { statusCode: 200, body: { sufficient: true, followUpQuestion: "" } };
+				return { statusCode: 200, body: { type: "none", message: "" } };
 			}
 		} catch {
 			return {

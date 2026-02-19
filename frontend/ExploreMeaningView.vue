@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, ref } from "vue";
+import { computed, nextTick, onMounted, ref, type Ref } from "vue";
 import { useRouter } from "vue-router";
 
 import AppButton from "./AppButton.vue";
-import { fetchAnswerDepthCheck, fetchInferredAnswers } from "./api.ts";
+import { fetchReflectOnAnswer, fetchInferredAnswers } from "./api.ts";
+import type { ReflectOnAnswerResponse } from "./api.ts";
 import { capture } from "./analytics.ts";
 import ExploreTextarea from "./ExploreTextarea.vue";
 import { useStringParam } from "./route-utils.ts";
@@ -25,9 +26,10 @@ const cardId = useStringParam("meaningId");
 const card = ref<MeaningCard | undefined>(undefined);
 const entries = ref<ExploreEntryFull[]>([]);
 const inferring = ref(false);
-const depthCheckFollowUp = ref("");
-const depthCheckShown = ref(false);
-const awaitingGuardrail = ref(false);
+const reflectionType: Ref<"guardrail" | "thought_bubble" | null> = ref(null);
+const reflectionMessage = ref("");
+const awaitingReflection = ref(false);
+const reflectionShown = computed(() => reflectionType.value !== null);
 const pendingInferResult = ref<Map<string, string> | null>(null);
 const activeTextarea = ref<InstanceType<typeof ExploreTextarea> | null>(null);
 const entryTextareas: (InstanceType<typeof ExploreTextarea> | null)[] = [];
@@ -47,7 +49,7 @@ const activeIndex = computed(() => {
 });
 
 const editingEntryIndex = computed(() => {
-	if (depthCheckShown.value) {
+	if (reflectionShown.value) {
 		const lastIdx = entries.value.length - 1;
 		return lastIdx >= 0 && entries.value[lastIdx].submitted ? lastIdx : -1;
 	}
@@ -96,6 +98,14 @@ function debouncedPersist(): void {
 		persistTimer = undefined;
 		persistEntries();
 	}, 300);
+}
+
+function onActiveEntryInput(entry: ExploreEntryFull): void {
+	const snapshot = submittedAnswerSnapshots.value.get(entry.questionId);
+	if (snapshot !== undefined && snapshot !== entry.userAnswer) {
+		editedAfterSubmit.value.add(entry.questionId);
+	}
+	debouncedPersist();
 }
 
 function onAnsweredEntryInput(entry: ExploreEntryFull): void {
@@ -198,22 +208,24 @@ function remainingQuestionIds(): string[] {
 	return EXPLORE_QUESTIONS.filter((q) => !answered.has(q.id) && !inEntries.has(q.id)).map((q) => q.id);
 }
 
-function acceptGuardrail(): void {
+function acceptReflection(): void {
 	const lastIdx = entries.value.length - 1;
 	if (lastIdx < 0 || !entries.value[lastIdx].submitted) return;
 	const entry = entries.value[lastIdx];
 	entry.userAnswer = entry.userAnswer.trim();
-	entry.submittedAfterGuardrail = true;
-	trackSubmittedSnapshot(entry.questionId, entry.userAnswer);
-	capture("answer_submitted_after_guardrail", {
-		session_id: sessionId,
-		card_id: cardId,
-		question_id: entry.questionId,
-	});
+	if (reflectionType.value === "guardrail") {
+		entry.submittedAfterGuardrail = true;
+		trackSubmittedSnapshot(entry.questionId, entry.userAnswer);
+		capture("answer_submitted_after_guardrail", {
+			session_id: sessionId,
+			card_id: cardId,
+			question_id: entry.questionId,
+		});
+	}
 }
 
 async function submitAnswer(): Promise<void> {
-	if (awaitingGuardrail.value) return;
+	if (awaitingReflection.value) return;
 
 	const focusedAtStart = document.activeElement;
 	function shouldAutoFocus(): boolean {
@@ -221,11 +233,59 @@ async function submitAnswer(): Promise<void> {
 		return current === focusedAtStart || current === document.body || current === null;
 	}
 
-	if (depthCheckShown.value) {
-		acceptGuardrail();
-		persistEntries();
-		depthCheckShown.value = false;
-		depthCheckFollowUp.value = "";
+	if (reflectionShown.value) {
+		const lastIdx = entries.value.length - 1;
+		if (lastIdx < 0) return;
+		const entry = entries.value[lastIdx];
+		const wasGuardrail = reflectionType.value === "guardrail";
+		const wasThoughtBubble = reflectionType.value === "thought_bubble";
+		const wasEdited = editedAfterSubmit.value.has(entry.questionId);
+
+		acceptReflection();
+		reflectionType.value = null;
+		reflectionMessage.value = "";
+
+		if (wasThoughtBubble) {
+			entry.thoughtBubbleAcknowledged = true;
+			persistEntries();
+		}
+
+		if (wasGuardrail && wasEdited) {
+			awaitingReflection.value = true;
+			let secondResult: ReflectOnAnswerResponse | null = null;
+			try {
+				secondResult = await fetchReflectOnAnswer({
+					cardId,
+					questionId: entry.questionId,
+					answer: entry.userAnswer,
+					suppressGuardrail: true,
+				});
+			} catch {
+				// fail open
+			} finally {
+				awaitingReflection.value = false;
+			}
+
+			if (secondResult !== null && secondResult.type === "thought_bubble" && secondResult.message !== "") {
+				entry.thoughtBubbleText = secondResult.message;
+				entry.thoughtBubbleAcknowledged = false;
+				persistEntries();
+				reflectionType.value = "thought_bubble";
+				reflectionMessage.value = secondResult.message;
+				capture("thought_bubble_shown", {
+					session_id: sessionId,
+					card_id: cardId,
+					question_id: entry.questionId,
+				});
+				void nextTick(() => {
+					if (shouldAutoFocus()) {
+						activeTextarea.value?.focus();
+					}
+				});
+				return;
+			}
+		}
+
 		applyInferAndAdvance(pendingInferResult.value ?? new Map<string, string>(), remainingQuestionIds());
 		pendingInferResult.value = null;
 		void nextTick(() => {
@@ -290,42 +350,65 @@ async function submitAnswer(): Promise<void> {
 
 	inferring.value = remaining.length > 0;
 
-	awaitingGuardrail.value = true;
-	const depthResult = await fetchAnswerDepthCheck({
+	awaitingReflection.value = true;
+	const reflectResult = await fetchReflectOnAnswer({
 		cardId,
 		questionId,
 		answer: answerText,
 	})
-		.catch(() => ({ sufficient: true, followUpQuestion: "" }))
+		.catch((): ReflectOnAnswerResponse => ({ type: "none", message: "" }))
 		.finally(() => {
-			awaitingGuardrail.value = false;
+			awaitingReflection.value = false;
 		});
-	capture("depth_check_triggered", {
+	capture("reflect_on_answer_triggered", {
 		session_id: sessionId,
 		card_id: cardId,
 		question_id: questionId,
-		sufficient: depthResult.sufficient,
+		result_type: reflectResult.type,
+		is_second_call: false,
 	});
 
-	if (!depthResult.sufficient && depthResult.followUpQuestion !== "") {
-		// Depth check failed fast — cache the still-pending infer promise
+	if (reflectResult.type === "guardrail" && reflectResult.message !== "") {
 		inferring.value = false;
 		pendingInferResult.value = null;
-		entries.value[idx].guardrailText = depthResult.followUpQuestion;
+		entries.value[idx].guardrailText = reflectResult.message;
 		persistEntries();
-		capture("depth_check_followup_shown", {
+		capture("guardrail_shown", {
 			session_id: sessionId,
 			card_id: cardId,
 			question_id: questionId,
 		});
-		depthCheckFollowUp.value = depthResult.followUpQuestion;
-		depthCheckShown.value = true;
+		reflectionType.value = "guardrail";
+		reflectionMessage.value = reflectResult.message;
 		void nextTick(() => {
 			if (shouldAutoFocus()) {
 				activeTextarea.value?.focus();
 			}
 		});
-		// Resolve infer in background so it's ready when user skips
+		void inferPromise.then((result) => {
+			pendingInferResult.value = result;
+		});
+		return;
+	}
+
+	if (reflectResult.type === "thought_bubble" && reflectResult.message !== "") {
+		inferring.value = false;
+		pendingInferResult.value = null;
+		entries.value[idx].thoughtBubbleText = reflectResult.message;
+		entries.value[idx].thoughtBubbleAcknowledged = false;
+		persistEntries();
+		capture("thought_bubble_shown", {
+			session_id: sessionId,
+			card_id: cardId,
+			question_id: questionId,
+		});
+		reflectionType.value = "thought_bubble";
+		reflectionMessage.value = reflectResult.message;
+		void nextTick(() => {
+			if (shouldAutoFocus()) {
+				activeTextarea.value?.focus();
+			}
+		});
 		void inferPromise.then((result) => {
 			pendingInferResult.value = result;
 		});
@@ -376,6 +459,8 @@ function applyInferAndAdvance(inferredMap: Map<string, string>, remaining: strin
 		submitted: false,
 		guardrailText: "",
 		submittedAfterGuardrail: false,
+		thoughtBubbleText: "",
+		thoughtBubbleAcknowledged: false,
 	});
 	if (nextPrefill !== "") {
 		prefilledQuestionIds.value.add(nextQuestionId);
@@ -407,8 +492,8 @@ async function inferAndAdvance(): Promise<void> {
 }
 
 function finishExploring(): void {
-	if (depthCheckShown.value) {
-		acceptGuardrail();
+	if (reflectionShown.value) {
+		acceptReflection();
 	}
 	persistEntries();
 	persistFreeform();
@@ -483,8 +568,13 @@ onMounted(() => {
 		if (lastEntry.submitted) {
 			if (lastEntry.guardrailText !== "" && !lastEntry.submittedAfterGuardrail) {
 				// Refreshed during guardrail — restore it
-				depthCheckFollowUp.value = lastEntry.guardrailText;
-				depthCheckShown.value = true;
+				reflectionType.value = "guardrail";
+				reflectionMessage.value = lastEntry.guardrailText;
+				return;
+			}
+			if (lastEntry.thoughtBubbleText !== "" && !lastEntry.thoughtBubbleAcknowledged) {
+				reflectionType.value = "thought_bubble";
+				reflectionMessage.value = lastEntry.thoughtBubbleText;
 				return;
 			}
 			if (entries.value.length < EXPLORE_QUESTIONS.length) {
@@ -544,16 +634,19 @@ onMounted(() => {
 				:variant="index === editingEntryIndex ? undefined : 'answered'"
 				:rows="index === editingEntryIndex ? 5 : 3"
 				:placeholder="index === editingEntryIndex ? 'Type your reflection here...' : ''"
-				@update:model-value="index === editingEntryIndex ? debouncedPersist() : onAnsweredEntryInput(entry)"
+				@update:model-value="index === editingEntryIndex ? onActiveEntryInput(entry) : onAnsweredEntryInput(entry)"
 				@blur="index === editingEntryIndex ? persistEntries() : onAnsweredEntryBlur(entry)"
 				@keydown="onKeydown(index, $event)"
 			/>
 			<template v-if="index === editingEntryIndex">
-				<p v-if="depthCheckShown" class="depth-follow-up">
-					<em>{{ depthCheckFollowUp }}</em>
+				<p v-if="reflectionType === 'guardrail'" class="reflection-guardrail">
+					<em>{{ reflectionMessage }}</em>
 				</p>
-				<AppButton variant="primary" class="submit-btn" :disabled="awaitingGuardrail || (!depthCheckShown && entry.userAnswer.trim() === '')" @click="submitAnswer">Next</AppButton>
-				<p v-if="depthCheckShown" class="hint">Press Next to continue as-is, or edit your answer above</p>
+				<p v-if="reflectionType === 'thought_bubble'" class="reflection-thought-bubble">
+					<span class="thought-bubble-icon" aria-hidden="true">💭</span> <em>{{ reflectionMessage }}</em>
+				</p>
+				<AppButton variant="primary" class="submit-btn" :disabled="awaitingReflection || (!reflectionShown && entry.userAnswer.trim() === '')" @click="submitAnswer">Next</AppButton>
+				<p v-if="reflectionShown" class="hint">Press Next to continue as-is, or edit your answer above</p>
 				<p v-else class="hint">Shift + Enter to submit</p>
 			</template>
 		</div>
@@ -562,12 +655,12 @@ onMounted(() => {
 			<span class="spinner"></span>
 			<span>Thinking about your next question...</span>
 		</div>
-		<div v-else-if="awaitingGuardrail" class="inferring-indicator">
+		<div v-else-if="awaitingReflection" class="inferring-indicator">
 			<span class="spinner"></span>
-			<span>Checking your answer...</span>
+			<span>Reflecting on your answer...</span>
 		</div>
 
-		<div v-if="allAnswered && !inferring && !depthCheckShown && !awaitingGuardrail" class="card-hrule">
+		<div v-if="allAnswered && !inferring && !reflectionShown && !awaitingReflection" class="card-hrule">
 			<h3 class="statements-heading">Which of these statements resonate with you?</h3>
 			<div class="statement-list">
 				<label v-for="s in cardStatements" :key="s.id" class="statement-row">
@@ -578,7 +671,7 @@ onMounted(() => {
 			<AppButton v-if="!statementsConfirmed" variant="primary" class="submit-btn" @click="confirmStatements">Next</AppButton>
 		</div>
 
-		<div v-if="allAnswered && statementsConfirmed && !inferring && !depthCheckShown && !awaitingGuardrail" class="card-hrule">
+		<div v-if="allAnswered && statementsConfirmed && !inferring && !reflectionShown && !awaitingReflection" class="card-hrule">
 			<label for="freeform-notes">Additional notes about this source of meaning</label>
 			<ExploreTextarea id="freeform-notes" ref="freeformTextarea" v-model="freeformNote" :rows="5" placeholder="Any other thoughts you'd like to capture (optional)" @update:model-value="debouncedFreeformPersist" @blur="persistFreeform()" @keydown="onKeydown(null, $event)" />
 		</div>
@@ -660,11 +753,22 @@ label {
 	margin: var(--space-2) 0 0;
 }
 
-.depth-follow-up {
+.reflection-guardrail {
 	font-size: var(--text-lg);
 	font-weight: 600;
 	color: var(--color-warning);
 	margin: 0 0 var(--space-2);
+}
+
+.reflection-thought-bubble {
+	font-size: var(--text-lg);
+	font-weight: 500;
+	color: var(--color-green-600);
+	background: var(--color-success-bg);
+	border-left: 3px solid var(--color-green-600);
+	padding: var(--space-3) var(--space-4);
+	margin: 0 0 var(--space-2);
+	font-style: italic;
 }
 
 .prefill-hint {

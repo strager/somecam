@@ -6,7 +6,7 @@ The same mechanism applies to:
 
 - `POST /api/report-pdf`
 - `POST /api/summarize`
-- `POST /api/check-answer-depth`
+- `POST /api/reflect-on-answer`
 - `POST /api/infer-answers`
 - other API endpoints that declare a non-zero budget cost
 
@@ -69,7 +69,7 @@ The same mechanism applies to:
 
 - `POST /api/report-pdf`
 - `POST /api/summarize`
-- `POST /api/check-answer-depth`
+- `POST /api/reflect-on-answer`
 - `POST /api/infer-answers`
 - others from the endpoint policy map
 
@@ -231,7 +231,7 @@ Suggested machine-readable codes:
 - refresh challenge: +100 credits, high challenge difficulty
 - session has upper limit of 150 credits
 - `/api/report-pdf`: -100 credits (max 3 downloads per rolling 24 hours)
-- `/api/summarize`, `/api/check-answer-depth`, `/api/infer-answers`: -5 credits
+- `/api/summarize`, `/api/reflect-on-answer`, `/api/infer-answers`: -5 credits
 
 ## Risks and Tradeoffs
 

@@ -303,8 +303,8 @@ describe("API", () => {
 		);
 	});
 
-	it("returns 400 for POST /api/check-answer-depth with missing fields", async () => {
-		const response = await fetch(`${baseUrl}/api/check-answer-depth`, {
+	it("returns 400 for POST /api/reflect-on-answer with missing fields", async () => {
+		const response = await fetch(`${baseUrl}/api/reflect-on-answer`, {
 			method: "POST",
 			headers: { "Content-Type": "application/json", Origin: TEST_ORIGIN },
 			body: JSON.stringify({ cardId: "self-knowledge" }),
@@ -319,9 +319,9 @@ describe("API", () => {
 		expect(body).toHaveProperty("detail", expect.any(String));
 	});
 
-	it("returns 500 for POST /api/check-answer-depth when config is not set", async () => {
+	it("returns 500 for POST /api/reflect-on-answer when config is not set", async () => {
 		const token = await obtainSessionToken(baseUrl);
-		const response = await fetch(`${baseUrl}/api/check-answer-depth`, {
+		const response = await fetch(`${baseUrl}/api/reflect-on-answer`, {
 			method: "POST",
 			headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}`, Origin: TEST_ORIGIN },
 			body: JSON.stringify({
@@ -339,7 +339,7 @@ describe("API", () => {
 				type: "about:blank",
 				title: "Internal Server Error",
 				status: 500,
-				detail: "AI depth check is not configured.",
+				detail: "AI reflection is not configured.",
 			}),
 		);
 	});

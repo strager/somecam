@@ -13,15 +13,16 @@ interface SummarizeResponse {
 	summary: string;
 }
 
-interface CheckAnswerDepthRequest {
+interface ReflectOnAnswerRequest {
 	cardId: string;
 	questionId: string;
 	answer: string;
+	suppressGuardrail?: boolean;
 }
 
-interface CheckAnswerDepthResponse {
-	sufficient: boolean;
-	followUpQuestion: string;
+export interface ReflectOnAnswerResponse {
+	type: "guardrail" | "thought_bubble" | "none";
+	message: string;
 }
 
 interface InferAnswersRequest {
@@ -173,11 +174,14 @@ function validateSummarizeResponse(raw: unknown): SummarizeResponse {
 	return { summary: raw.summary };
 }
 
-function validateCheckAnswerDepthResponse(raw: unknown): CheckAnswerDepthResponse {
-	if (typeof raw !== "object" || raw === null || !("sufficient" in raw) || typeof raw.sufficient !== "boolean" || !("followUpQuestion" in raw) || typeof raw.followUpQuestion !== "string") {
-		throw new Error("Invalid check-answer-depth response");
+function validateReflectOnAnswerResponse(raw: unknown): ReflectOnAnswerResponse {
+	if (typeof raw !== "object" || raw === null || !("type" in raw) || typeof raw.type !== "string" || !("message" in raw) || typeof raw.message !== "string") {
+		throw new Error("Invalid reflect-on-answer response");
 	}
-	return { sufficient: raw.sufficient, followUpQuestion: raw.followUpQuestion };
+	if (raw.type !== "guardrail" && raw.type !== "thought_bubble" && raw.type !== "none") {
+		throw new Error("Invalid reflect-on-answer response");
+	}
+	return { type: raw.type, message: raw.message };
 }
 
 function validateInferAnswersResponse(raw: unknown): InferAnswersResponse {
@@ -198,8 +202,8 @@ export async function fetchSummary(request: SummarizeRequest): Promise<Summarize
 	return postJson("/api/summarize", request, "Summarize", validateSummarizeResponse);
 }
 
-export async function fetchAnswerDepthCheck(request: CheckAnswerDepthRequest): Promise<CheckAnswerDepthResponse> {
-	return postJson("/api/check-answer-depth", request, "Check answer depth", validateCheckAnswerDepthResponse);
+export async function fetchReflectOnAnswer(request: ReflectOnAnswerRequest): Promise<ReflectOnAnswerResponse> {
+	return postJson("/api/reflect-on-answer", request, "Reflect on answer", validateReflectOnAnswerResponse);
 }
 
 export async function fetchInferredAnswers(request: InferAnswersRequest): Promise<InferAnswersResponse> {

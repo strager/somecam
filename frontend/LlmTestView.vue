@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { reactive, ref, watch } from "vue";
 
-import { fetchAnswerDepthCheck, fetchInferredAnswers, fetchSummary } from "./api.ts";
+import { fetchReflectOnAnswer, fetchInferredAnswers, fetchSummary } from "./api.ts";
 import type { LlmTestState } from "./store.ts";
 import { loadLlmTestState, saveLlmTestState } from "./store.ts";
 import { EXPLORE_QUESTIONS } from "../shared/explore-questions.ts";
@@ -89,7 +89,7 @@ async function checkDepth(row: QuestionRow) {
 	row.depthError = null;
 	row.depthResult = null;
 	try {
-		const result = await fetchAnswerDepthCheck({
+		const result = await fetchReflectOnAnswer({
 			cardId: selectedCardId.value,
 			questionId: row.questionId,
 			answer: row.answer,
@@ -168,7 +168,7 @@ async function inferAnswers() {
 
 			<div class="row-actions">
 				<button :disabled="row.depthLoading" @click="checkDepth(row)">
-					{{ row.depthLoading ? "Checking..." : "Check Depth" }}
+					{{ row.depthLoading ? "Reflecting..." : "Reflect" }}
 				</button>
 				<button :disabled="row.summarizeLoading" @click="summarize(row)">
 					{{ row.summarizeLoading ? "Summarizing..." : "Summarize" }}
@@ -176,7 +176,7 @@ async function inferAnswers() {
 			</div>
 
 			<div v-if="row.depthLoading || row.depthResult || row.depthError" class="result-section">
-				<h3>Check Depth</h3>
+				<h3>Reflect</h3>
 				<p v-if="row.depthLoading">Loading...</p>
 				<pre v-if="row.depthResult">{{ row.depthResult }}</pre>
 				<p v-if="row.depthError" class="error">{{ row.depthError }}</p>

@@ -297,24 +297,24 @@ paths:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/ProblemDetails"
-  /check-answer-depth:
+  /reflect-on-answer:
     post:
-      operationId: postCheckAnswerDepth
+      operationId: postReflectOnAnswer
       x-somecam-budget-cost: 5
-      summary: Check whether an exploration answer shows sufficient depth
+      summary: Reflect on an exploration answer to provide guardrails or thought bubbles
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/CheckAnswerDepthRequest"
+              $ref: "#/components/schemas/ReflectOnAnswerRequest"
       responses:
         "200":
-          description: Depth check completed successfully.
+          description: Reflection completed successfully.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/CheckAnswerDepthResponse"
+                $ref: "#/components/schemas/ReflectOnAnswerResponse"
         "400":
           description: Request failed validation.
           content:
@@ -431,7 +431,7 @@ components:
                 type: string
               answer:
                 type: string
-    CheckAnswerDepthRequest:
+    ReflectOnAnswerRequest:
       type: object
       additionalProperties: false
       required:
@@ -448,16 +448,22 @@ components:
         answer:
           type: string
           minLength: 1
-    CheckAnswerDepthResponse:
+        suppressGuardrail:
+          type: boolean
+    ReflectOnAnswerResponse:
       type: object
       additionalProperties: false
       required:
-        - sufficient
-        - followUpQuestion
+        - type
+        - message
       properties:
-        sufficient:
-          type: boolean
-        followUpQuestion:
+        type:
+          type: string
+          enum:
+            - guardrail
+            - thought_bubble
+            - none
+        message:
           type: string
     SessionVerifyRequest:
       type: object

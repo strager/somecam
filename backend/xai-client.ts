@@ -9,6 +9,7 @@ interface ChatCompletionOptions {
 	messages: ChatMessage[];
 	maxTokens?: number;
 	temperature?: number;
+	responseFormat?: Record<string, unknown>;
 	debugPrompt?: boolean;
 }
 
@@ -22,6 +23,9 @@ export async function createChatCompletion(options: ChatCompletionOptions): Prom
 	}
 	if (options.temperature !== undefined) {
 		body.temperature = options.temperature;
+	}
+	if (options.responseFormat !== undefined) {
+		body.response_format = options.responseFormat;
 	}
 
 	if (options.debugPrompt) {

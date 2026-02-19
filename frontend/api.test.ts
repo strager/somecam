@@ -6,7 +6,7 @@ import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
-import { budgetedFetch, fetchAnswerDepthCheck, fetchInferredAnswers, fetchSummary } from "./api.ts";
+import { budgetedFetch, fetchReflectOnAnswer, fetchInferredAnswers, fetchSummary } from "./api.ts";
 import { loadRateLimitToken, saveRateLimitToken } from "./store.ts";
 
 const TEST_HMAC_KEY = "test-hmac-key-for-challenges";
@@ -219,7 +219,7 @@ describe("budgetedFetch", () => {
 	it("deduplicates concurrent 429 challenges into one verify call", async () => {
 		const challengeBody = await makeChallenge();
 		let verifyCount = 0;
-		const callCounts: Record<string, number> = { summarize: 0, "check-answer-depth": 0 };
+		const callCounts: Record<string, number> = { summarize: 0, "reflect-on-answer": 0 };
 		const retryAuths: string[] = [];
 
 		server.use(
@@ -231,13 +231,13 @@ describe("budgetedFetch", () => {
 				retryAuths.push(request.headers.get("Authorization") ?? "");
 				return HttpResponse.json({ summary: "ok" });
 			}),
-			http.post("*/api/check-answer-depth", ({ request }) => {
-				callCounts["check-answer-depth"]++;
-				if (callCounts["check-answer-depth"] === 1) {
+			http.post("*/api/reflect-on-answer", ({ request }) => {
+				callCounts["reflect-on-answer"]++;
+				if (callCounts["reflect-on-answer"] === 1) {
 					return HttpResponse.json(challengeBody, { status: 429 });
 				}
 				retryAuths.push(request.headers.get("Authorization") ?? "");
-				return HttpResponse.json({ sufficient: true, followUpQuestion: "" });
+				return HttpResponse.json({ type: "none", message: "" });
 			}),
 			http.post("*/api/session/verify", () => {
 				verifyCount++;
@@ -245,10 +245,10 @@ describe("budgetedFetch", () => {
 			}),
 		);
 
-		const [summary, depth] = await Promise.all([fetchSummary({ cardId: "c", answer: "a" }), fetchAnswerDepthCheck({ cardId: "c", questionId: "q", answer: "a" })]);
+		const [summary, depth] = await Promise.all([fetchSummary({ cardId: "c", answer: "a" }), fetchReflectOnAnswer({ cardId: "c", questionId: "q", answer: "a" })]);
 
 		expect(summary).toEqual({ summary: "ok" });
-		expect(depth).toEqual({ sufficient: true, followUpQuestion: "" });
+		expect(depth).toEqual({ type: "none", message: "" });
 		expect(verifyCount).toBe(1);
 		expect(loadRateLimitToken()).toBe(TEST_SESSION_TOKEN);
 		expect(retryAuths).toEqual([`Bearer ${TEST_SESSION_TOKEN}`, `Bearer ${TEST_SESSION_TOKEN}`]);
@@ -314,7 +314,7 @@ describe("postJson error handling (via fetchSummary)", () => {
 		const firstChallengeBody = await makeChallenge();
 		const secondChallengeBody = await makeChallenge();
 		let verifyCount = 0;
-		const callCounts: Record<string, number> = { summarize: 0, "check-answer-depth": 0 };
+		const callCounts: Record<string, number> = { summarize: 0, "reflect-on-answer": 0 };
 		const depthRetryAuths: string[] = [];
 		const firstToken = "abcdefghijklmnopqrstuvwxyzabcdef";
 		const secondToken = "bcdefghijklmnopqrstuvwxyzaabcde";
@@ -327,16 +327,16 @@ describe("postJson error handling (via fetchSummary)", () => {
 				}
 				return HttpResponse.json({ summary: "ok" });
 			}),
-			http.post("*/api/check-answer-depth", ({ request }) => {
-				callCounts["check-answer-depth"]++;
-				if (callCounts["check-answer-depth"] === 1) {
+			http.post("*/api/reflect-on-answer", ({ request }) => {
+				callCounts["reflect-on-answer"]++;
+				if (callCounts["reflect-on-answer"] === 1) {
 					return HttpResponse.json(firstChallengeBody, { status: 429 });
 				}
 				depthRetryAuths.push(request.headers.get("Authorization") ?? "");
-				if (callCounts["check-answer-depth"] === 2) {
+				if (callCounts["reflect-on-answer"] === 2) {
 					return HttpResponse.json(secondChallengeBody, { status: 429 });
 				}
-				return HttpResponse.json({ sufficient: true, followUpQuestion: "" });
+				return HttpResponse.json({ type: "none", message: "" });
 			}),
 			http.post("*/api/session/verify", () => {
 				verifyCount++;
@@ -347,10 +347,10 @@ describe("postJson error handling (via fetchSummary)", () => {
 			}),
 		);
 
-		const [summary, depth] = await Promise.all([fetchSummary({ cardId: "c", answer: "a" }), fetchAnswerDepthCheck({ cardId: "c", questionId: "q", answer: "a" })]);
+		const [summary, depth] = await Promise.all([fetchSummary({ cardId: "c", answer: "a" }), fetchReflectOnAnswer({ cardId: "c", questionId: "q", answer: "a" })]);
 
 		expect(summary).toEqual({ summary: "ok" });
-		expect(depth).toEqual({ sufficient: true, followUpQuestion: "" });
+		expect(depth).toEqual({ type: "none", message: "" });
 		expect(depthRetryAuths).toEqual([`Bearer ${firstToken}`, `Bearer ${secondToken}`]);
 		expect(verifyCount).toBe(2);
 		expect(loadRateLimitToken()).toBe(secondToken);
@@ -391,18 +391,18 @@ describe("fetchSummary", () => {
 	});
 });
 
-// --- fetchAnswerDepthCheck ---
+// --- fetchReflectOnAnswer ---
 
-describe("fetchAnswerDepthCheck", () => {
+describe("fetchReflectOnAnswer", () => {
 	it("succeeds on 200", async () => {
 		server.use(
-			http.post("*/api/check-answer-depth", () => {
-				return HttpResponse.json({ sufficient: true, followUpQuestion: "" });
+			http.post("*/api/reflect-on-answer", () => {
+				return HttpResponse.json({ type: "none", message: "" });
 			}),
 		);
 
-		const result = await fetchAnswerDepthCheck({ cardId: "c", questionId: "q", answer: "a" });
-		expect(result).toEqual({ sufficient: true, followUpQuestion: "" });
+		const result = await fetchReflectOnAnswer({ cardId: "c", questionId: "q", answer: "a" });
+		expect(result).toEqual({ type: "none", message: "" });
 	});
 });
 
