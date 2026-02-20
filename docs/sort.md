@@ -6,11 +6,11 @@ prioritize a small handful that resonate most with you.
 
 ## Step 1: Initial sorting
 
-You are shown each of the 26 cards one at a time. Each card displays a
-statement — for example, _"I intervene when I see injustice being done"_
-or _"Freedom is the most important thing for me"_. At this stage, you do
-not see the name of the source of meaning behind each card; you only see
-the statement itself.
+You are shown each of the 26 cards one at a time, in a randomized
+(shuffled) order. Each card displays a statement — for example, _"I
+intervene when I see injustice being done"_ or _"Freedom is the most
+important thing for me"_. At this stage, you do not see the name of the
+source of meaning behind each card; you only see the statement itself.
 
 For each card, you choose one of three responses:
 

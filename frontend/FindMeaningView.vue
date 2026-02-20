@@ -1,107 +1,45 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
-import type { RouteLocationRaw } from "vue-router";
 
-import type { MeaningCard, SwipeDirection } from "../shared/meaning-cards.ts";
-import { MEANING_CARDS } from "../shared/meaning-cards.ts";
-import { capture } from "./analytics.ts";
+import type { SwipeDirection } from "../shared/meaning-cards.ts";
+import { FindMeaningViewModel } from "./FindMeaningViewModel.ts";
 import { useStringParam } from "./route-utils.ts";
-import type { SwipeRecord } from "./store.ts";
-import { detectSessionPhase, loadSwipeProgress, needsPrioritization, saveChosenCardIds, savePrioritize, selectCandidateCards, saveSwipeProgress } from "./store.ts";
+import { detectSessionPhase } from "./store.ts";
 import AppButton from "./AppButton.vue";
 import SwipeCard from "./SwipeCard.vue";
 
 const router = useRouter();
 const sessionId = useStringParam("sessionId");
+const vm = new FindMeaningViewModel(sessionId);
 
-const shuffledCards = ref<MeaningCard[]>([]);
-const currentIndex = ref(0);
-const swipeHistory = ref<SwipeRecord[]>([]);
 const swipeCardRef = ref<InstanceType<typeof SwipeCard> | null>(null);
-const lastSwipeMethod = ref<"drag" | "button">("drag");
-const cardShownAtMs = ref(performance.now());
-const phaseStartedAtMs = ref(performance.now());
+const pendingSwipeMethod = ref<"drag" | "button">("drag");
 
-const nextPhaseLabel = ref("Continue to Next Phase");
-
-function detectNextPhase(): { label: string; route: RouteLocationRaw } | null {
-	const phase = detectSessionPhase(sessionId);
-	switch (phase) {
+const nextPhaseLabel = computed(() => {
+	switch (detectSessionPhase(sessionId)) {
 		case "explore":
-			return { label: "Explore Meaning", route: { name: "explore", params: { sessionId } } };
 		case "prioritize-complete":
-			return { label: "Explore Meaning", route: { name: "findMeaningPrioritize", params: { sessionId } } };
+			return "Explore Meaning";
 		case "prioritize":
-			return { label: "Prioritize Meaning", route: { name: "findMeaningPrioritize", params: { sessionId } } };
+			return "Prioritize Meaning";
 		default:
-			return null;
+			return "Continue to Next Phase";
 	}
-}
-
-const currentCard = computed(() => shuffledCards.value[currentIndex.value] ?? null);
-const nextCard = computed(() => shuffledCards.value[currentIndex.value + 1] ?? null);
-const totalCards = computed(() => shuffledCards.value.length);
-const progressPercent = computed(() => (totalCards.value > 0 ? Math.round((currentIndex.value / totalCards.value) * 100) : 0));
-const isComplete = computed(() => currentIndex.value >= totalCards.value);
-const canUndo = computed(() => swipeHistory.value.length > 0);
-
-function shuffle<T>(array: readonly T[]): T[] {
-	const result = [...array];
-	for (let i = result.length - 1; i > 0; i--) {
-		const j = Math.floor(Math.random() * (i + 1));
-		[result[i], result[j]] = [result[j], result[i]];
-	}
-	return result;
-}
-
-const cardsById = new Map(MEANING_CARDS.map((c) => [c.id, c]));
+});
 
 onMounted(() => {
-	phaseStartedAtMs.value = performance.now();
-	const saved = loadSwipeProgress(sessionId);
-	if (saved !== null) {
-		const cards = saved.shuffledCardIds.map((id) => cardsById.get(id)).filter((c): c is MeaningCard => c !== undefined);
-		if (cards.length > 0) {
-			shuffledCards.value = cards;
-			swipeHistory.value = saved.swipeHistory;
-			currentIndex.value = saved.swipeHistory.length;
-			cardShownAtMs.value = performance.now();
-			const detected = detectNextPhase();
-			if (detected !== null) {
-				nextPhaseLabel.value = detected.label;
-			}
-			return;
-		}
-	}
-	shuffledCards.value = shuffle(MEANING_CARDS);
-	cardShownAtMs.value = performance.now();
+	vm.initialize();
 });
 
 function handleSwipe(direction: SwipeDirection): void {
-	const cardId = currentCard.value.id;
-	const now = performance.now();
-	capture("card_swiped", {
-		session_id: sessionId,
-		method: lastSwipeMethod.value,
-		time_on_card_ms: Math.round(now - cardShownAtMs.value),
-	});
-	swipeHistory.value.push({
-		cardId,
-		direction,
-	});
-	currentIndex.value++;
-	saveSwipeProgress(sessionId, {
-		shuffledCardIds: shuffledCards.value.map((c) => c.id),
-		swipeHistory: swipeHistory.value,
-	});
-	cardShownAtMs.value = performance.now();
-	lastSwipeMethod.value = "drag";
+	vm.swipe(direction, pendingSwipeMethod.value);
+	pendingSwipeMethod.value = "drag";
 }
 
 function handleButtonSwipe(direction: SwipeDirection): void {
-	if (isComplete.value) return;
-	lastSwipeMethod.value = "button";
+	if (vm.isComplete) return;
+	pendingSwipeMethod.value = "button";
 	if (swipeCardRef.value !== null) {
 		swipeCardRef.value.flyAway(direction);
 	} else {
@@ -110,43 +48,25 @@ function handleButtonSwipe(direction: SwipeDirection): void {
 }
 
 function handleUndo(): void {
-	if (swipeHistory.value.length === 0) return;
-	swipeHistory.value.pop();
-	currentIndex.value = swipeHistory.value.length;
-	capture("swipe_undone", { session_id: sessionId });
-	saveSwipeProgress(sessionId, {
-		shuffledCardIds: shuffledCards.value.map((c) => c.id),
-		swipeHistory: swipeHistory.value,
-	});
-	cardShownAtMs.value = performance.now();
-	lastSwipeMethod.value = "drag";
+	vm.undo();
+	pendingSwipeMethod.value = "drag";
 }
 
 function continueToNextPhase(): void {
-	const detected = detectNextPhase();
-	if (detected !== null) {
-		void router.push(detected.route);
+	const phase = detectSessionPhase(sessionId);
+	if (phase === "explore") {
+		void router.push({ name: "explore", params: { sessionId } });
+		return;
+	}
+	if (phase === "prioritize-complete" || phase === "prioritize") {
+		void router.push({ name: "findMeaningPrioritize", params: { sessionId } });
 		return;
 	}
 
-	const agreedCount = swipeHistory.value.filter((record) => record.direction === "agree").length;
-	const disagreedCount = swipeHistory.value.filter((record) => record.direction === "disagree").length;
-	const unsureCount = swipeHistory.value.filter((record) => record.direction === "unsure").length;
-	capture("swiping_phase_completed", {
-		session_id: sessionId,
-		agreed_count: agreedCount,
-		disagreed_count: disagreedCount,
-		unsure_count: unsureCount,
-		total_time_ms: Math.round(performance.now() - phaseStartedAtMs.value),
-	});
-
-	const cardIdsToConsider = selectCandidateCards(sessionId);
-
-	if (needsPrioritization(sessionId)) {
-		savePrioritize(sessionId, { cardIds: cardIdsToConsider, swipeHistory: [] });
+	vm.finalize();
+	if (vm.requiresPrioritization) {
 		void router.push({ name: "findMeaningPrioritize", params: { sessionId } });
 	} else {
-		saveChosenCardIds(sessionId, cardIdsToConsider);
 		void router.push({ name: "explore", params: { sessionId } });
 	}
 }
@@ -156,36 +76,36 @@ function continueToNextPhase(): void {
 	<main>
 		<header>
 			<h1>Find Meaning</h1>
-			<div v-if="!isComplete" class="instruction-stack">
-				<p :class="['instruction', { active: currentIndex === 0 }]">Read each card and decide if this source of meaning resonates with you.</p>
-				<p :class="['instruction', { active: currentIndex > 0 }]">Keep going — decide if each source of meaning resonates with you.</p>
+			<div v-if="!vm.isComplete" class="instruction-stack">
+				<p :class="['instruction', { active: vm.currentIndex === 0 }]">Read each card and decide if this source of meaning resonates with you.</p>
+				<p :class="['instruction', { active: vm.currentIndex > 0 }]">Keep going — decide if each source of meaning resonates with you.</p>
 			</div>
 			<div class="progress">
 				<div class="progress-bar">
-					<div class="progress-fill" :style="{ width: `${String(progressPercent)}%` }" />
+					<div class="progress-fill" :style="{ width: `${String(vm.progressPercent)}%` }" />
 				</div>
-				<span class="progress-text"> {{ progressPercent }}% ({{ currentIndex }}/{{ totalCards }}) </span>
+				<span class="progress-text"> {{ vm.progressPercent }}% ({{ vm.currentIndex }}/{{ vm.totalCards }}) </span>
 			</div>
 		</header>
 
-		<div v-if="!isComplete" class="card-area">
-			<SwipeCard ref="swipeCardRef" :key="currentIndex" :card="currentCard!" :next-card="nextCard" @swiped="handleSwipe" />
+		<div v-if="!vm.isComplete" class="card-area">
+			<SwipeCard ref="swipeCardRef" :key="vm.currentIndex" :card="vm.currentCard!" :next-card="vm.nextCard" @swiped="handleSwipe" />
 		</div>
 
 		<div v-else class="end-state">
 			<h2>All cards reviewed!</h2>
-			<p>You have reviewed all {{ totalCards }} sources of meaning.</p>
+			<p>You have reviewed all {{ vm.totalCards }} sources of meaning.</p>
 			<AppButton variant="primary" @click="continueToNextPhase">{{ nextPhaseLabel }}</AppButton>
 		</div>
 
 		<div class="controls">
-			<AppButton variant="primary" emphasis="muted" :disabled="isComplete" @click="handleButtonSwipe('disagree')">Disagree ✕</AppButton>
-			<AppButton variant="secondary" emphasis="muted" :disabled="isComplete" @click="handleButtonSwipe('unsure')">Unsure ？</AppButton>
-			<AppButton variant="primary" :disabled="isComplete" @click="handleButtonSwipe('agree')">Agree ✓</AppButton>
+			<AppButton variant="primary" emphasis="muted" :disabled="vm.isComplete" @click="handleButtonSwipe('disagree')">Disagree ✕</AppButton>
+			<AppButton variant="secondary" emphasis="muted" :disabled="vm.isComplete" @click="handleButtonSwipe('unsure')">Unsure ？</AppButton>
+			<AppButton variant="primary" :disabled="vm.isComplete" @click="handleButtonSwipe('agree')">Agree ✓</AppButton>
 		</div>
 
 		<div class="undo-area">
-			<AppButton variant="secondary" emphasis="muted" :disabled="!canUndo" @click="handleUndo">Undo</AppButton>
+			<AppButton variant="secondary" emphasis="muted" :disabled="!vm.canUndo" @click="handleUndo">Undo</AppButton>
 		</div>
 	</main>
 </template>
