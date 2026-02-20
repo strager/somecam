@@ -125,6 +125,29 @@ response), the app fails open: it treats the answer as sufficient and advances
 normally. This ensures the reflection step is purely additive and never
 degrades the core explore experience.
 
+## Manual reflection on answered questions
+
+A subtle "Reflect" link appears below every answered question's textarea. Clicking
+it calls the reflect-on-answer endpoint on demand, letting the user request a
+fresh reflection at any time — not just during the automatic submit flow.
+
+The result is displayed inline using the same styling as the automatic flow:
+
+- **guardrail** — amber follow-up, same as the automatic guardrail.
+- **thought bubble** — green Socratic prompt with 💭, same as the automatic
+  thought bubble.
+- **none** — a positive "Your answer looks good!" message in green italic.
+
+The Reflect link is hidden when a result is showing. The reflection result remains
+visible even if the user edits the answer text — it is not cleared on input.
+
+Manual reflection state is transient (not persisted to localStorage). If the
+reflect-on-answer request fails, the app fails open by showing "Your answer looks
+good!" (type "none").
+
+The Reflect link is not shown on the active question while the automatic
+submit-flow reflection is visible, to avoid duplication.
+
 ## Using "Stop Exploring" for early exit
 
 At any point during the exploration, a **Stop Exploring** button is visible below

@@ -40,6 +40,8 @@ const statementsConfirmed = ref(false);
 const questionStartTimeMs = ref(performance.now());
 const submittedAnswerSnapshots = ref<Map<string, string>>(new Map());
 const editedAfterSubmit = ref<Set<string>>(new Set());
+const manualReflectLoading = ref<Set<string>>(new Set());
+const manualReflectResult = ref<Map<string, ReflectOnAnswerResponse>>(new Map());
 
 const EXPLORE_PHASE_TRACK_KEY_PREFIX = "somecam-explore-phase-complete";
 
@@ -128,6 +130,47 @@ function onAnsweredEntryBlur(entry: ExploreEntryFull): void {
 		answer_length: entry.userAnswer.trim().length,
 	});
 	trackSubmittedSnapshot(entry.questionId, entry.userAnswer);
+}
+
+async function reflectOnEntry(entry: ExploreEntryFull): Promise<void> {
+	const questionId = entry.questionId;
+	if (manualReflectLoading.value.has(questionId)) return;
+
+	if (entry.userAnswer.trim() === "") {
+		manualReflectResult.value = new Map([...manualReflectResult.value, [questionId, { type: "guardrail", message: "Please write something first" }]]);
+		const idx = entries.value.indexOf(entry);
+		if (idx >= 0) entryTextareas[idx]?.focus();
+		return;
+	}
+
+	manualReflectLoading.value = new Set([...manualReflectLoading.value, questionId]);
+	const next = new Map(manualReflectResult.value);
+	next.delete(questionId);
+	manualReflectResult.value = next;
+
+	let result: ReflectOnAnswerResponse;
+	try {
+		result = await fetchReflectOnAnswer({
+			cardId,
+			questionId,
+			answer: entry.userAnswer,
+		});
+	} catch {
+		result = { type: "none", message: "" };
+	}
+
+	manualReflectResult.value = new Map([...manualReflectResult.value, [questionId, result]]);
+
+	const loadingNext = new Set(manualReflectLoading.value);
+	loadingNext.delete(questionId);
+	manualReflectLoading.value = loadingNext;
+
+	capture("manual_reflect", {
+		session_id: sessionId,
+		card_id: cardId,
+		question_id: questionId,
+		result_type: result.type,
+	});
 }
 
 function persistFreeform(): void {
@@ -638,6 +681,20 @@ onMounted(() => {
 				@blur="index === editingEntryIndex ? persistEntries() : onAnsweredEntryBlur(entry)"
 				@keydown="onKeydown(index, $event)"
 			/>
+			<template v-if="entry.submitted && !(index === editingEntryIndex && reflectionShown)">
+				<template v-if="manualReflectResult.has(entry.questionId)">
+					<p v-if="manualReflectResult.get(entry.questionId)!.type === 'guardrail'" class="reflection-guardrail">
+						<em>{{ manualReflectResult.get(entry.questionId)!.message }}</em>
+					</p>
+					<p v-else-if="manualReflectResult.get(entry.questionId)!.type === 'thought_bubble'" class="reflection-thought-bubble">
+						<span class="thought-bubble-icon" aria-hidden="true">💭</span> <em>{{ manualReflectResult.get(entry.questionId)!.message }}</em>
+					</p>
+					<p v-else class="manual-reflect-positive"><em>Your answer looks good!</em></p>
+				</template>
+				<p v-if="manualReflectLoading.has(entry.questionId) || ((awaitingReflection || inferring) && index === entries.length - 1)" class="hint">Thinking about your answer...</p>
+				<!-- eslint-disable-next-line vue/no-restricted-html-elements -->
+				<button v-else class="reflect-link-btn" @click="reflectOnEntry(entry)">Get feedback</button>
+			</template>
 			<template v-if="index === editingEntryIndex">
 				<p v-if="reflectionType === 'guardrail'" class="reflection-guardrail">
 					<em>{{ reflectionMessage }}</em>
@@ -649,15 +706,6 @@ onMounted(() => {
 				<p v-if="reflectionShown" class="hint">Press Next to continue as-is, or edit your answer above</p>
 				<p v-else class="hint">Shift + Enter to submit</p>
 			</template>
-		</div>
-
-		<div v-if="inferring" class="inferring-indicator">
-			<span class="spinner"></span>
-			<span>Thinking about your next question...</span>
-		</div>
-		<div v-else-if="awaitingReflection" class="inferring-indicator">
-			<span class="spinner"></span>
-			<span>Reflecting on your answer...</span>
 		</div>
 
 		<div v-if="allAnswered && !inferring && !reflectionShown && !awaitingReflection" class="card-hrule">
@@ -715,33 +763,6 @@ label {
 	cursor: pointer;
 }
 
-.inferring-indicator {
-	display: flex;
-	align-items: center;
-	gap: var(--space-3);
-	padding: var(--space-4) 0;
-	font-size: var(--text-base);
-	color: var(--color-gray-400);
-	font-style: italic;
-}
-
-.spinner {
-	display: inline-block;
-	width: 1.25rem;
-	height: 1.25rem;
-	border: 2px solid var(--color-gray-200);
-	border-top-color: var(--color-green-600);
-	border-radius: 50%;
-	animation: spin 0.8s linear infinite;
-	flex-shrink: 0;
-}
-
-@keyframes spin {
-	to {
-		transform: rotate(360deg);
-	}
-}
-
 .submit-btn {
 	width: 100%;
 	margin-top: var(--space-4);
@@ -769,6 +790,35 @@ label {
 	padding: var(--space-3) var(--space-4);
 	margin: 0 0 var(--space-2);
 	font-style: italic;
+}
+
+.reflect-link-btn {
+	background: none;
+	border: none;
+	color: var(--color-gray-400);
+	font-size: var(--text-sm);
+	text-decoration: underline;
+	cursor: pointer;
+	padding: 0;
+	margin-top: var(--space-1);
+}
+
+.reflect-link-btn:hover {
+	color: var(--color-green-600);
+}
+
+.reflect-link-btn:disabled {
+	background: none;
+	border: none;
+	text-decoration: none;
+	cursor: default;
+}
+
+.manual-reflect-positive {
+	font-size: var(--text-sm);
+	color: var(--color-green-600);
+	font-style: italic;
+	margin: var(--space-1) 0 0;
 }
 
 .prefill-hint {
