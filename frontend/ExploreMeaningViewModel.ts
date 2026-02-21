@@ -1,0 +1,620 @@
+import { ref, type Ref } from "vue";
+
+import { fetchReflectOnAnswer, fetchInferredAnswers } from "./api.ts";
+import type { ReflectOnAnswerResponse } from "./api.ts";
+import { capture } from "./analytics.ts";
+import type { ExploreEntryFull } from "./store.ts";
+import { loadChosenCardIds, loadExploreDataFull, loadFreeformNotes, loadStatementSelections, requestStoragePersistence, saveExploreData, saveFreeformNotes, saveStatementSelections } from "./store.ts";
+import { EXPLORE_QUESTIONS } from "../shared/explore-questions.ts";
+import type { MeaningCard } from "../shared/meaning-cards.ts";
+import { MEANING_CARDS } from "../shared/meaning-cards.ts";
+import { MEANING_STATEMENTS } from "../shared/meaning-statements.ts";
+
+const cardsById = new Map(MEANING_CARDS.map((c) => [c.id, c]));
+
+const EXPLORE_PHASE_TRACK_KEY_PREFIX = "somecam-explore-phase-complete";
+
+export class ExploreMeaningViewModel {
+	private readonly sessionId: string;
+	private readonly cardId: string;
+
+	private readonly _card = ref<MeaningCard | undefined>(undefined);
+	private readonly _entries = ref<ExploreEntryFull[]>([]);
+	private readonly _inferring = ref(false);
+	private readonly _reflectionType: Ref<"guardrail" | "thought_bubble" | null> = ref(null);
+	private readonly _reflectionMessage = ref("");
+	private readonly _awaitingReflection = ref(false);
+	private readonly _pendingInferResult = ref<Map<string, string> | null>(null);
+	private readonly _freeformNote = ref("");
+	private readonly _selectedStatementIds = ref<Set<string>>(new Set());
+	private readonly _statementsConfirmed = ref(false);
+	private readonly _questionStartTimeMs = ref(performance.now());
+	private readonly _submittedAnswerSnapshots = ref<Map<string, string>>(new Map());
+	private readonly _editedAfterSubmit = ref<Set<string>>(new Set());
+	private readonly _manualReflectLoading = ref<Set<string>>(new Set());
+	private readonly _manualReflectResult = ref<Map<string, ReflectOnAnswerResponse>>(new Map());
+	private readonly _prefilledQuestionIds = ref<Set<string>>(new Set());
+
+	constructor(sessionId: string, cardId: string) {
+		this.sessionId = sessionId;
+		this.cardId = cardId;
+	}
+
+	// --- Public getters ---
+
+	get card(): MeaningCard | undefined {
+		return this._card.value;
+	}
+
+	get entries(): ExploreEntryFull[] {
+		return this._entries.value;
+	}
+
+	get inferring(): boolean {
+		return this._inferring.value;
+	}
+
+	get reflectionType(): "guardrail" | "thought_bubble" | null {
+		return this._reflectionType.value;
+	}
+
+	get reflectionMessage(): string {
+		return this._reflectionMessage.value;
+	}
+
+	get awaitingReflection(): boolean {
+		return this._awaitingReflection.value;
+	}
+
+	get freeformNote(): string {
+		return this._freeformNote.value;
+	}
+
+	set freeformNote(value: string) {
+		this._freeformNote.value = value;
+	}
+
+	get selectedStatementIds(): Set<string> {
+		return this._selectedStatementIds.value;
+	}
+
+	get statementsConfirmed(): boolean {
+		return this._statementsConfirmed.value;
+	}
+
+	get manualReflectLoading(): Set<string> {
+		return this._manualReflectLoading.value;
+	}
+
+	get manualReflectResult(): Map<string, ReflectOnAnswerResponse> {
+		return this._manualReflectResult.value;
+	}
+
+	get prefilledQuestionIds(): Set<string> {
+		return this._prefilledQuestionIds.value;
+	}
+
+	// --- Computed getters ---
+
+	get reflectionShown(): boolean {
+		return this._reflectionType.value !== null;
+	}
+
+	get activeIndex(): number {
+		const idx = this._entries.value.findIndex((e) => !e.submitted);
+		return idx === -1 ? this._entries.value.length : idx;
+	}
+
+	get editingEntryIndex(): number {
+		if (this.reflectionShown) {
+			const lastIdx = this._entries.value.length - 1;
+			return lastIdx >= 0 && this._entries.value[lastIdx].submitted ? lastIdx : -1;
+		}
+		const idx = this.activeIndex;
+		return idx < this._entries.value.length ? idx : -1;
+	}
+
+	get allAnswered(): boolean {
+		return this._entries.value.length === EXPLORE_QUESTIONS.length && this._entries.value.every((e) => e.submitted);
+	}
+
+	get submittedCount(): number {
+		return this._entries.value.filter((e) => e.submitted).length;
+	}
+
+	get cardStatements(): (typeof MEANING_STATEMENTS)[number][] {
+		return MEANING_STATEMENTS.filter((s) => s.meaningId === this.cardId);
+	}
+
+	// --- Public methods ---
+
+	initialize(): "ready" | "no-data" {
+		const foundCard = cardsById.get(this.cardId);
+		if (foundCard === undefined) {
+			return "no-data";
+		}
+
+		try {
+			const data = loadExploreDataFull(this.sessionId);
+			if (data === null) {
+				return "no-data";
+			}
+			const cardEntries = data[this.cardId];
+			if (!Array.isArray(cardEntries) || cardEntries.length === 0) {
+				return "no-data";
+			}
+
+			this._card.value = foundCard;
+			this._entries.value = cardEntries;
+			this._freeformNote.value = loadFreeformNotes(this.sessionId)[this.cardId] ?? "";
+			const savedSelections = loadStatementSelections(this.sessionId);
+			if (this.cardId in savedSelections) {
+				this._selectedStatementIds.value = new Set(savedSelections[this.cardId]);
+				this._statementsConfirmed.value = true;
+			}
+			this._submittedAnswerSnapshots.value = new Map(this._entries.value.filter((entry) => entry.submitted).map((entry) => [entry.questionId, entry.userAnswer]));
+
+			const lastEntry = this._entries.value[this._entries.value.length - 1];
+			if (lastEntry.submitted) {
+				if (lastEntry.guardrailText !== "" && !lastEntry.submittedAfterGuardrail) {
+					this._reflectionType.value = "guardrail";
+					this._reflectionMessage.value = lastEntry.guardrailText;
+					return "ready";
+				}
+				if (lastEntry.thoughtBubbleText !== "" && !lastEntry.thoughtBubbleAcknowledged) {
+					this._reflectionType.value = "thought_bubble";
+					this._reflectionMessage.value = lastEntry.thoughtBubbleText;
+					return "ready";
+				}
+				if (this._entries.value.length < EXPLORE_QUESTIONS.length) {
+					void this.inferAndAdvance();
+				}
+			} else {
+				const idx = this.activeIndex;
+				if (idx < this._entries.value.length) {
+					const entry = this._entries.value[idx];
+					if (entry.prefilledAnswer !== "") {
+						this._prefilledQuestionIds.value.add(entry.questionId);
+						if (entry.userAnswer === "") {
+							entry.userAnswer = entry.prefilledAnswer;
+						}
+					}
+					this.markQuestionStartNow();
+				}
+			}
+
+			return "ready";
+		} catch {
+			return "no-data";
+		}
+	}
+
+	async submitAnswer(): Promise<void> {
+		if (this._awaitingReflection.value) return;
+
+		if (this.reflectionShown) {
+			const lastIdx = this._entries.value.length - 1;
+			if (lastIdx < 0) return;
+			const entry = this._entries.value[lastIdx];
+			const wasGuardrail = this._reflectionType.value === "guardrail";
+			const wasThoughtBubble = this._reflectionType.value === "thought_bubble";
+			const wasEdited = this._editedAfterSubmit.value.has(entry.questionId);
+
+			this.acceptReflection();
+			this._reflectionType.value = null;
+			this._reflectionMessage.value = "";
+
+			if (wasThoughtBubble) {
+				entry.thoughtBubbleAcknowledged = true;
+				this.persistEntries();
+			}
+
+			if (wasGuardrail && wasEdited) {
+				this._awaitingReflection.value = true;
+				let secondResult: ReflectOnAnswerResponse | null = null;
+				try {
+					secondResult = await fetchReflectOnAnswer({
+						cardId: this.cardId,
+						questionId: entry.questionId,
+						answer: entry.userAnswer,
+						suppressGuardrail: true,
+					});
+				} catch {
+					// fail open
+				} finally {
+					this._awaitingReflection.value = false;
+				}
+
+				if (secondResult !== null && secondResult.type === "thought_bubble" && secondResult.message !== "") {
+					entry.thoughtBubbleText = secondResult.message;
+					entry.thoughtBubbleAcknowledged = false;
+					this.persistEntries();
+					this._reflectionType.value = "thought_bubble";
+					this._reflectionMessage.value = secondResult.message;
+					capture("thought_bubble_shown", {
+						session_id: this.sessionId,
+						card_id: this.cardId,
+						question_id: entry.questionId,
+					});
+					return;
+				}
+			}
+
+			this.applyInferAndAdvance(this._pendingInferResult.value ?? new Map<string, string>(), this.remainingQuestionIds());
+			this._pendingInferResult.value = null;
+			return;
+		}
+
+		const idx = this.activeIndex;
+		if (idx >= this._entries.value.length) return;
+
+		const answerText = this._entries.value[idx].userAnswer.trim();
+		if (answerText === "") return;
+
+		const questionId = this._entries.value[idx].questionId;
+		const source = this.answerSource(this._entries.value[idx], answerText);
+		capture("question_answered", {
+			session_id: this.sessionId,
+			card_id: this.cardId,
+			question_id: questionId,
+			answer_length: answerText.length,
+			time_spent_ms: Math.round(performance.now() - this._questionStartTimeMs.value),
+			source,
+		});
+		if (source === "inferred-accepted") {
+			capture("inferred_answer_accepted", {
+				session_id: this.sessionId,
+				card_id: this.cardId,
+				question_id: questionId,
+			});
+		} else if (source === "inferred-edited") {
+			capture("inferred_answer_edited", {
+				session_id: this.sessionId,
+				card_id: this.cardId,
+				question_id: questionId,
+			});
+		}
+
+		this._entries.value[idx].userAnswer = answerText;
+		this._entries.value[idx].submitted = true;
+		this._prefilledQuestionIds.value.delete(questionId);
+		this.trackSubmittedSnapshot(questionId, answerText);
+		this.persistEntries();
+
+		requestStoragePersistence(this.sessionId);
+
+		const remaining = this.remainingQuestionIds();
+
+		const questions = [...this._entries.value.filter((e) => e.submitted).map((e) => ({ questionId: e.questionId, answer: e.userAnswer })), ...remaining.map((qId) => ({ questionId: qId, answer: "" }))];
+
+		const inferPromise =
+			remaining.length > 0
+				? fetchInferredAnswers({ cardId: this.cardId, questions })
+						.then((r) => new Map(r.inferredAnswers.map((ia) => [ia.questionId, ia.answer])))
+						.catch(() => new Map<string, string>())
+				: Promise.resolve(new Map<string, string>());
+
+		this._inferring.value = remaining.length > 0;
+
+		this._awaitingReflection.value = true;
+		const reflectResult = await fetchReflectOnAnswer({
+			cardId: this.cardId,
+			questionId,
+			answer: answerText,
+		})
+			.catch((): ReflectOnAnswerResponse => ({ type: "none", message: "" }))
+			.finally(() => {
+				this._awaitingReflection.value = false;
+			});
+		capture("reflect_on_answer_triggered", {
+			session_id: this.sessionId,
+			card_id: this.cardId,
+			question_id: questionId,
+			result_type: reflectResult.type,
+			is_second_call: false,
+		});
+
+		if (reflectResult.type === "guardrail" && reflectResult.message !== "") {
+			this._inferring.value = false;
+			this._pendingInferResult.value = null;
+			this._entries.value[idx].guardrailText = reflectResult.message;
+			this.persistEntries();
+			capture("guardrail_shown", {
+				session_id: this.sessionId,
+				card_id: this.cardId,
+				question_id: questionId,
+			});
+			this._reflectionType.value = "guardrail";
+			this._reflectionMessage.value = reflectResult.message;
+			void inferPromise.then((result) => {
+				this._pendingInferResult.value = result;
+			});
+			return;
+		}
+
+		if (reflectResult.type === "thought_bubble" && reflectResult.message !== "") {
+			this._inferring.value = false;
+			this._pendingInferResult.value = null;
+			this._entries.value[idx].thoughtBubbleText = reflectResult.message;
+			this._entries.value[idx].thoughtBubbleAcknowledged = false;
+			this.persistEntries();
+			capture("thought_bubble_shown", {
+				session_id: this.sessionId,
+				card_id: this.cardId,
+				question_id: questionId,
+			});
+			this._reflectionType.value = "thought_bubble";
+			this._reflectionMessage.value = reflectResult.message;
+			void inferPromise.then((result) => {
+				this._pendingInferResult.value = result;
+			});
+			return;
+		}
+
+		const inferResult = await inferPromise;
+		this._inferring.value = false;
+
+		this.applyInferAndAdvance(inferResult, remaining);
+	}
+
+	onActiveEntryInput(entry: ExploreEntryFull): void {
+		const snapshot = this._submittedAnswerSnapshots.value.get(entry.questionId);
+		if (snapshot !== undefined && snapshot !== entry.userAnswer) {
+			this._editedAfterSubmit.value.add(entry.questionId);
+		}
+	}
+
+	onAnsweredEntryInput(entry: ExploreEntryFull): void {
+		const snapshot = this._submittedAnswerSnapshots.value.get(entry.questionId);
+		if (snapshot !== undefined && snapshot !== entry.userAnswer) {
+			this._editedAfterSubmit.value.add(entry.questionId);
+		}
+	}
+
+	onAnsweredEntryBlur(entry: ExploreEntryFull): void {
+		this.persistEntries();
+		if (!this._editedAfterSubmit.value.has(entry.questionId)) {
+			return;
+		}
+		capture("answer_edited_after_submit", {
+			session_id: this.sessionId,
+			card_id: this.cardId,
+			question_id: entry.questionId,
+			answer_length: entry.userAnswer.trim().length,
+		});
+		this.trackSubmittedSnapshot(entry.questionId, entry.userAnswer);
+	}
+
+	async reflectOnEntry(questionId: string): Promise<void> {
+		if (this._manualReflectLoading.value.has(questionId)) return;
+
+		const entry = this._entries.value.find((e) => e.questionId === questionId);
+		if (entry === undefined) return;
+
+		if (entry.userAnswer.trim() === "") {
+			this._manualReflectResult.value = new Map([...this._manualReflectResult.value, [questionId, { type: "guardrail", message: "Please write something first" }]]);
+			return;
+		}
+
+		this._manualReflectLoading.value = new Set([...this._manualReflectLoading.value, questionId]);
+		const next = new Map(this._manualReflectResult.value);
+		next.delete(questionId);
+		this._manualReflectResult.value = next;
+
+		let result: ReflectOnAnswerResponse;
+		try {
+			result = await fetchReflectOnAnswer({
+				cardId: this.cardId,
+				questionId,
+				answer: entry.userAnswer,
+			});
+		} catch {
+			result = { type: "none", message: "" };
+		}
+
+		this._manualReflectResult.value = new Map([...this._manualReflectResult.value, [questionId, result]]);
+
+		const loadingNext = new Set(this._manualReflectLoading.value);
+		loadingNext.delete(questionId);
+		this._manualReflectLoading.value = loadingNext;
+
+		capture("manual_reflect", {
+			session_id: this.sessionId,
+			card_id: this.cardId,
+			question_id: questionId,
+			result_type: result.type,
+		});
+	}
+
+	toggleStatement(id: string): void {
+		if (this._selectedStatementIds.value.has(id)) {
+			this._selectedStatementIds.value.delete(id);
+		} else {
+			this._selectedStatementIds.value.add(id);
+		}
+		this._selectedStatementIds.value = new Set(this._selectedStatementIds.value);
+		if (this._statementsConfirmed.value) {
+			this.persistStatements();
+		}
+	}
+
+	confirmStatements(): void {
+		this._statementsConfirmed.value = true;
+		this.persistStatements();
+	}
+
+	persistEntries(): void {
+		const data = loadExploreDataFull(this.sessionId);
+		if (data === null) return;
+		data[this.cardId] = this._entries.value;
+		saveExploreData(this.sessionId, data);
+	}
+
+	persistFreeform(): void {
+		const notes = loadFreeformNotes(this.sessionId);
+		notes[this.cardId] = this._freeformNote.value;
+		saveFreeformNotes(this.sessionId, notes);
+	}
+
+	finishExploring(): void {
+		if (this.reflectionShown) {
+			this.acceptReflection();
+		}
+		this.persistEntries();
+		this.persistFreeform();
+		this.persistStatements();
+		const noteLength = this._freeformNote.value.trim().length;
+		if (noteLength > 0) {
+			capture("freeform_notes_added", {
+				session_id: this.sessionId,
+				card_id: this.cardId,
+				note_length: noteLength,
+			});
+		}
+		const answeredCount = this._entries.value.filter((entry) => entry.submitted).length;
+		capture("card_exploration_finished", {
+			session_id: this.sessionId,
+			card_id: this.cardId,
+			answered_count: answeredCount,
+			total_questions: EXPLORE_QUESTIONS.length,
+			completed_all_questions: answeredCount === EXPLORE_QUESTIONS.length,
+		});
+		this.maybeTrackExplorePhaseCompleted();
+	}
+
+	// --- Private helpers ---
+
+	private answerSource(entry: ExploreEntryFull, answer: string): "original" | "inferred-accepted" | "inferred-edited" {
+		if (entry.prefilledAnswer === "") {
+			return "original";
+		}
+		return answer === entry.prefilledAnswer ? "inferred-accepted" : "inferred-edited";
+	}
+
+	private trackSubmittedSnapshot(questionId: string, answer: string): void {
+		this._submittedAnswerSnapshots.value.set(questionId, answer);
+		this._editedAfterSubmit.value.delete(questionId);
+	}
+
+	private markQuestionStartNow(): void {
+		this._questionStartTimeMs.value = performance.now();
+	}
+
+	private acceptReflection(): void {
+		const lastIdx = this._entries.value.length - 1;
+		if (lastIdx < 0 || !this._entries.value[lastIdx].submitted) return;
+		const entry = this._entries.value[lastIdx];
+		entry.userAnswer = entry.userAnswer.trim();
+		if (this._reflectionType.value === "guardrail") {
+			entry.submittedAfterGuardrail = true;
+			this.trackSubmittedSnapshot(entry.questionId, entry.userAnswer);
+			capture("answer_submitted_after_guardrail", {
+				session_id: this.sessionId,
+				card_id: this.cardId,
+				question_id: entry.questionId,
+			});
+		}
+	}
+
+	private answeredQuestionIds(): Set<string> {
+		return new Set(this._entries.value.filter((e) => e.submitted).map((e) => e.questionId));
+	}
+
+	private remainingQuestionIds(): string[] {
+		const answered = this.answeredQuestionIds();
+		const inEntries = new Set(this._entries.value.map((e) => e.questionId));
+		return EXPLORE_QUESTIONS.filter((q) => !answered.has(q.id) && !inEntries.has(q.id)).map((q) => q.id);
+	}
+
+	private applyInferAndAdvance(inferredMap: Map<string, string>, remaining: string[]): void {
+		if (remaining.length === 0) {
+			return;
+		}
+
+		let nextQuestionId: string | undefined;
+		let nextPrefill = "";
+
+		for (const qId of remaining) {
+			const inferred = inferredMap.get(qId);
+			if (inferred !== undefined) {
+				nextQuestionId = qId;
+				nextPrefill = inferred;
+				break;
+			}
+		}
+
+		if (nextQuestionId === undefined) {
+			const randomIndex = Math.floor(Math.random() * remaining.length);
+			nextQuestionId = remaining[randomIndex];
+		}
+
+		this._entries.value.push({
+			questionId: nextQuestionId,
+			userAnswer: nextPrefill,
+			prefilledAnswer: nextPrefill,
+			submitted: false,
+			guardrailText: "",
+			submittedAfterGuardrail: false,
+			thoughtBubbleText: "",
+			thoughtBubbleAcknowledged: false,
+		});
+		if (nextPrefill !== "") {
+			this._prefilledQuestionIds.value.add(nextQuestionId);
+		}
+		this.persistEntries();
+		this.markQuestionStartNow();
+	}
+
+	private async inferAndAdvance(): Promise<void> {
+		const remaining = this.remainingQuestionIds();
+		if (remaining.length === 0) {
+			return;
+		}
+
+		const questions = [...this._entries.value.filter((e) => e.submitted).map((e) => ({ questionId: e.questionId, answer: e.userAnswer })), ...remaining.map((qId) => ({ questionId: qId, answer: "" }))];
+
+		this._inferring.value = true;
+		let inferredMap = new Map<string, string>();
+		try {
+			const result = await fetchInferredAnswers({ cardId: this.cardId, questions });
+			inferredMap = new Map(result.inferredAnswers.map((ia) => [ia.questionId, ia.answer]));
+		} catch {
+			// graceful degradation: no pre-fills
+		} finally {
+			this._inferring.value = false;
+		}
+
+		this.applyInferAndAdvance(inferredMap, remaining);
+	}
+
+	private persistStatements(): void {
+		const selections = loadStatementSelections(this.sessionId);
+		selections[this.cardId] = [...this._selectedStatementIds.value];
+		saveStatementSelections(this.sessionId, selections);
+	}
+
+	private maybeTrackExplorePhaseCompleted(): void {
+		const trackedKey = `${EXPLORE_PHASE_TRACK_KEY_PREFIX}:${this.sessionId}`;
+		if (sessionStorage.getItem(trackedKey) === "1") {
+			return;
+		}
+
+		const chosenCardIds = loadChosenCardIds(this.sessionId);
+		const data = loadExploreDataFull(this.sessionId);
+		if (chosenCardIds === null || data === null) {
+			return;
+		}
+
+		const allCardsComplete = chosenCardIds.every((chosenId) => {
+			const cardEntries = data[chosenId];
+			return Array.isArray(cardEntries) && cardEntries.length === EXPLORE_QUESTIONS.length && cardEntries.every((entry) => entry.submitted);
+		});
+
+		if (!allCardsComplete) {
+			return;
+		}
+
+		capture("explore_phase_completed", { session_id: this.sessionId });
+		sessionStorage.setItem(trackedKey, "1");
+	}
+}
