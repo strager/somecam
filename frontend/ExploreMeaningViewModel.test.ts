@@ -10,7 +10,7 @@ import { MEANING_CARDS } from "../shared/meaning-cards.ts";
 import { MEANING_STATEMENTS } from "../shared/meaning-statements.ts";
 import { ExploreMeaningViewModel } from "./ExploreMeaningViewModel.ts";
 import type { ExploreDataFull, ExploreEntryFull } from "./store.ts";
-import { ensureSessionsInitialized, getActiveSessionId, loadExploreDataFull, loadFreeformNotes, loadStatementSelections, saveChosenCardIds, saveExploreData, saveFreeformNotes, saveStatementSelections } from "./store.ts";
+import { ensureSessionsInitialized, getActiveSessionId, loadExploreDataFull, loadFreeformNotes, loadStatementSelections, saveChosenCardIds, saveExploreData, saveFreeformNotes } from "./store.ts";
 
 let currentWindow: Window | null = null;
 
@@ -153,13 +153,18 @@ describe("initialize", () => {
 	it("restores statement selections from localStorage", () => {
 		const entries = [makeEntry(EXPLORE_QUESTIONS[0].id, "answer", false)];
 		setupExploreData(TEST_CARD_ID, entries);
-		saveStatementSelections(sid(), { [TEST_CARD_ID]: ["3", "6"] });
 
-		const vm = new ExploreMeaningViewModel(sid(), TEST_CARD_ID);
-		vm.initialize();
-		expect(vm.selectedStatementIds.has("3")).toBe(true);
-		expect(vm.selectedStatementIds.has("6")).toBe(true);
-		expect(vm.statementsConfirmed).toBe(true);
+		const vm1 = new ExploreMeaningViewModel(sid(), TEST_CARD_ID);
+		vm1.initialize();
+		vm1.toggleStatement("3");
+		vm1.toggleStatement("6");
+		vm1.confirmStatements();
+
+		const vm2 = new ExploreMeaningViewModel(sid(), TEST_CARD_ID);
+		vm2.initialize();
+		expect(vm2.selectedStatementIds.has("3")).toBe(true);
+		expect(vm2.selectedStatementIds.has("6")).toBe(true);
+		expect(vm2.statementsConfirmed).toBe(true);
 	});
 
 	it("resumes with pending guardrail", () => {
@@ -208,15 +213,30 @@ describe("initialize", () => {
 		expect(vm.reflectionType).toBeNull();
 	});
 
-	it("restores prefilled answer state", () => {
-		const entry = makeEntry(EXPLORE_QUESTIONS[0].id, "", false);
-		entry.prefilledAnswer = "suggested answer";
-		setupExploreData(TEST_CARD_ID, [entry]);
+	it("restores prefilled answer state", async () => {
+		const nextQId = EXPLORE_QUESTIONS[1].id;
+		server.use(
+			http.post("*/api/reflect-on-answer", () => {
+				return HttpResponse.json({ type: "none", message: "" });
+			}),
+			http.post("*/api/infer-answers", () => {
+				return HttpResponse.json({
+					inferredAnswers: [{ questionId: nextQId, answer: "suggested answer" }],
+				});
+			}),
+		);
+		const entries = [makeEntry(EXPLORE_QUESTIONS[0].id, "My answer", false)];
+		setupExploreData(TEST_CARD_ID, entries);
 
-		const vm = new ExploreMeaningViewModel(sid(), TEST_CARD_ID);
-		vm.initialize();
-		expect(vm.prefilledQuestionIds.has(EXPLORE_QUESTIONS[0].id)).toBe(true);
-		expect(vm.entries[0].userAnswer).toBe("suggested answer");
+		const vm1 = new ExploreMeaningViewModel(sid(), TEST_CARD_ID);
+		vm1.initialize();
+		await vm1.submitAnswer();
+
+		// Q2 entry now exists with prefilled answer persisted
+		const vm2 = new ExploreMeaningViewModel(sid(), TEST_CARD_ID);
+		vm2.initialize();
+		expect(vm2.prefilledQuestionIds.has(nextQId)).toBe(true);
+		expect(vm2.entries[1].userAnswer).toBe("suggested answer");
 	});
 
 	it("returns 'no-data' on corrupt localStorage data", () => {
@@ -564,6 +584,34 @@ describe("dismissing reflection", () => {
 		expect(vm.reflectionMessage).toBe("Interesting point");
 	});
 
+	it("second reflect after guardrail+edit ignores guardrail response", async () => {
+		server.use(
+			http.post("*/api/reflect-on-answer", () => {
+				return HttpResponse.json({ type: "guardrail", message: "Try again" });
+			}),
+			http.post("*/api/infer-answers", () => {
+				return HttpResponse.json({ inferredAnswers: [] });
+			}),
+		);
+		const entries = [makeEntry(EXPLORE_QUESTIONS[0].id, "short", false)];
+		setupExploreData(TEST_CARD_ID, entries);
+
+		const vm = new ExploreMeaningViewModel(sid(), TEST_CARD_ID);
+		vm.initialize();
+		await vm.submitAnswer();
+		expect(vm.reflectionType).toBe("guardrail");
+
+		// Edit the answer and resubmit — second call also returns guardrail,
+		// but suppressGuardrail + the client-side thought_bubble gate means
+		// it is ignored.
+		vm.entries[0].userAnswer = "a much longer and more detailed answer now";
+		vm.onActiveEntryInput(vm.entries[0]);
+		await vm.submitAnswer();
+
+		expect(vm.reflectionType).toBeNull();
+		expect(vm.entries).toHaveLength(2);
+	});
+
 	it("dismissing thought bubble sets thoughtBubbleAcknowledged", async () => {
 		server.use(
 			http.post("*/api/reflect-on-answer", () => {
@@ -708,6 +756,26 @@ describe("manual reflection", () => {
 		const result = vm.manualReflectResult.get(EXPLORE_QUESTIONS[0].id);
 		expect(result).toBeDefined();
 		expect(result!.type).toBe("none");
+	});
+
+	it("manual reflection result is not restored on reload", async () => {
+		server.use(
+			http.post("*/api/reflect-on-answer", () => {
+				return HttpResponse.json({ type: "thought_bubble", message: "Interesting!" });
+			}),
+		);
+		const entries = makeAllSubmitted();
+		setupExploreData(TEST_CARD_ID, entries);
+
+		const vm = new ExploreMeaningViewModel(sid(), TEST_CARD_ID);
+		vm.initialize();
+		await vm.reflectOnEntry(EXPLORE_QUESTIONS[0].id);
+		expect(vm.manualReflectResult.get(EXPLORE_QUESTIONS[0].id)).toBeDefined();
+
+		// Create a second VM from the same persisted state
+		const vm2 = new ExploreMeaningViewModel(sid(), TEST_CARD_ID);
+		vm2.initialize();
+		expect(vm2.manualReflectResult.size).toBe(0);
 	});
 });
 
@@ -926,6 +994,36 @@ describe("derived properties", () => {
 		expect(statements.length).toBeGreaterThan(0);
 		for (const s of statements) {
 			expect(s.meaningId).toBe(TEST_CARD_ID);
+		}
+	});
+});
+
+describe("random question selection", () => {
+	it("uses Math.random to pick next question when no inferences", async () => {
+		const originalRandom = Math.random;
+		Math.random = () => 0.999;
+		try {
+			server.use(
+				http.post("*/api/reflect-on-answer", () => {
+					return HttpResponse.json({ type: "none", message: "" });
+				}),
+				http.post("*/api/infer-answers", () => {
+					return new HttpResponse(null, { status: 500 });
+				}),
+			);
+			const entries = [makeEntry(EXPLORE_QUESTIONS[0].id, "My answer", false)];
+			setupExploreData(TEST_CARD_ID, entries);
+
+			const vm = new ExploreMeaningViewModel(sid(), TEST_CARD_ID);
+			vm.initialize();
+			await vm.submitAnswer();
+
+			// Remaining questions are EXPLORE_QUESTIONS[1..4] (4 items).
+			// Math.floor(0.999 * 4) = 3, so index 3 → EXPLORE_QUESTIONS[4].
+			expect(vm.entries).toHaveLength(2);
+			expect(vm.entries[1].questionId).toBe(EXPLORE_QUESTIONS[4].id);
+		} finally {
+			Math.random = originalRandom;
 		}
 	});
 });
