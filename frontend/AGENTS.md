@@ -1,3 +1,7 @@
+## ViewModel Pattern
+
+- Pages use a ViewModel pattern (see `docs/viewmodel.md`). When introducing or editing a feature, update the ViewModel (`.ts`) and its tests (`.test.ts`), not just the View (`.vue`).
+
 ## localStorage
 
 - All localStorage access goes through `frontend/store.ts`. Do not use `localStorage` directly in components.
