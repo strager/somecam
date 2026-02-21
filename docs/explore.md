@@ -57,17 +57,6 @@ Selections are saved to localStorage (as statement IDs) and included in the
 downloadable report. Statement text is resolved from the shared
 `MEANING_STATEMENTS` data at display time.
 
-## Additional notes (free-form)
-
-Once all five questions have been answered, a free-form textarea labelled
-"Additional notes about this source of meaning" is displayed. This is not a
-structured question — there is no AI summary and no depth check. The user can
-type any extra thoughts they want to capture about the card. The note is saved to
-localStorage and included in the downloadable report above the five Q&A blocks.
-
-The user can leave the field empty and click **Finish exploring** to return to
-the sources-of-meaning overview.
-
 ## Answer reflection (guardrail and thought bubble)
 
 After the user submits an answer, the app fires two requests in parallel: the
@@ -147,6 +136,17 @@ good!" (type "none").
 
 The Reflect link is not shown on the active question while the automatic
 submit-flow reflection is visible, to avoid duplication.
+
+## Additional notes (free-form)
+
+Once all five questions have been answered, a free-form textarea labelled
+"Additional notes about this source of meaning" is displayed. This is not a
+structured question — there is no answer reflection. The user can type any extra
+thoughts they want to capture about the card. The note is saved to localStorage
+and included in the downloadable report above the five Q&A blocks.
+
+The user can leave the field empty and click **Finish exploring** to return to
+the sources-of-meaning overview.
 
 ## Using "Stop Exploring" for early exit
 
