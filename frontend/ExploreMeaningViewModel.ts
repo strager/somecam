@@ -4,7 +4,7 @@ import { fetchReflectOnAnswer, fetchInferredAnswers } from "./api.ts";
 import type { ReflectOnAnswerResponse } from "./api.ts";
 import { capture } from "./analytics.ts";
 import type { ExploreEntry } from "./store.ts";
-import { isExplorePhaseComplete, loadExploreData, loadFreeformNotes, loadStatementSelections, requestStoragePersistence, saveExploreData, saveFreeformNotes, saveStatementSelections } from "./store.ts";
+import { isExplorePhaseComplete, loadExploreData, requestStoragePersistence, saveExploreData } from "./store.ts";
 import { EXPLORE_QUESTIONS } from "../shared/explore-questions.ts";
 import type { MeaningCard } from "../shared/meaning-cards.ts";
 import { MEANING_CARDS } from "../shared/meaning-cards.ts";
@@ -139,17 +139,16 @@ export class ExploreMeaningViewModel {
 			if (data === null) {
 				return "no-data";
 			}
-			const cardEntries = data[this.cardId];
-			if (!Array.isArray(cardEntries) || cardEntries.length === 0) {
+			if (!(this.cardId in data) || data[this.cardId].entries.length === 0) {
 				return "no-data";
 			}
+			const cardData = data[this.cardId];
 
 			this._card.value = foundCard;
-			this._entries.value = cardEntries;
-			this._freeformNote.value = loadFreeformNotes(this.sessionId)[this.cardId] ?? "";
-			const savedSelections = loadStatementSelections(this.sessionId);
-			if (this.cardId in savedSelections) {
-				this._selectedStatementIds.value = new Set(savedSelections[this.cardId]);
+			this._entries.value = cardData.entries;
+			this._freeformNote.value = cardData.freeformNote;
+			if (cardData.statementSelections.length > 0) {
+				this._selectedStatementIds.value = new Set(cardData.statementSelections);
 				this._statementsConfirmed.value = true;
 			}
 			this._submittedAnswerSnapshots.value = new Map(this._entries.value.filter((entry) => entry.submitted).map((entry) => [entry.questionId, entry.userAnswer]));
@@ -446,14 +445,15 @@ export class ExploreMeaningViewModel {
 	persistEntries(): void {
 		const data = loadExploreData(this.sessionId);
 		if (data === null) return;
-		data[this.cardId] = this._entries.value;
+		data[this.cardId] = { ...data[this.cardId], entries: this._entries.value };
 		saveExploreData(this.sessionId, data);
 	}
 
 	persistFreeform(): void {
-		const notes = loadFreeformNotes(this.sessionId);
-		notes[this.cardId] = this._freeformNote.value;
-		saveFreeformNotes(this.sessionId, notes);
+		const data = loadExploreData(this.sessionId);
+		if (data === null) return;
+		data[this.cardId] = { ...data[this.cardId], freeformNote: this._freeformNote.value };
+		saveExploreData(this.sessionId, data);
 	}
 
 	finishExploring(): void {
@@ -588,9 +588,10 @@ export class ExploreMeaningViewModel {
 	}
 
 	private persistStatements(): void {
-		const selections = loadStatementSelections(this.sessionId);
-		selections[this.cardId] = [...this._selectedStatementIds.value];
-		saveStatementSelections(this.sessionId, selections);
+		const data = loadExploreData(this.sessionId);
+		if (data === null) return;
+		data[this.cardId] = { ...data[this.cardId], statementSelections: [...this._selectedStatementIds.value] };
+		saveExploreData(this.sessionId, data);
 	}
 
 	private maybeTrackExplorePhaseCompleted(): void {

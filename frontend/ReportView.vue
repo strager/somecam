@@ -8,7 +8,7 @@ import { budgetedFetch } from "./api.ts";
 import type { CardReport, QuestionReport } from "../shared/report-types.ts";
 import { capture } from "./analytics.ts";
 import { useStringParam } from "./route-utils.ts";
-import { exportSessionData, loadChosenCardIds, loadExploreData, loadFreeformNotes, loadStatementSelections, lookupCachedSummary } from "./store.ts";
+import { exportSessionData, loadChosenCardIds, loadExploreData, lookupCachedSummary } from "./store.ts";
 import { EXPLORE_QUESTIONS } from "../shared/explore-questions.ts";
 import { MEANING_CARDS } from "../shared/meaning-cards.ts";
 import { MEANING_STATEMENTS } from "../shared/meaning-statements.ts";
@@ -163,15 +163,14 @@ onMounted(() => {
 		}
 
 		const exploreData = loadExploreData(sessionId) ?? {};
-		const freeformNotes = loadFreeformNotes(sessionId);
-		const statementSelections = loadStatementSelections(sessionId);
 		const statementTextById = new Map(MEANING_STATEMENTS.map((s) => [s.id, s.statement]));
 
 		for (const cardId of cardIds) {
 			const card = cardsById.get(cardId);
 			if (card === undefined) continue;
 
-			const entries = exploreData[cardId] ?? [];
+			const hasCardData = cardId in exploreData;
+			const entries = hasCardData ? exploreData[cardId].entries : [];
 			const answersByQuestionId = new Map(entries.map((e) => [e.questionId, e.userAnswer]));
 			const questions: QuestionReport[] = [];
 
@@ -187,10 +186,10 @@ onMounted(() => {
 				});
 			}
 
-			const freeformNote = freeformNotes[cardId] ?? "";
+			const freeformNote = hasCardData ? exploreData[cardId].freeformNote : "";
 			const freeformSummary = lookupCachedSummary({ sessionId, cardId, answer: freeformNote }) ?? "";
 
-			const selectedIds = statementSelections[cardId] ?? [];
+			const selectedIds = hasCardData ? exploreData[cardId].statementSelections : [];
 			const selectedStatements = selectedIds.map((id) => statementTextById.get(id)).filter((text): text is string => text !== undefined);
 
 			reports.value.push({ card, questions, selectedStatements, freeformNote, freeformSummary });

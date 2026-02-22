@@ -61,10 +61,15 @@ export interface ExploreEntry {
 	thoughtBubbleAcknowledged: boolean;
 }
 
-export type ExploreData = Record<string, ExploreEntry[]>;
+export interface CardExploreData {
+	entries: ExploreEntry[];
+	freeformNote: string;
+	statementSelections: string[];
+}
+export type ExploreData = Record<string, CardExploreData>;
 type SummaryCache = Record<string, { answer: string; summary: string }>;
-export type FreeformNotes = Partial<Record<string, string>>;
-export type StatementSelections = Partial<Record<string, string[]>>;
+type FreeformNotes = Partial<Record<string, string>>;
+type StatementSelections = Partial<Record<string, string[]>>;
 
 interface LlmTestRow {
 	questionId: string;
@@ -420,6 +425,9 @@ export function loadExploreData(sessionId: string): ExploreData | null {
 		return null;
 	}
 
+	const freeformNotes = loadFreeformNotesInternal(sessionId);
+	const statementSelections = loadStatementSelectionsInternal(sessionId);
+
 	const result: ExploreData = {};
 	for (const [cardId, entries] of Object.entries(parsed)) {
 		if (!Array.isArray(entries)) {
@@ -435,14 +443,32 @@ export function loadExploreData(sessionId: string): ExploreData | null {
 			validEntries.push(validEntry);
 		}
 		const nonBlank = validEntries.filter((e) => e.userAnswer.trim() !== "");
-		result[cardId] = nonBlank.length > 0 ? nonBlank : validEntries.slice(0, 1);
+		result[cardId] = {
+			entries: nonBlank.length > 0 ? nonBlank : validEntries.slice(0, 1),
+			freeformNote: freeformNotes[cardId] ?? "",
+			statementSelections: statementSelections[cardId] ?? [],
+		};
 	}
 
 	return result;
 }
 
 export function saveExploreData(sessionId: string, data: ExploreData): void {
-	localStorage.setItem(exploreKey(sessionId), JSON.stringify(data));
+	const entriesRecord: Record<string, ExploreEntry[]> = {};
+	const freeformRecord: FreeformNotes = {};
+	const statementsRecord: StatementSelections = {};
+	for (const [cardId, cardData] of Object.entries(data)) {
+		entriesRecord[cardId] = cardData.entries;
+		if (cardData.freeformNote !== "") {
+			freeformRecord[cardId] = cardData.freeformNote;
+		}
+		if (cardData.statementSelections.length > 0) {
+			statementsRecord[cardId] = cardData.statementSelections;
+		}
+	}
+	localStorage.setItem(exploreKey(sessionId), JSON.stringify(entriesRecord));
+	localStorage.setItem(freeformKey(sessionId), JSON.stringify(freeformRecord));
+	localStorage.setItem(statementsKey(sessionId), JSON.stringify(statementsRecord));
 	touchSession(sessionId);
 }
 
@@ -481,14 +507,9 @@ function isFreeformNotes(value: unknown): value is FreeformNotes {
 	return true;
 }
 
-export function loadFreeformNotes(sessionId: string): FreeformNotes {
+function loadFreeformNotesInternal(sessionId: string): FreeformNotes {
 	const parsed = parseJsonFromStorage(freeformKey(sessionId));
 	return isFreeformNotes(parsed) ? parsed : {};
-}
-
-export function saveFreeformNotes(sessionId: string, notes: FreeformNotes): void {
-	localStorage.setItem(freeformKey(sessionId), JSON.stringify(notes));
-	touchSession(sessionId);
 }
 
 function isStatementSelections(value: unknown): value is StatementSelections {
@@ -499,14 +520,9 @@ function isStatementSelections(value: unknown): value is StatementSelections {
 	return true;
 }
 
-export function loadStatementSelections(sessionId: string): StatementSelections {
+function loadStatementSelectionsInternal(sessionId: string): StatementSelections {
 	const parsed = parseJsonFromStorage(statementsKey(sessionId));
 	return isStatementSelections(parsed) ? parsed : {};
-}
-
-export function saveStatementSelections(sessionId: string, selections: StatementSelections): void {
-	localStorage.setItem(statementsKey(sessionId), JSON.stringify(selections));
-	touchSession(sessionId);
 }
 
 // --- Global (non-session-scoped) ---
@@ -577,8 +593,9 @@ export function isExplorePhaseComplete(sessionId: string): boolean {
 	}
 
 	return chosenCardIds.every((chosenId) => {
-		const cardEntries = data[chosenId];
-		return Array.isArray(cardEntries) && cardEntries.length === EXPLORE_QUESTIONS.length && cardEntries.every((entry) => entry.submitted);
+		if (!(chosenId in data)) return false;
+		const cardData = data[chosenId];
+		return cardData.entries.length === EXPLORE_QUESTIONS.length && cardData.entries.every((entry) => entry.submitted);
 	});
 }
 

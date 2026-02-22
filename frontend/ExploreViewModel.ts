@@ -7,7 +7,7 @@ import { fetchSummary } from "./api.ts";
 import { capture } from "./analytics.ts";
 import { assignQuestions } from "./explore-data.ts";
 import type { ExploreEntry } from "./store.ts";
-import { loadChosenCardIds, loadExploreData, loadFreeformNotes, lookupCachedSummary, saveCachedSummary, saveExploreData } from "./store.ts";
+import { loadChosenCardIds, loadExploreData, lookupCachedSummary, saveCachedSummary, saveExploreData } from "./store.ts";
 
 export interface SummaryEntry {
 	questionId: string;
@@ -126,7 +126,8 @@ export class ExploreViewModel {
 			}
 			const promises: Promise<void>[] = [];
 
-			for (const [cardId, entries] of Object.entries(exploreData)) {
+			for (const [cardId, cardData] of Object.entries(exploreData)) {
+				const entries = cardData.entries;
 				const answered = entries.filter((e) => e.userAnswer !== "");
 				this._cardAnswerCounts.value[cardId] = answered.length;
 				if (answered.length === 0) continue;
@@ -174,10 +175,9 @@ export class ExploreViewModel {
 				}
 			}
 
-			const freeformNotes = loadFreeformNotes(this.sessionId);
-			for (const cardId of Object.keys(exploreData)) {
-				const noteText: string | undefined = freeformNotes[cardId];
-				if (noteText === undefined || noteText === "") continue;
+			for (const [cardId, cardData] of Object.entries(exploreData)) {
+				const noteText = cardData.freeformNote;
+				if (noteText === "") continue;
 
 				const freeformEntry: FreeformSummary = { summary: "", loading: false, error: "" };
 				this._cardFreeformSummary.value[cardId] = freeformEntry;

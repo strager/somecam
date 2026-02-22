@@ -91,8 +91,8 @@ onMounted(() => {
 
 		const exploreData = loadExploreData(sessionId);
 		if (exploreData !== null) {
-			for (const [cardId, entries] of Object.entries(exploreData)) {
-				if (entries.some((e) => e.userAnswer !== "")) {
+			for (const [cardId, cardData] of Object.entries(exploreData)) {
+				if (cardData.entries.some((e) => e.userAnswer !== "")) {
 					exploredIds.value.add(cardId);
 				}
 			}

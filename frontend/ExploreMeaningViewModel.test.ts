@@ -10,7 +10,7 @@ import { MEANING_CARDS } from "../shared/meaning-cards.ts";
 import { MEANING_STATEMENTS } from "../shared/meaning-statements.ts";
 import { ExploreMeaningViewModel } from "./ExploreMeaningViewModel.ts";
 import type { ExploreData, ExploreEntry } from "./store.ts";
-import { ensureSessionsInitialized, getActiveSessionId, loadExploreData, loadFreeformNotes, loadStatementSelections, saveChosenCardIds, saveExploreData, saveFreeformNotes } from "./store.ts";
+import { ensureSessionsInitialized, getActiveSessionId, loadExploreData, saveChosenCardIds, saveExploreData } from "./store.ts";
 
 let currentWindow: Window | null = null;
 
@@ -87,7 +87,7 @@ function makeEntry(questionId: string, answer: string, submitted: boolean): Expl
 
 function setupExploreData(cardId: string, entries: ExploreEntry[]): void {
 	saveChosenCardIds(sid(), [cardId]);
-	const data: ExploreData = { [cardId]: entries };
+	const data: ExploreData = { [cardId]: { entries, freeformNote: "", statementSelections: [] } };
 	saveExploreData(sid(), data);
 }
 
@@ -123,7 +123,7 @@ describe("initialize", () => {
 
 	it("returns 'no-data' when entries for card are empty", () => {
 		saveChosenCardIds(sid(), [TEST_CARD_ID]);
-		saveExploreData(sid(), { [TEST_CARD_ID]: [] });
+		saveExploreData(sid(), { [TEST_CARD_ID]: { entries: [], freeformNote: "", statementSelections: [] } });
 		const vm = new ExploreMeaningViewModel(sid(), TEST_CARD_ID);
 		expect(vm.initialize()).toBe("no-data");
 	});
@@ -142,8 +142,8 @@ describe("initialize", () => {
 
 	it("restores freeform notes from localStorage", () => {
 		const entries = [makeEntry(EXPLORE_QUESTIONS[0].id, "answer", false)];
-		setupExploreData(TEST_CARD_ID, entries);
-		saveFreeformNotes(sid(), { [TEST_CARD_ID]: "my notes" });
+		saveChosenCardIds(sid(), [TEST_CARD_ID]);
+		saveExploreData(sid(), { [TEST_CARD_ID]: { entries, freeformNote: "my notes", statementSelections: [] } });
 
 		const vm = new ExploreMeaningViewModel(sid(), TEST_CARD_ID);
 		vm.initialize();
@@ -285,7 +285,7 @@ describe("submitAnswer", () => {
 		expect(vm.entries[0].userAnswer).toBe("My thoughtful answer");
 
 		const saved = loadExploreData(sid());
-		expect(saved![TEST_CARD_ID][0].submitted).toBe(true);
+		expect(saved![TEST_CARD_ID].entries[0].submitted).toBe(true);
 	});
 
 	it("trims answer text before submission", async () => {
@@ -670,7 +670,7 @@ describe("entry input and blur", () => {
 
 		// Verify persisted
 		const saved = loadExploreData(sid());
-		expect(saved![TEST_CARD_ID][0].userAnswer).toBe("edited answer");
+		expect(saved![TEST_CARD_ID].entries[0].userAnswer).toBe("edited answer");
 	});
 });
 
@@ -811,8 +811,8 @@ describe("statements and freeform", () => {
 		vm.confirmStatements();
 
 		expect(vm.statementsConfirmed).toBe(true);
-		const saved = loadStatementSelections(sid());
-		expect(saved[TEST_CARD_ID]).toContain(stmtId);
+		const saved = loadExploreData(sid());
+		expect(saved![TEST_CARD_ID].statementSelections).toContain(stmtId);
 	});
 
 	it("toggle persists when already confirmed", () => {
@@ -828,8 +828,8 @@ describe("statements and freeform", () => {
 		vm.confirmStatements();
 		vm.toggleStatement(stmtId);
 
-		const saved = loadStatementSelections(sid());
-		expect(saved[TEST_CARD_ID]).toContain(stmtId);
+		const saved = loadExploreData(sid());
+		expect(saved![TEST_CARD_ID].statementSelections).toContain(stmtId);
 	});
 
 	it("freeform persist saves to localStorage", () => {
@@ -841,8 +841,8 @@ describe("statements and freeform", () => {
 		vm.freeformNote = "My additional thoughts";
 		vm.persistFreeform();
 
-		const saved = loadFreeformNotes(sid());
-		expect(saved[TEST_CARD_ID]).toBe("My additional thoughts");
+		const saved = loadExploreData(sid());
+		expect(saved![TEST_CARD_ID].freeformNote).toBe("My additional thoughts");
 	});
 });
 
@@ -862,14 +862,10 @@ describe("finishExploring", () => {
 
 		vm.finishExploring();
 
-		const savedEntries = loadExploreData(sid());
-		expect(savedEntries![TEST_CARD_ID]).toHaveLength(EXPLORE_QUESTIONS.length);
-
-		const savedNotes = loadFreeformNotes(sid());
-		expect(savedNotes[TEST_CARD_ID]).toBe("Final notes");
-
-		const savedStatements = loadStatementSelections(sid());
-		expect(savedStatements[TEST_CARD_ID]).toBeDefined();
+		const savedData = loadExploreData(sid());
+		expect(savedData![TEST_CARD_ID].entries).toHaveLength(EXPLORE_QUESTIONS.length);
+		expect(savedData![TEST_CARD_ID].freeformNote).toBe("Final notes");
+		expect(savedData![TEST_CARD_ID].statementSelections).toBeDefined();
 	});
 
 	it("accepts pending reflection if shown", async () => {

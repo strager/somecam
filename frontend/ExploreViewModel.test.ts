@@ -9,7 +9,7 @@ import { EXPLORE_QUESTIONS } from "../shared/explore-questions.ts";
 import { MEANING_CARDS } from "../shared/meaning-cards.ts";
 import { ExploreViewModel } from "./ExploreViewModel.ts";
 import type { ExploreData } from "./store.ts";
-import { ensureSessionsInitialized, getActiveSessionId, loadExploreData, lookupCachedSummary, saveCachedSummary, saveChosenCardIds, saveExploreData, saveFreeformNotes } from "./store.ts";
+import { ensureSessionsInitialized, getActiveSessionId, loadExploreData, lookupCachedSummary, saveCachedSummary, saveChosenCardIds, saveExploreData } from "./store.ts";
 
 let currentWindow: Window | null = null;
 
@@ -70,16 +70,20 @@ function setupChosenCards(count: number): string[] {
 function makeExploreData(cardIds: string[], answeredCount: number): ExploreData {
 	const data: ExploreData = {};
 	for (const cardId of cardIds) {
-		data[cardId] = EXPLORE_QUESTIONS.map((q, i) => ({
-			questionId: q.id,
-			userAnswer: i < answeredCount ? `Answer for ${q.id}` : "",
-			prefilledAnswer: "",
-			submitted: i < answeredCount,
-			guardrailText: "",
-			submittedAfterGuardrail: false,
-			thoughtBubbleText: "",
-			thoughtBubbleAcknowledged: false,
-		}));
+		data[cardId] = {
+			entries: EXPLORE_QUESTIONS.map((q, i) => ({
+				questionId: q.id,
+				userAnswer: i < answeredCount ? `Answer for ${q.id}` : "",
+				prefilledAnswer: "",
+				submitted: i < answeredCount,
+				guardrailText: "",
+				submittedAfterGuardrail: false,
+				thoughtBubbleText: "",
+				thoughtBubbleAcknowledged: false,
+			})),
+			freeformNote: "",
+			statementSelections: [],
+		};
 	}
 	return data;
 }
@@ -163,9 +167,9 @@ describe("progress tracking", () => {
 	it("totalAnswered counts answered entries across cards", () => {
 		const cardIds = setupChosenCards(2);
 		const data = makeExploreData(cardIds, 0);
-		data[cardIds[0]][0].userAnswer = "answer 1";
-		data[cardIds[0]][1].userAnswer = "answer 2";
-		data[cardIds[1]][0].userAnswer = "answer 3";
+		data[cardIds[0]].entries[0].userAnswer = "answer 1";
+		data[cardIds[0]].entries[1].userAnswer = "answer 2";
+		data[cardIds[1]].entries[0].userAnswer = "answer 3";
 		saveExploreData(sid(), data);
 		setupDefaultSummarizeHandler();
 
@@ -249,9 +253,9 @@ describe("sortedCards", () => {
 		const data = makeExploreData(cardIds, 0);
 		// Card 0: complete, Card 1: untouched, Card 2: partial
 		for (let i = 0; i < EXPLORE_QUESTIONS.length; i++) {
-			data[cardIds[0]][i].userAnswer = `answer ${String(i)}`;
+			data[cardIds[0]].entries[i].userAnswer = `answer ${String(i)}`;
 		}
-		data[cardIds[2]][0].userAnswer = "partial answer";
+		data[cardIds[2]].entries[0].userAnswer = "partial answer";
 		saveExploreData(sid(), data);
 		setupDefaultSummarizeHandler();
 
@@ -300,7 +304,7 @@ describe("summary loading", () => {
 		saveExploreData(sid(), data);
 
 		const questionId = EXPLORE_QUESTIONS[0].id;
-		const answer = data[cardIds[0]][0].userAnswer;
+		const answer = data[cardIds[0]].entries[0].userAnswer;
 		saveCachedSummary({ sessionId: sid(), cardId: cardIds[0], answer, summary: "Cached summary", questionId });
 
 		// No MSW handler — any fetch would fail with onUnhandledRequest: "error"
@@ -351,7 +355,7 @@ describe("summary loading", () => {
 		const cardIds = setupChosenCards(1);
 		const data = makeExploreData(cardIds, 0);
 		// Answer only the last question
-		data[cardIds[0]][EXPLORE_QUESTIONS.length - 1].userAnswer = "answer";
+		data[cardIds[0]].entries[EXPLORE_QUESTIONS.length - 1].userAnswer = "answer";
 		saveExploreData(sid(), data);
 		setupDefaultSummarizeHandler();
 
@@ -395,8 +399,9 @@ describe("summary loading", () => {
 describe("freeform summary loading", () => {
 	it("loads freeform summary from API", async () => {
 		const cardIds = setupChosenCards(1);
-		saveExploreData(sid(), makeExploreData(cardIds, 1));
-		saveFreeformNotes(sid(), { [cardIds[0]]: "My freeform notes" });
+		const data = makeExploreData(cardIds, 1);
+		data[cardIds[0]].freeformNote = "My freeform notes";
+		saveExploreData(sid(), data);
 		setupDefaultSummarizeHandler();
 
 		const vm = new ExploreViewModel(sid());
@@ -412,9 +417,10 @@ describe("freeform summary loading", () => {
 
 	it("uses cached freeform summary", async () => {
 		const cardIds = setupChosenCards(1);
-		saveExploreData(sid(), makeExploreData(cardIds, 0));
+		const data = makeExploreData(cardIds, 0);
 		const noteText = "My freeform notes";
-		saveFreeformNotes(sid(), { [cardIds[0]]: noteText });
+		data[cardIds[0]].freeformNote = noteText;
+		saveExploreData(sid(), data);
 		saveCachedSummary({ sessionId: sid(), cardId: cardIds[0], answer: noteText, summary: "Cached freeform" });
 
 		// No MSW handler — any fetch would fail
@@ -427,8 +433,9 @@ describe("freeform summary loading", () => {
 
 	it("sets error on freeform fetch failure", async () => {
 		const cardIds = setupChosenCards(1);
-		saveExploreData(sid(), makeExploreData(cardIds, 0));
-		saveFreeformNotes(sid(), { [cardIds[0]]: "My notes" });
+		const data = makeExploreData(cardIds, 0);
+		data[cardIds[0]].freeformNote = "My notes";
+		saveExploreData(sid(), data);
 		server.use(
 			http.post("*/api/summarize", () => {
 				return new HttpResponse(null, { status: 500 });
@@ -456,7 +463,7 @@ describe("freeform summary loading", () => {
 	it("does not create freeform entry for empty string notes", () => {
 		const cardIds = setupChosenCards(1);
 		saveExploreData(sid(), makeExploreData(cardIds, 0));
-		saveFreeformNotes(sid(), { [cardIds[0]]: "" });
+		// freeformNote defaults to "" in makeExploreData, so no change needed
 
 		const vm = new ExploreViewModel(sid());
 		vm.initialize();

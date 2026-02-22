@@ -3,7 +3,7 @@
 import { Window } from "happy-dom";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { createSession, deleteSession, ensureSessionsInitialized, exportProgressData, formatSessionDate, getActiveSessionId, importProgressData, listSessions, loadChosenCardIds, loadExploreData, loadFreeformNotes, loadLlmTestState, loadPrioritize, loadStatementSelections, loadSwipeProgress, lookupCachedSummary, removePrioritize, renameSession, saveCachedSummary, saveChosenCardIds, saveExploreData, saveFreeformNotes, saveLlmTestState, savePrioritize, saveStatementSelections, saveSwipeProgress } from "./store.ts";
+import { createSession, deleteSession, ensureSessionsInitialized, exportProgressData, formatSessionDate, getActiveSessionId, importProgressData, listSessions, loadChosenCardIds, loadExploreData, loadLlmTestState, loadPrioritize, loadSwipeProgress, lookupCachedSummary, removePrioritize, renameSession, saveCachedSummary, saveChosenCardIds, saveExploreData, saveLlmTestState, savePrioritize, saveSwipeProgress } from "./store.ts";
 
 function sid(): string {
 	return getActiveSessionId();
@@ -239,33 +239,41 @@ describe("loadExploreData/saveExploreData", () => {
 
 	it("round-trips saved explore data", () => {
 		saveExploreData(sid(), {
-			"self-knowledge": [
-				{
-					questionId: "interpretation",
-					userAnswer: "My answer",
-					prefilledAnswer: "",
-					submitted: true,
-					guardrailText: "",
-					submittedAfterGuardrail: false,
-					thoughtBubbleText: "",
-					thoughtBubbleAcknowledged: false,
-				},
-			],
+			"self-knowledge": {
+				entries: [
+					{
+						questionId: "interpretation",
+						userAnswer: "My answer",
+						prefilledAnswer: "",
+						submitted: true,
+						guardrailText: "",
+						submittedAfterGuardrail: false,
+						thoughtBubbleText: "",
+						thoughtBubbleAcknowledged: false,
+					},
+				],
+				freeformNote: "",
+				statementSelections: [],
+			},
 		});
 
 		expect(loadExploreData(sid())).toEqual({
-			"self-knowledge": [
-				{
-					questionId: "interpretation",
-					userAnswer: "My answer",
-					prefilledAnswer: "",
-					submitted: true,
-					guardrailText: "",
-					submittedAfterGuardrail: false,
-					thoughtBubbleText: "",
-					thoughtBubbleAcknowledged: false,
-				},
-			],
+			"self-knowledge": {
+				entries: [
+					{
+						questionId: "interpretation",
+						userAnswer: "My answer",
+						prefilledAnswer: "",
+						submitted: true,
+						guardrailText: "",
+						submittedAfterGuardrail: false,
+						thoughtBubbleText: "",
+						thoughtBubbleAcknowledged: false,
+					},
+				],
+				freeformNote: "",
+				statementSelections: [],
+			},
 		});
 	});
 
@@ -285,18 +293,22 @@ describe("loadExploreData/saveExploreData", () => {
 		);
 
 		expect(loadExploreData(sid())).toEqual({
-			"self-knowledge": [
-				{
-					questionId: "interpretation",
-					userAnswer: "answer",
-					prefilledAnswer: "",
-					submitted: true,
-					guardrailText: "",
-					submittedAfterGuardrail: false,
-					thoughtBubbleText: "",
-					thoughtBubbleAcknowledged: false,
-				},
-			],
+			"self-knowledge": {
+				entries: [
+					{
+						questionId: "interpretation",
+						userAnswer: "answer",
+						prefilledAnswer: "",
+						submitted: true,
+						guardrailText: "",
+						submittedAfterGuardrail: false,
+						thoughtBubbleText: "",
+						thoughtBubbleAcknowledged: false,
+					},
+				],
+				freeformNote: "",
+				statementSelections: [],
+			},
 		});
 	});
 
@@ -320,18 +332,22 @@ describe("loadExploreData/saveExploreData", () => {
 		);
 
 		expect(loadExploreData(sid())).toEqual({
-			"self-knowledge": [
-				{
-					questionId: "interpretation",
-					userAnswer: "answer",
-					prefilledAnswer: "",
-					submitted: true,
-					guardrailText: "Can you go deeper?",
-					submittedAfterGuardrail: true,
-					thoughtBubbleText: "What about X?",
-					thoughtBubbleAcknowledged: true,
-				},
-			],
+			"self-knowledge": {
+				entries: [
+					{
+						questionId: "interpretation",
+						userAnswer: "answer",
+						prefilledAnswer: "",
+						submitted: true,
+						guardrailText: "Can you go deeper?",
+						submittedAfterGuardrail: true,
+						thoughtBubbleText: "What about X?",
+						thoughtBubbleAcknowledged: true,
+					},
+				],
+				freeformNote: "",
+				statementSelections: [],
+			},
 		});
 	});
 
@@ -389,7 +405,7 @@ describe("loadExploreData/saveExploreData", () => {
 
 		const result = loadExploreData(sid());
 		expect(result).not.toBeNull();
-		expect(result!["self-knowledge"][0].thoughtBubbleText).toBe("What about your relationship with X?");
+		expect(result!["self-knowledge"].entries[0].thoughtBubbleText).toBe("What about your relationship with X?");
 	});
 
 	it("preserves existing thoughtBubbleAcknowledged", () => {
@@ -410,7 +426,7 @@ describe("loadExploreData/saveExploreData", () => {
 
 		const result = loadExploreData(sid());
 		expect(result).not.toBeNull();
-		expect(result!["self-knowledge"][0].thoughtBubbleAcknowledged).toBe(true);
+		expect(result!["self-knowledge"].entries[0].thoughtBubbleAcknowledged).toBe(true);
 	});
 
 	it("returns null when thoughtBubbleText is not a string", () => {
@@ -581,34 +597,56 @@ describe("loadLlmTestState/saveLlmTestState", () => {
 	});
 });
 
-describe("loadFreeformNotes/saveFreeformNotes", () => {
-	it("returns empty object when key is absent", () => {
-		expect(loadFreeformNotes(sid())).toEqual({});
+describe("freeform notes in ExploreData", () => {
+	it("defaults freeformNote to empty string when freeform key is absent", () => {
+		localStorage.setItem(
+			activeKey("explore"),
+			JSON.stringify({
+				"self-knowledge": [{ questionId: "interpretation", userAnswer: "answer", prefilledAnswer: "", submitted: true }],
+			}),
+		);
+		const result = loadExploreData(sid());
+		expect(result).not.toBeNull();
+		expect(result!["self-knowledge"].freeformNote).toBe("");
 	});
 
-	it("returns empty object for corrupt JSON", () => {
+	it("defaults freeformNote to empty string for corrupt freeform JSON", () => {
+		localStorage.setItem(
+			activeKey("explore"),
+			JSON.stringify({
+				"self-knowledge": [{ questionId: "interpretation", userAnswer: "answer", prefilledAnswer: "", submitted: true }],
+			}),
+		);
 		localStorage.setItem(activeKey("freeform"), "{");
-		expect(loadFreeformNotes(sid())).toEqual({});
+		const result = loadExploreData(sid());
+		expect(result).not.toBeNull();
+		expect(result!["self-knowledge"].freeformNote).toBe("");
 	});
 
-	it("returns empty object for non-object JSON", () => {
-		localStorage.setItem(activeKey("freeform"), JSON.stringify("not-an-object"));
-		expect(loadFreeformNotes(sid())).toEqual({});
+	it("round-trips freeform notes through ExploreData", () => {
+		saveExploreData(sid(), {
+			"self-knowledge": {
+				entries: [{ questionId: "interpretation", userAnswer: "answer", prefilledAnswer: "", submitted: true, guardrailText: "", submittedAfterGuardrail: false, thoughtBubbleText: "", thoughtBubbleAcknowledged: false }],
+				freeformNote: "Some extra thoughts",
+				statementSelections: [],
+			},
+		});
+		const result = loadExploreData(sid());
+		expect(result).not.toBeNull();
+		expect(result!["self-knowledge"].freeformNote).toBe("Some extra thoughts");
 	});
 
-	it("returns empty object when values are not strings", () => {
-		localStorage.setItem(activeKey("freeform"), JSON.stringify({ "self-knowledge": 123 }));
-		expect(loadFreeformNotes(sid())).toEqual({});
-	});
-
-	it("round-trips saved notes", () => {
-		saveFreeformNotes(sid(), { "self-knowledge": "Some extra thoughts", community: "Community notes" });
-		expect(loadFreeformNotes(sid())).toEqual({ "self-knowledge": "Some extra thoughts", community: "Community notes" });
-	});
-
-	it("round-trips empty object", () => {
-		saveFreeformNotes(sid(), {});
-		expect(loadFreeformNotes(sid())).toEqual({});
+	it("round-trips empty freeformNote", () => {
+		saveExploreData(sid(), {
+			"self-knowledge": {
+				entries: [{ questionId: "interpretation", userAnswer: "answer", prefilledAnswer: "", submitted: true, guardrailText: "", submittedAfterGuardrail: false, thoughtBubbleText: "", thoughtBubbleAcknowledged: false }],
+				freeformNote: "",
+				statementSelections: [],
+			},
+		});
+		const result = loadExploreData(sid());
+		expect(result).not.toBeNull();
+		expect(result!["self-knowledge"].freeformNote).toBe("");
 	});
 });
 
@@ -694,7 +732,13 @@ describe("exportProgressData/importProgressData", () => {
 
 	it("importProgressData v2 round-trips: export → import restores data", () => {
 		saveChosenCardIds(sid(), ["self-knowledge", "community"]);
-		saveFreeformNotes(sid(), { "self-knowledge": "notes" });
+		saveExploreData(sid(), {
+			"self-knowledge": {
+				entries: [{ questionId: "interpretation", userAnswer: "answer", prefilledAnswer: "", submitted: true, guardrailText: "", submittedAfterGuardrail: false, thoughtBubbleText: "", thoughtBubbleAcknowledged: false }],
+				freeformNote: "notes",
+				statementSelections: [],
+			},
+		});
 
 		const exported = exportProgressData();
 		const activeId = getActiveSessionId();
@@ -709,12 +753,20 @@ describe("exportProgressData/importProgressData", () => {
 
 		localStorage.setItem("somecam-active-session", activeId);
 		expect(loadChosenCardIds(sid())).toEqual(["self-knowledge", "community"]);
-		expect(loadFreeformNotes(sid())).toEqual({ "self-knowledge": "notes" });
+		const result = loadExploreData(sid());
+		expect(result).not.toBeNull();
+		expect(result!["self-knowledge"].freeformNote).toBe("notes");
 	});
 
 	it("importProgressData v2 clears data keys not present in import", () => {
 		saveChosenCardIds(sid(), ["self-knowledge"]);
-		saveFreeformNotes(sid(), { "self-knowledge": "notes" });
+		saveExploreData(sid(), {
+			"self-knowledge": {
+				entries: [{ questionId: "interpretation", userAnswer: "answer", prefilledAnswer: "", submitted: true, guardrailText: "", submittedAfterGuardrail: false, thoughtBubbleText: "", thoughtBubbleAcknowledged: false }],
+				freeformNote: "notes",
+				statementSelections: [],
+			},
+		});
 		const currentId = getActiveSessionId();
 
 		const v2Data = JSON.stringify({
@@ -734,7 +786,7 @@ describe("exportProgressData/importProgressData", () => {
 		importProgressData(v2Data);
 
 		expect(loadChosenCardIds(sid())).toEqual(["community"]);
-		expect(loadFreeformNotes(sid())).toEqual({});
+		expect(loadExploreData(sid())).toBeNull();
 	});
 
 	it("importProgressData throws on invalid JSON", () => {
@@ -756,34 +808,54 @@ describe("exportProgressData/importProgressData", () => {
 	});
 });
 
-describe("loadStatementSelections/saveStatementSelections", () => {
-	it("returns {} when no data", () => {
-		expect(loadStatementSelections(sid())).toEqual({});
+describe("statement selections in ExploreData", () => {
+	it("defaults statementSelections to empty array when statements key is absent", () => {
+		localStorage.setItem(
+			activeKey("explore"),
+			JSON.stringify({
+				"self-knowledge": [{ questionId: "interpretation", userAnswer: "answer", prefilledAnswer: "", submitted: true }],
+			}),
+		);
+		const result = loadExploreData(sid());
+		expect(result).not.toBeNull();
+		expect(result!["self-knowledge"].statementSelections).toEqual([]);
 	});
 
-	it("returns {} for corrupt JSON", () => {
+	it("defaults statementSelections to empty array for corrupt statements JSON", () => {
+		localStorage.setItem(
+			activeKey("explore"),
+			JSON.stringify({
+				"self-knowledge": [{ questionId: "interpretation", userAnswer: "answer", prefilledAnswer: "", submitted: true }],
+			}),
+		);
 		localStorage.setItem(activeKey("statements"), "{bad");
-		expect(loadStatementSelections(sid())).toEqual({});
+		const result = loadExploreData(sid());
+		expect(result).not.toBeNull();
+		expect(result!["self-knowledge"].statementSelections).toEqual([]);
 	});
 
-	it("returns {} for non-object JSON", () => {
-		localStorage.setItem(activeKey("statements"), JSON.stringify("not-object"));
-		expect(loadStatementSelections(sid())).toEqual({});
-	});
-
-	it("returns {} when values are not string arrays", () => {
-		localStorage.setItem(activeKey("statements"), JSON.stringify({ card1: [1, 2] }));
-		expect(loadStatementSelections(sid())).toEqual({});
-	});
-
-	it("round-trips saved selections", () => {
-		saveStatementSelections(sid(), { "self-knowledge": ["6", "34"], community: ["78"] });
-		expect(loadStatementSelections(sid())).toEqual({ "self-knowledge": ["6", "34"], community: ["78"] });
+	it("round-trips statement selections through ExploreData", () => {
+		saveExploreData(sid(), {
+			"self-knowledge": {
+				entries: [{ questionId: "interpretation", userAnswer: "answer", prefilledAnswer: "", submitted: true, guardrailText: "", submittedAfterGuardrail: false, thoughtBubbleText: "", thoughtBubbleAcknowledged: false }],
+				freeformNote: "",
+				statementSelections: ["6", "34"],
+			},
+		});
+		const result = loadExploreData(sid());
+		expect(result).not.toBeNull();
+		expect(result!["self-knowledge"].statementSelections).toEqual(["6", "34"]);
 	});
 
 	it("exportProgressData includes statements data", () => {
 		saveChosenCardIds(sid(), ["self-knowledge"]);
-		saveStatementSelections(sid(), { "self-knowledge": ["6", "34"] });
+		saveExploreData(sid(), {
+			"self-knowledge": {
+				entries: [{ questionId: "interpretation", userAnswer: "answer", prefilledAnswer: "", submitted: true, guardrailText: "", submittedAfterGuardrail: false, thoughtBubbleText: "", thoughtBubbleAcknowledged: false }],
+				freeformNote: "",
+				statementSelections: ["6", "34"],
+			},
+		});
 
 		const exported = JSON.parse(exportProgressData());
 		expect(exported.sessions[0].data.statements).toEqual({ "self-knowledge": ["6", "34"] });
@@ -800,6 +872,9 @@ describe("loadStatementSelections/saveStatementSelections", () => {
 					createdAt: new Date().toISOString(),
 					data: {
 						chosen: ["self-knowledge"],
+						explore: {
+							"self-knowledge": [{ questionId: "interpretation", userAnswer: "answer", prefilledAnswer: "", submitted: true }],
+						},
 						statements: { "self-knowledge": ["6", "34"] },
 					},
 				},
@@ -807,11 +882,19 @@ describe("loadStatementSelections/saveStatementSelections", () => {
 		});
 
 		importProgressData(v2Data);
-		expect(loadStatementSelections(sid())).toEqual({ "self-knowledge": ["6", "34"] });
+		const result = loadExploreData(sid());
+		expect(result).not.toBeNull();
+		expect(result!["self-knowledge"].statementSelections).toEqual(["6", "34"]);
 	});
 
 	it("importProgressData clears statements when not present in import", () => {
-		saveStatementSelections(sid(), { "self-knowledge": ["6"] });
+		saveExploreData(sid(), {
+			"self-knowledge": {
+				entries: [{ questionId: "interpretation", userAnswer: "answer", prefilledAnswer: "", submitted: true, guardrailText: "", submittedAfterGuardrail: false, thoughtBubbleText: "", thoughtBubbleAcknowledged: false }],
+				freeformNote: "",
+				statementSelections: ["6"],
+			},
+		});
 		const currentId = getActiveSessionId();
 
 		const v2Data = JSON.stringify({
@@ -823,13 +906,18 @@ describe("loadStatementSelections/saveStatementSelections", () => {
 					createdAt: new Date().toISOString(),
 					data: {
 						chosen: ["self-knowledge"],
+						explore: {
+							"self-knowledge": [{ questionId: "interpretation", userAnswer: "answer", prefilledAnswer: "", submitted: true }],
+						},
 					},
 				},
 			],
 		});
 
 		importProgressData(v2Data);
-		expect(loadStatementSelections(sid())).toEqual({});
+		const result = loadExploreData(sid());
+		expect(result).not.toBeNull();
+		expect(result!["self-knowledge"].statementSelections).toEqual([]);
 	});
 });
 
@@ -941,12 +1029,18 @@ describe("session management", () => {
 describe("session data isolation", () => {
 	it("data saved in one session is not visible in another", () => {
 		saveChosenCardIds(sid(), ["self-knowledge"]);
-		saveFreeformNotes(sid(), { "self-knowledge": "notes from session 1" });
+		saveExploreData(sid(), {
+			"self-knowledge": {
+				entries: [{ questionId: "interpretation", userAnswer: "answer", prefilledAnswer: "", submitted: true, guardrailText: "", submittedAfterGuardrail: false, thoughtBubbleText: "", thoughtBubbleAcknowledged: false }],
+				freeformNote: "notes from session 1",
+				statementSelections: [],
+			},
+		});
 
 		createSession("Second");
 
 		expect(loadChosenCardIds(sid())).toBeNull();
-		expect(loadFreeformNotes(sid())).toEqual({});
+		expect(loadExploreData(sid())).toBeNull();
 	});
 });
 
