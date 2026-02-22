@@ -151,6 +151,7 @@ function onPointerUp(): void {
 }
 
 function flyAway(direction: SwipeDirection, durationMs = FLY_AWAY_DURATION_MS): void {
+	if (flyingAway.value) return;
 	if (!props.allowUnsure && direction === "unsure") return;
 	flyingAway.value = true;
 	flyDirection.value = direction;
