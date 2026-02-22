@@ -3,8 +3,8 @@ import { ref, type Ref } from "vue";
 import { fetchReflectOnAnswer, fetchInferredAnswers } from "./api.ts";
 import type { ReflectOnAnswerResponse } from "./api.ts";
 import { capture } from "./analytics.ts";
-import type { ExploreEntryFull } from "./store.ts";
-import { isExplorePhaseComplete, loadExploreDataFull, loadFreeformNotes, loadStatementSelections, requestStoragePersistence, saveExploreData, saveFreeformNotes, saveStatementSelections } from "./store.ts";
+import type { ExploreEntry } from "./store.ts";
+import { isExplorePhaseComplete, loadExploreData, loadFreeformNotes, loadStatementSelections, requestStoragePersistence, saveExploreData, saveFreeformNotes, saveStatementSelections } from "./store.ts";
 import { EXPLORE_QUESTIONS } from "../shared/explore-questions.ts";
 import type { MeaningCard } from "../shared/meaning-cards.ts";
 import { MEANING_CARDS } from "../shared/meaning-cards.ts";
@@ -19,7 +19,7 @@ export class ExploreMeaningViewModel {
 	private readonly cardId: string;
 
 	private readonly _card = ref<MeaningCard | undefined>(undefined);
-	private readonly _entries = ref<ExploreEntryFull[]>([]);
+	private readonly _entries = ref<ExploreEntry[]>([]);
 	private readonly _inferring = ref(false);
 	private readonly _reflectionType: Ref<"guardrail" | "thought_bubble" | null> = ref(null);
 	private readonly _reflectionMessage = ref("");
@@ -46,7 +46,7 @@ export class ExploreMeaningViewModel {
 		return this._card.value;
 	}
 
-	get entries(): ExploreEntryFull[] {
+	get entries(): ExploreEntry[] {
 		return this._entries.value;
 	}
 
@@ -135,7 +135,7 @@ export class ExploreMeaningViewModel {
 		}
 
 		try {
-			const data = loadExploreDataFull(this.sessionId);
+			const data = loadExploreData(this.sessionId);
 			if (data === null) {
 				return "no-data";
 			}
@@ -357,21 +357,21 @@ export class ExploreMeaningViewModel {
 		this.applyInferAndAdvance(inferResult, remaining);
 	}
 
-	onActiveEntryInput(entry: ExploreEntryFull): void {
+	onActiveEntryInput(entry: ExploreEntry): void {
 		const snapshot = this._submittedAnswerSnapshots.value.get(entry.questionId);
 		if (snapshot !== undefined && snapshot !== entry.userAnswer) {
 			this._editedAfterSubmit.value.add(entry.questionId);
 		}
 	}
 
-	onAnsweredEntryInput(entry: ExploreEntryFull): void {
+	onAnsweredEntryInput(entry: ExploreEntry): void {
 		const snapshot = this._submittedAnswerSnapshots.value.get(entry.questionId);
 		if (snapshot !== undefined && snapshot !== entry.userAnswer) {
 			this._editedAfterSubmit.value.add(entry.questionId);
 		}
 	}
 
-	onAnsweredEntryBlur(entry: ExploreEntryFull): void {
+	onAnsweredEntryBlur(entry: ExploreEntry): void {
 		this.persistEntries();
 		if (!this._editedAfterSubmit.value.has(entry.questionId)) {
 			return;
@@ -444,7 +444,7 @@ export class ExploreMeaningViewModel {
 	}
 
 	persistEntries(): void {
-		const data = loadExploreDataFull(this.sessionId);
+		const data = loadExploreData(this.sessionId);
 		if (data === null) return;
 		data[this.cardId] = this._entries.value;
 		saveExploreData(this.sessionId, data);
@@ -484,7 +484,7 @@ export class ExploreMeaningViewModel {
 
 	// --- Private helpers ---
 
-	private answerSource(entry: ExploreEntryFull, answer: string): "original" | "inferred-accepted" | "inferred-edited" {
+	private answerSource(entry: ExploreEntry, answer: string): "original" | "inferred-accepted" | "inferred-edited" {
 		if (entry.prefilledAnswer === "") {
 			return "original";
 		}

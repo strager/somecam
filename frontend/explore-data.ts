@@ -11,7 +11,7 @@ export function assignQuestions(cardIds: string[]): ExploreData {
 		const index = Math.floor(Math.random() * pool.length);
 		const questionId = pool[index];
 		pool.splice(index, 1);
-		data[cardId] = [{ questionId, userAnswer: "", prefilledAnswer: "", submitted: false }];
+		data[cardId] = [{ questionId, userAnswer: "", prefilledAnswer: "", submitted: false, guardrailText: "", submittedAfterGuardrail: false, thoughtBubbleText: "", thoughtBubbleAcknowledged: false }];
 	}
 	return data;
 }

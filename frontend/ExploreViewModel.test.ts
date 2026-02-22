@@ -75,6 +75,10 @@ function makeExploreData(cardIds: string[], answeredCount: number): ExploreData 
 			userAnswer: i < answeredCount ? `Answer for ${q.id}` : "",
 			prefilledAnswer: "",
 			submitted: i < answeredCount,
+			guardrailText: "",
+			submittedAfterGuardrail: false,
+			thoughtBubbleText: "",
+			thoughtBubbleAcknowledged: false,
 		}));
 	}
 	return data;
@@ -127,8 +131,9 @@ describe("initialize", () => {
 
 	it("reuses existing explore data when present", () => {
 		const cardIds = setupChosenCards(2);
-		const exploreData = makeExploreData(cardIds, 0);
+		const exploreData = makeExploreData(cardIds, EXPLORE_QUESTIONS.length);
 		saveExploreData(sid(), exploreData);
+		setupDefaultSummarizeHandler();
 
 		const vm = new ExploreViewModel(sid());
 		vm.initialize();

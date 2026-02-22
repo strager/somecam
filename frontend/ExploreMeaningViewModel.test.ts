@@ -9,8 +9,8 @@ import { EXPLORE_QUESTIONS } from "../shared/explore-questions.ts";
 import { MEANING_CARDS } from "../shared/meaning-cards.ts";
 import { MEANING_STATEMENTS } from "../shared/meaning-statements.ts";
 import { ExploreMeaningViewModel } from "./ExploreMeaningViewModel.ts";
-import type { ExploreDataFull, ExploreEntryFull } from "./store.ts";
-import { ensureSessionsInitialized, getActiveSessionId, loadExploreDataFull, loadFreeformNotes, loadStatementSelections, saveChosenCardIds, saveExploreData, saveFreeformNotes } from "./store.ts";
+import type { ExploreData, ExploreEntry } from "./store.ts";
+import { ensureSessionsInitialized, getActiveSessionId, loadExploreData, loadFreeformNotes, loadStatementSelections, saveChosenCardIds, saveExploreData, saveFreeformNotes } from "./store.ts";
 
 let currentWindow: Window | null = null;
 
@@ -72,7 +72,7 @@ afterAll(() => {
 
 const TEST_CARD_ID = MEANING_CARDS[0].id;
 
-function makeEntry(questionId: string, answer: string, submitted: boolean): ExploreEntryFull {
+function makeEntry(questionId: string, answer: string, submitted: boolean): ExploreEntry {
 	return {
 		questionId,
 		userAnswer: answer,
@@ -85,17 +85,17 @@ function makeEntry(questionId: string, answer: string, submitted: boolean): Expl
 	};
 }
 
-function setupExploreData(cardId: string, entries: ExploreEntryFull[]): void {
+function setupExploreData(cardId: string, entries: ExploreEntry[]): void {
 	saveChosenCardIds(sid(), [cardId]);
-	const data: ExploreDataFull = { [cardId]: entries };
+	const data: ExploreData = { [cardId]: entries };
 	saveExploreData(sid(), data);
 }
 
-function makeSubmittedEntries(count: number): ExploreEntryFull[] {
+function makeSubmittedEntries(count: number): ExploreEntry[] {
 	return EXPLORE_QUESTIONS.slice(0, count).map((q) => makeEntry(q.id, `Answer for ${q.id}`, true));
 }
 
-function makeAllSubmitted(): ExploreEntryFull[] {
+function makeAllSubmitted(): ExploreEntry[] {
 	return makeSubmittedEntries(EXPLORE_QUESTIONS.length);
 }
 
@@ -284,7 +284,7 @@ describe("submitAnswer", () => {
 		expect(vm.entries[0].submitted).toBe(true);
 		expect(vm.entries[0].userAnswer).toBe("My thoughtful answer");
 
-		const saved = loadExploreDataFull(sid());
+		const saved = loadExploreData(sid());
 		expect(saved![TEST_CARD_ID][0].submitted).toBe(true);
 	});
 
@@ -669,7 +669,7 @@ describe("entry input and blur", () => {
 		vm.onAnsweredEntryBlur(vm.entries[0]);
 
 		// Verify persisted
-		const saved = loadExploreDataFull(sid());
+		const saved = loadExploreData(sid());
 		expect(saved![TEST_CARD_ID][0].userAnswer).toBe("edited answer");
 	});
 });
@@ -862,7 +862,7 @@ describe("finishExploring", () => {
 
 		vm.finishExploring();
 
-		const savedEntries = loadExploreDataFull(sid());
+		const savedEntries = loadExploreData(sid());
 		expect(savedEntries![TEST_CARD_ID]).toHaveLength(EXPLORE_QUESTIONS.length);
 
 		const savedNotes = loadFreeformNotes(sid());

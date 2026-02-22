@@ -3,7 +3,7 @@
 import { Window } from "happy-dom";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { clearAllProgress, createSession, deleteSession, ensureSessionsInitialized, exportProgressData, formatSessionDate, getActiveSessionId, hasProgressData, importProgressData, listSessions, loadChosenCardIds, loadExploreData, loadExploreDataFull, loadFreeformNotes, loadLlmTestState, loadPrioritize, loadStatementSelections, loadSummaryCache, loadSwipeProgress, removePrioritize, renameSession, saveChosenCardIds, saveExploreData, saveFreeformNotes, saveLlmTestState, savePrioritize, saveSummaryCache, saveStatementSelections, saveSwipeProgress, switchSession } from "./store.ts";
+import { clearAllProgress, createSession, deleteSession, ensureSessionsInitialized, exportProgressData, formatSessionDate, getActiveSessionId, hasProgressData, importProgressData, listSessions, loadChosenCardIds, loadExploreData, loadFreeformNotes, loadLlmTestState, loadPrioritize, loadStatementSelections, loadSummaryCache, loadSwipeProgress, removePrioritize, renameSession, saveChosenCardIds, saveExploreData, saveFreeformNotes, saveLlmTestState, savePrioritize, saveSummaryCache, saveStatementSelections, saveSwipeProgress, switchSession } from "./store.ts";
 
 function sid(): string {
 	return getActiveSessionId();
@@ -245,6 +245,10 @@ describe("loadExploreData/saveExploreData", () => {
 					userAnswer: "My answer",
 					prefilledAnswer: "",
 					submitted: true,
+					guardrailText: "",
+					submittedAfterGuardrail: false,
+					thoughtBubbleText: "",
+					thoughtBubbleAcknowledged: false,
 				},
 			],
 		});
@@ -256,18 +260,16 @@ describe("loadExploreData/saveExploreData", () => {
 					userAnswer: "My answer",
 					prefilledAnswer: "",
 					submitted: true,
+					guardrailText: "",
+					submittedAfterGuardrail: false,
+					thoughtBubbleText: "",
+					thoughtBubbleAcknowledged: false,
 				},
 			],
 		});
 	});
-});
 
-describe("loadExploreDataFull", () => {
-	it("returns null when key is absent", () => {
-		expect(loadExploreDataFull(sid())).toBeNull();
-	});
-
-	it("fills defaults for entries that lack guardrail fields", () => {
+	it("fills defaults for entries that lack reflection fields", () => {
 		localStorage.setItem(
 			activeKey("explore"),
 			JSON.stringify({
@@ -282,7 +284,7 @@ describe("loadExploreDataFull", () => {
 			}),
 		);
 
-		expect(loadExploreDataFull(sid())).toEqual({
+		expect(loadExploreData(sid())).toEqual({
 			"self-knowledge": [
 				{
 					questionId: "interpretation",
@@ -317,7 +319,7 @@ describe("loadExploreDataFull", () => {
 			}),
 		);
 
-		expect(loadExploreDataFull(sid())).toEqual({
+		expect(loadExploreData(sid())).toEqual({
 			"self-knowledge": [
 				{
 					questionId: "interpretation",
@@ -348,7 +350,7 @@ describe("loadExploreDataFull", () => {
 				],
 			}),
 		);
-		expect(loadExploreDataFull(sid())).toBeNull();
+		expect(loadExploreData(sid())).toBeNull();
 	});
 
 	it("returns null when submittedAfterGuardrail is not a boolean", () => {
@@ -366,7 +368,7 @@ describe("loadExploreDataFull", () => {
 				],
 			}),
 		);
-		expect(loadExploreDataFull(sid())).toBeNull();
+		expect(loadExploreData(sid())).toBeNull();
 	});
 
 	it("preserves existing thoughtBubbleText", () => {
@@ -385,7 +387,7 @@ describe("loadExploreDataFull", () => {
 			}),
 		);
 
-		const result = loadExploreDataFull(sid());
+		const result = loadExploreData(sid());
 		expect(result).not.toBeNull();
 		expect(result!["self-knowledge"][0].thoughtBubbleText).toBe("What about your relationship with X?");
 	});
@@ -406,7 +408,7 @@ describe("loadExploreDataFull", () => {
 			}),
 		);
 
-		const result = loadExploreDataFull(sid());
+		const result = loadExploreData(sid());
 		expect(result).not.toBeNull();
 		expect(result!["self-knowledge"][0].thoughtBubbleAcknowledged).toBe(true);
 	});
@@ -426,7 +428,7 @@ describe("loadExploreDataFull", () => {
 				],
 			}),
 		);
-		expect(loadExploreDataFull(sid())).toBeNull();
+		expect(loadExploreData(sid())).toBeNull();
 	});
 
 	it("returns null when thoughtBubbleAcknowledged is not a boolean", () => {
@@ -444,7 +446,7 @@ describe("loadExploreDataFull", () => {
 				],
 			}),
 		);
-		expect(loadExploreDataFull(sid())).toBeNull();
+		expect(loadExploreData(sid())).toBeNull();
 	});
 
 	it("returns null when a card entry bucket is not an array", () => {
@@ -456,7 +458,7 @@ describe("loadExploreDataFull", () => {
 				},
 			}),
 		);
-		expect(loadExploreDataFull(sid())).toBeNull();
+		expect(loadExploreData(sid())).toBeNull();
 	});
 });
 
@@ -647,6 +649,10 @@ describe("clearAllProgress", () => {
 					userAnswer: "",
 					prefilledAnswer: "",
 					submitted: false,
+					guardrailText: "",
+					submittedAfterGuardrail: false,
+					thoughtBubbleText: "",
+					thoughtBubbleAcknowledged: false,
 				},
 			],
 		});

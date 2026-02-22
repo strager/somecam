@@ -55,9 +55,6 @@ export interface ExploreEntry {
 	userAnswer: string;
 	prefilledAnswer: string;
 	submitted: boolean;
-}
-
-export interface ExploreEntryFull extends ExploreEntry {
 	guardrailText: string;
 	submittedAfterGuardrail: boolean;
 	thoughtBubbleText: string;
@@ -65,7 +62,6 @@ export interface ExploreEntryFull extends ExploreEntry {
 }
 
 export type ExploreData = Record<string, ExploreEntry[]>;
-export type ExploreDataFull = Record<string, ExploreEntryFull[]>;
 export type SummaryCache = Record<string, { answer: string; summary: string }>;
 export type FreeformNotes = Partial<Record<string, string>>;
 export type StatementSelections = Partial<Record<string, string[]>>;
@@ -306,48 +302,37 @@ function isSwipeRecord(value: unknown): value is SwipeRecord {
 	return typeof value.cardId === "string" && isSwipeDirection(value.direction);
 }
 
-function isExploreEntry(value: unknown): value is ExploreEntry {
+function toExploreEntry(value: unknown): ExploreEntry | null {
 	if (!isObjectRecord(value)) {
-		return false;
-	}
-
-	return typeof value.questionId === "string" && typeof value.userAnswer === "string" && typeof value.prefilledAnswer === "string" && typeof value.submitted === "boolean";
-}
-
-function toExploreEntryFull(value: unknown): ExploreEntryFull | null {
-	if (!isExploreEntry(value)) {
 		return null;
 	}
 
-	const withOptional: ExploreEntry & {
-		guardrailText?: unknown;
-		submittedAfterGuardrail?: unknown;
-		thoughtBubbleText?: unknown;
-		thoughtBubbleAcknowledged?: unknown;
-	} = value;
+	if (typeof value.questionId !== "string" || typeof value.userAnswer !== "string" || typeof value.prefilledAnswer !== "string" || typeof value.submitted !== "boolean") {
+		return null;
+	}
 
-	if (withOptional.guardrailText !== undefined && typeof withOptional.guardrailText !== "string") {
+	if (value.guardrailText !== undefined && typeof value.guardrailText !== "string") {
 		return null;
 	}
-	if (withOptional.submittedAfterGuardrail !== undefined && typeof withOptional.submittedAfterGuardrail !== "boolean") {
+	if (value.submittedAfterGuardrail !== undefined && typeof value.submittedAfterGuardrail !== "boolean") {
 		return null;
 	}
-	if (withOptional.thoughtBubbleText !== undefined && typeof withOptional.thoughtBubbleText !== "string") {
+	if (value.thoughtBubbleText !== undefined && typeof value.thoughtBubbleText !== "string") {
 		return null;
 	}
-	if (withOptional.thoughtBubbleAcknowledged !== undefined && typeof withOptional.thoughtBubbleAcknowledged !== "boolean") {
+	if (value.thoughtBubbleAcknowledged !== undefined && typeof value.thoughtBubbleAcknowledged !== "boolean") {
 		return null;
 	}
 
 	return {
-		questionId: withOptional.questionId,
-		userAnswer: withOptional.userAnswer,
-		prefilledAnswer: withOptional.prefilledAnswer,
-		submitted: withOptional.submitted,
-		guardrailText: withOptional.guardrailText ?? "",
-		submittedAfterGuardrail: withOptional.submittedAfterGuardrail ?? false,
-		thoughtBubbleText: withOptional.thoughtBubbleText ?? "",
-		thoughtBubbleAcknowledged: withOptional.thoughtBubbleAcknowledged ?? false,
+		questionId: value.questionId,
+		userAnswer: value.userAnswer,
+		prefilledAnswer: value.prefilledAnswer,
+		submitted: value.submitted,
+		guardrailText: value.guardrailText ?? "",
+		submittedAfterGuardrail: value.submittedAfterGuardrail ?? false,
+		thoughtBubbleText: value.thoughtBubbleText ?? "",
+		thoughtBubbleAcknowledged: value.thoughtBubbleAcknowledged ?? false,
 	};
 }
 
@@ -437,49 +422,34 @@ export function needsPrioritization(sessionId: string): boolean {
 	return selectCandidateCards(sessionId).length > 5;
 }
 
-function isExploreData(value: unknown): value is ExploreData {
-	if (!isObjectRecord(value)) return false;
-	for (const entries of Object.values(value)) {
-		if (!Array.isArray(entries) || !entries.every((entry) => isExploreEntry(entry))) {
-			return false;
-		}
-	}
-	return true;
-}
-
 export function loadExploreData(sessionId: string): ExploreData | null {
-	const parsed = parseJsonFromStorage(exploreKey(sessionId));
-	return isExploreData(parsed) ? parsed : null;
-}
-
-export function loadExploreDataFull(sessionId: string): ExploreDataFull | null {
 	const parsed = parseJsonFromStorage(exploreKey(sessionId));
 	if (!isObjectRecord(parsed)) {
 		return null;
 	}
 
-	const result: ExploreDataFull = {};
+	const result: ExploreData = {};
 	for (const [cardId, entries] of Object.entries(parsed)) {
 		if (!Array.isArray(entries)) {
 			return null;
 		}
 
-		const fullEntries: ExploreEntryFull[] = [];
+		const validEntries: ExploreEntry[] = [];
 		for (const entry of entries) {
-			const fullEntry = toExploreEntryFull(entry);
-			if (fullEntry === null) {
+			const validEntry = toExploreEntry(entry);
+			if (validEntry === null) {
 				return null;
 			}
-			fullEntries.push(fullEntry);
+			validEntries.push(validEntry);
 		}
-		const nonBlank = fullEntries.filter((e) => e.userAnswer.trim() !== "");
-		result[cardId] = nonBlank.length > 0 ? nonBlank : fullEntries.slice(0, 1);
+		const nonBlank = validEntries.filter((e) => e.userAnswer.trim() !== "");
+		result[cardId] = nonBlank.length > 0 ? nonBlank : validEntries.slice(0, 1);
 	}
 
 	return result;
 }
 
-export function saveExploreData(sessionId: string, data: ExploreData | ExploreDataFull): void {
+export function saveExploreData(sessionId: string, data: ExploreData): void {
 	localStorage.setItem(exploreKey(sessionId), JSON.stringify(data));
 	touchSession(sessionId);
 }
@@ -618,7 +588,7 @@ export function hasProgressData(sessionId: string): boolean {
 
 export function isExplorePhaseComplete(sessionId: string): boolean {
 	const chosenCardIds = loadChosenCardIds(sessionId);
-	const data = loadExploreDataFull(sessionId);
+	const data = loadExploreData(sessionId);
 	if (chosenCardIds === null || data === null) {
 		return false;
 	}
