@@ -31,10 +31,15 @@ continue to the prioritizing step.
 > are included alongside your "agree" cards for the prioritizing step, so
 > you have enough to work with.
 
-## Step 2: Prioritizing
+## Step 2: Ranking
 
-In this step, you revisit only the cards that passed the initial sort.
-The goal is to keep your top 3–5 sources of meaning.
+In this step, you narrow down the cards that passed the initial sort to
+your top 5 through a series of head-to-head comparisons.
+
+You are shown two cards side by side and choose which one resonates with
+you more. The card you do not choose is eliminated. A new pair is drawn
+from the remaining cards, and you choose again. Matchups are randomized
+so that no card is advantaged by its position in the sequence.
 
 An important change happens here: each card now reveals the **name of
 its source of meaning** alongside the original statement. For example,
@@ -42,16 +47,9 @@ you might see the label _"Social commitment"_ above the statement _"I
 intervene when I see injustice being done"_. This additional context
 helps you make more deliberate choices.
 
-For each card, you choose:
-
-- **Keep** — this source of meaning stays in your selection
-- **Remove** — this source of meaning is set aside
-
-There is no "unsure" option in this step. As before, you can undo
-individual choices. A counter shows how many cards you have kept so far.
-
-When you have reviewed all the cards in this round, every card you kept
-becomes part of your final selection, and you are taken to your results.
+Comparisons continue until exactly 5 cards remain. Those 5 become your
+final selection, and you are taken to your results. A progress indicator
+shows how many comparisons are left.
 
 ## Step 3: Editing your selection
 
