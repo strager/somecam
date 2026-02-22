@@ -230,6 +230,20 @@ export class Ranking<T> {
 	get history(): readonly ComparisonRecord<T>[] {
 		return this._comparisonRecords;
 	}
+
+	clone(): Ranking<T> {
+		const copy = new Ranking(this._items, this._config);
+		copy._mu = this._mu.slice();
+		copy._sigma = this._sigma.slice();
+		copy._history = [...this._history];
+		copy._comparisonRecords = [...this._comparisonRecords];
+		copy._round = this._round;
+		copy._stopped = this._stopped;
+		copy._stopReason = this._stopReason;
+		copy._previousTopK = this._previousTopK !== null ? [...this._previousTopK] : null;
+		copy._stableCount = this._stableCount;
+		return copy;
+	}
 }
 
 /**

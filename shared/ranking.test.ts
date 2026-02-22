@@ -657,6 +657,40 @@ describe("Ranking class", () => {
 		expect(run1.topK).toEqual(run2.topK);
 	});
 
+	it("clone produces an independent copy with identical state", () => {
+		const items = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
+		const ranking = new Ranking(items, {
+			k: 5,
+			maxComparisons: 80,
+			monteCarloSamples: 100,
+			rng: makeRng(42),
+		});
+
+		// Advance a few rounds
+		for (let i = 0; i < 5; i++) {
+			const { a, b } = ranking.selectPair();
+			const winner = a > b ? a : b;
+			const loser = a > b ? b : a;
+			ranking.recordComparison(winner, loser);
+		}
+
+		const clone = ranking.clone();
+
+		// Clone has the same observable state
+		expect(clone.round).toBe(ranking.round);
+		expect(clone.stopped).toBe(ranking.stopped);
+		expect(clone.stopReason).toBe(ranking.stopReason);
+		expect(clone.mu).toEqual(ranking.mu);
+		expect(clone.sigma).toEqual(ranking.sigma);
+		expect(clone.topK).toEqual(ranking.topK);
+
+		// Mutating the clone does not affect the original
+		const { a, b } = clone.selectPair();
+		clone.recordComparison(a > b ? a : b, a > b ? b : a);
+		expect(clone.round).toBe(ranking.round + 1);
+		expect(ranking.round).toBe(5);
+	});
+
 	it("recencyDiscount reduces consecutive appearances of the same item", () => {
 		const items = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
 		const trueStrength = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
