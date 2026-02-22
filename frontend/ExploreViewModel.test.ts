@@ -9,7 +9,7 @@ import { EXPLORE_QUESTIONS } from "../shared/explore-questions.ts";
 import { MEANING_CARDS } from "../shared/meaning-cards.ts";
 import { ExploreViewModel } from "./ExploreViewModel.ts";
 import type { ExploreData } from "./store.ts";
-import { ensureSessionsInitialized, getActiveSessionId, loadExploreData, loadSummaryCache, saveChosenCardIds, saveExploreData, saveFreeformNotes, saveSummaryCache } from "./store.ts";
+import { ensureSessionsInitialized, getActiveSessionId, loadExploreData, lookupCachedSummary, saveCachedSummary, saveChosenCardIds, saveExploreData, saveFreeformNotes } from "./store.ts";
 
 let currentWindow: Window | null = null;
 
@@ -301,8 +301,7 @@ describe("summary loading", () => {
 
 		const questionId = EXPLORE_QUESTIONS[0].id;
 		const answer = data[cardIds[0]][0].userAnswer;
-		const cacheKey = `${cardIds[0]}:${questionId}`;
-		saveSummaryCache(sid(), { [cacheKey]: { answer, summary: "Cached summary" } });
+		saveCachedSummary({ sessionId: sid(), cardId: cardIds[0], answer, summary: "Cached summary", questionId });
 
 		// No MSW handler — any fetch would fail with onUnhandledRequest: "error"
 		const vm = new ExploreViewModel(sid());
@@ -385,11 +384,11 @@ describe("summary loading", () => {
 		vm.initialize();
 		await vm.whenReady;
 
-		const cache = loadSummaryCache(sid());
 		const questionId = EXPLORE_QUESTIONS[0].id;
-		const cacheKey = `${cardIds[0]}:${questionId}`;
-		expect(cache[cacheKey]).toBeDefined();
-		expect(cache[cacheKey].summary).not.toBe("");
+		const answer = `Answer for ${questionId}`;
+		const cached = lookupCachedSummary({ sessionId: sid(), cardId: cardIds[0], answer, questionId });
+		expect(cached).not.toBeNull();
+		expect(cached).not.toBe("");
 	});
 });
 
@@ -416,7 +415,7 @@ describe("freeform summary loading", () => {
 		saveExploreData(sid(), makeExploreData(cardIds, 0));
 		const noteText = "My freeform notes";
 		saveFreeformNotes(sid(), { [cardIds[0]]: noteText });
-		saveSummaryCache(sid(), { [`${cardIds[0]}:freeform`]: { answer: noteText, summary: "Cached freeform" } });
+		saveCachedSummary({ sessionId: sid(), cardId: cardIds[0], answer: noteText, summary: "Cached freeform" });
 
 		// No MSW handler — any fetch would fail
 		const vm = new ExploreViewModel(sid());

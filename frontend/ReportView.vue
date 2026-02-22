@@ -8,7 +8,7 @@ import { budgetedFetch } from "./api.ts";
 import type { CardReport, QuestionReport } from "../shared/report-types.ts";
 import { capture } from "./analytics.ts";
 import { useStringParam } from "./route-utils.ts";
-import { exportSessionData, loadChosenCardIds, loadExploreData, loadFreeformNotes, loadStatementSelections, loadSummaryCache, lookupCachedSummary } from "./store.ts";
+import { exportSessionData, loadChosenCardIds, loadExploreData, loadFreeformNotes, loadStatementSelections, lookupCachedSummary } from "./store.ts";
 import { EXPLORE_QUESTIONS } from "../shared/explore-questions.ts";
 import { MEANING_CARDS } from "../shared/meaning-cards.ts";
 import { MEANING_STATEMENTS } from "../shared/meaning-statements.ts";
@@ -163,7 +163,6 @@ onMounted(() => {
 		}
 
 		const exploreData = loadExploreData(sessionId) ?? {};
-		const summaryCache = loadSummaryCache(sessionId);
 		const freeformNotes = loadFreeformNotes(sessionId);
 		const statementSelections = loadStatementSelections(sessionId);
 		const statementTextById = new Map(MEANING_STATEMENTS.map((s) => [s.id, s.statement]));
@@ -178,7 +177,7 @@ onMounted(() => {
 
 			for (const question of EXPLORE_QUESTIONS) {
 				const answer = answersByQuestionId.get(question.id) ?? "";
-				const summary = lookupCachedSummary(summaryCache, cardId, answer, question.id) ?? "";
+				const summary = lookupCachedSummary({ sessionId, cardId, answer, questionId: question.id }) ?? "";
 
 				questions.push({
 					topic: question.topic,
@@ -189,7 +188,7 @@ onMounted(() => {
 			}
 
 			const freeformNote = freeformNotes[cardId] ?? "";
-			const freeformSummary = lookupCachedSummary(summaryCache, cardId, freeformNote) ?? "";
+			const freeformSummary = lookupCachedSummary({ sessionId, cardId, answer: freeformNote }) ?? "";
 
 			const selectedIds = statementSelections[cardId] ?? [];
 			const selectedStatements = selectedIds.map((id) => statementTextById.get(id)).filter((text): text is string => text !== undefined);

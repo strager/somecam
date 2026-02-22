@@ -3,7 +3,7 @@
 import { Window } from "happy-dom";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { createSession, deleteSession, ensureSessionsInitialized, exportProgressData, formatSessionDate, getActiveSessionId, importProgressData, listSessions, loadChosenCardIds, loadExploreData, loadFreeformNotes, loadLlmTestState, loadPrioritize, loadStatementSelections, loadSummaryCache, loadSwipeProgress, removePrioritize, renameSession, saveChosenCardIds, saveExploreData, saveFreeformNotes, saveLlmTestState, savePrioritize, saveSummaryCache, saveStatementSelections, saveSwipeProgress } from "./store.ts";
+import { createSession, deleteSession, ensureSessionsInitialized, exportProgressData, formatSessionDate, getActiveSessionId, importProgressData, listSessions, loadChosenCardIds, loadExploreData, loadFreeformNotes, loadLlmTestState, loadPrioritize, loadStatementSelections, loadSwipeProgress, lookupCachedSummary, removePrioritize, renameSession, saveCachedSummary, saveChosenCardIds, saveExploreData, saveFreeformNotes, saveLlmTestState, savePrioritize, saveStatementSelections, saveSwipeProgress } from "./store.ts";
 
 function sid(): string {
 	return getActiveSessionId();
@@ -462,43 +462,24 @@ describe("loadExploreData/saveExploreData", () => {
 	});
 });
 
-describe("loadSummaryCache/saveSummaryCache", () => {
-	it("returns empty object when key is absent", () => {
-		expect(loadSummaryCache(sid())).toEqual({});
+describe("lookupCachedSummary/saveCachedSummary", () => {
+	it("returns null when key is absent", () => {
+		expect(lookupCachedSummary({ sessionId: sid(), cardId: "self-knowledge", answer: "My answer", questionId: "interpretation" })).toBeNull();
 	});
 
-	it("returns empty object for corrupt JSON", () => {
+	it("returns null for corrupt JSON", () => {
 		localStorage.setItem(activeKey("summaries"), "{");
-		expect(loadSummaryCache(sid())).toEqual({});
+		expect(lookupCachedSummary({ sessionId: sid(), cardId: "self-knowledge", answer: "My answer", questionId: "interpretation" })).toBeNull();
 	});
 
-	it("returns empty object for malformed cache entries", () => {
-		localStorage.setItem(
-			activeKey("summaries"),
-			JSON.stringify({
-				"self-knowledge:interpretation": {
-					answer: "answer",
-					summary: 123,
-				},
-			}),
-		);
-		expect(loadSummaryCache(sid())).toEqual({});
+	it("returns null on answer mismatch", () => {
+		saveCachedSummary({ sessionId: sid(), cardId: "self-knowledge", answer: "My answer", summary: "My summary", questionId: "interpretation" });
+		expect(lookupCachedSummary({ sessionId: sid(), cardId: "self-knowledge", answer: "Different answer", questionId: "interpretation" })).toBeNull();
 	});
 
-	it("round-trips saved cache", () => {
-		saveSummaryCache(sid(), {
-			"self-knowledge:interpretation": {
-				answer: "My answer",
-				summary: "My summary",
-			},
-		});
-
-		expect(loadSummaryCache(sid())).toEqual({
-			"self-knowledge:interpretation": {
-				answer: "My answer",
-				summary: "My summary",
-			},
-		});
+	it("round-trips saved summary", () => {
+		saveCachedSummary({ sessionId: sid(), cardId: "self-knowledge", answer: "My answer", summary: "My summary", questionId: "interpretation" });
+		expect(lookupCachedSummary({ sessionId: sid(), cardId: "self-knowledge", answer: "My answer", questionId: "interpretation" })).toBe("My summary");
 	});
 });
 
@@ -967,7 +948,6 @@ describe("session data isolation", () => {
 		expect(loadChosenCardIds(sid())).toBeNull();
 		expect(loadFreeformNotes(sid())).toEqual({});
 	});
-
 });
 
 describe("formatSessionDate", () => {

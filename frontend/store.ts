@@ -62,7 +62,7 @@ export interface ExploreEntry {
 }
 
 export type ExploreData = Record<string, ExploreEntry[]>;
-export type SummaryCache = Record<string, { answer: string; summary: string }>;
+type SummaryCache = Record<string, { answer: string; summary: string }>;
 export type FreeformNotes = Partial<Record<string, string>>;
 export type StatementSelections = Partial<Record<string, string[]>>;
 
@@ -454,22 +454,23 @@ function isSummaryCache(value: unknown): value is SummaryCache {
 	return true;
 }
 
-export function loadSummaryCache(sessionId: string): SummaryCache {
-	const parsed = parseJsonFromStorage(summariesKey(sessionId));
-	return isSummaryCache(parsed) ? parsed : {};
-}
-
-export function saveSummaryCache(sessionId: string, cache: SummaryCache): void {
-	localStorage.setItem(summariesKey(sessionId), JSON.stringify(cache));
-	touchSession(sessionId);
-}
-
-export function lookupCachedSummary(cache: SummaryCache, cardId: string, answer: string, questionId?: string): string | null {
-	const cacheKey = `${cardId}:${questionId ?? "freeform"}`;
-	if (cacheKey in cache && cache[cacheKey].answer === answer) {
+export function lookupCachedSummary(options: { sessionId: string; cardId: string; answer: string; questionId?: string }): string | null {
+	const parsed = parseJsonFromStorage(summariesKey(options.sessionId));
+	const cache = isSummaryCache(parsed) ? parsed : {};
+	const cacheKey = `${options.cardId}:${options.questionId ?? "freeform"}`;
+	if (cacheKey in cache && cache[cacheKey].answer === options.answer) {
 		return cache[cacheKey].summary;
 	}
 	return null;
+}
+
+export function saveCachedSummary(options: { sessionId: string; cardId: string; answer: string; summary: string; questionId?: string }): void {
+	const parsed = parseJsonFromStorage(summariesKey(options.sessionId));
+	const cache = isSummaryCache(parsed) ? parsed : {};
+	const cacheKey = `${options.cardId}:${options.questionId ?? "freeform"}`;
+	cache[cacheKey] = { answer: options.answer, summary: options.summary };
+	localStorage.setItem(summariesKey(options.sessionId), JSON.stringify(cache));
+	touchSession(options.sessionId);
 }
 
 function isFreeformNotes(value: unknown): value is FreeformNotes {
