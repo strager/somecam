@@ -1,11 +1,10 @@
 import { ref, type Ref } from "vue";
 
 import { fetchReflectOnAnswer, fetchInferredAnswers } from "./api.ts";
-import { hashStrings } from "./deterministic-hash.ts";
 import type { ReflectOnAnswerResponse } from "./api.ts";
 import { capture } from "./analytics.ts";
 import type { ExploreEntry } from "./store.ts";
-import { isExplorePhaseComplete, loadExploreData, requestStoragePersistence, saveExploreData } from "./store.ts";
+import { isExplorePhaseComplete, loadExploreData, requestStoragePersistence, saveExploreData, selectNextQuestion } from "./store.ts";
 import { EXPLORE_QUESTIONS } from "../shared/explore-questions.ts";
 import type { MeaningCard } from "../shared/meaning-cards.ts";
 import { MEANING_CARDS } from "../shared/meaning-cards.ts";
@@ -532,22 +531,8 @@ export class ExploreMeaningViewModel {
 			return;
 		}
 
-		let nextQuestionId: string | undefined;
-		let nextPrefill = "";
-
-		for (const qId of remaining) {
-			const inferred = inferredMap.get(qId);
-			if (inferred !== undefined) {
-				nextQuestionId = qId;
-				nextPrefill = inferred;
-				break;
-			}
-		}
-
-		if (nextQuestionId === undefined) {
-			const index = hashStrings(this.cardId, this.sessionId, String(this._entries.value.length)) % remaining.length;
-			nextQuestionId = remaining[index];
-		}
+		const nextQuestionId = selectNextQuestion(this.sessionId, this.cardId, remaining, [...inferredMap.keys()]);
+		const nextPrefill = inferredMap.get(nextQuestionId) ?? "";
 
 		this._entries.value.push({
 			questionId: nextQuestionId,

@@ -1,6 +1,7 @@
 import { EXPLORE_QUESTIONS } from "../shared/explore-questions.ts";
 import type { SwipeDirection } from "../shared/meaning-cards.ts";
 import { capture } from "./analytics.ts";
+import { hashStrings } from "./deterministic-hash.ts";
 
 const SESSIONS_KEY = "somecam-sessions";
 const ACTIVE_SESSION_KEY = "somecam-active-session";
@@ -470,6 +471,17 @@ export function saveExploreData(sessionId: string, data: ExploreData): void {
 	localStorage.setItem(freeformKey(sessionId), JSON.stringify(freeformRecord));
 	localStorage.setItem(statementsKey(sessionId), JSON.stringify(statementsRecord));
 	touchSession(sessionId);
+}
+
+export function selectNextQuestion(sessionId: string, cardId: string, allowedQuestionIds: string[], priorityQuestionIds: string[]): string {
+	for (const qId of allowedQuestionIds) {
+		if (priorityQuestionIds.includes(qId)) {
+			return qId;
+		}
+	}
+	const entryCount = EXPLORE_QUESTIONS.length - allowedQuestionIds.length;
+	const index = hashStrings(cardId, sessionId, String(entryCount)) % allowedQuestionIds.length;
+	return allowedQuestionIds[index];
 }
 
 function isSummaryCache(value: unknown): value is SummaryCache {
