@@ -5,7 +5,6 @@ import { MEANING_CARDS } from "../shared/meaning-cards.ts";
 import { EXPLORE_QUESTIONS } from "../shared/explore-questions.ts";
 import { fetchSummary } from "./api.ts";
 import { capture } from "./analytics.ts";
-import { assignQuestions } from "./explore-data.ts";
 import type { ExploreEntry } from "./store.ts";
 import { loadChosenCardIds, loadExploreData, lookupCachedSummary, saveCachedSummary, saveExploreData } from "./store.ts";
 
@@ -121,7 +120,7 @@ export class ExploreViewModel {
 
 			let exploreData = loadExploreData(this.sessionId);
 			if (exploreData === null) {
-				exploreData = assignQuestions(cardIds, this.sessionId);
+				exploreData = {};
 				saveExploreData(this.sessionId, exploreData);
 			}
 			const promises: Promise<void>[] = [];

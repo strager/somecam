@@ -3,10 +3,9 @@ import { computed, onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
 
 import AppButton from "./AppButton.vue";
-import { assignQuestions } from "./explore-data.ts";
 import { capture } from "./analytics.ts";
 import { useStringParam } from "./route-utils.ts";
-import { loadChosenCardIds, loadExploreData, saveChosenCardIds, saveExploreData } from "./store.ts";
+import { loadChosenCardIds, loadExploreData, saveChosenCardIds } from "./store.ts";
 import { MEANING_CARDS } from "../shared/meaning-cards.ts";
 
 const router = useRouter();
@@ -43,13 +42,6 @@ function addCard(cardId: string): void {
 	chosenIds.value = new Set(chosenIds.value);
 	saveChosenIds();
 	capture("card_toggled", { session_id: sessionId });
-
-	const exploreData = loadExploreData(sessionId);
-	if (exploreData !== null && !(cardId in exploreData)) {
-		const newEntry = assignQuestions([cardId], sessionId);
-		Object.assign(exploreData, newEntry);
-		saveExploreData(sessionId, exploreData);
-	}
 }
 
 function removeCard(cardId: string, hadData: boolean): void {

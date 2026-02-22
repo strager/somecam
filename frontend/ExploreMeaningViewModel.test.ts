@@ -116,16 +116,29 @@ describe("initialize", () => {
 		expect(vm.initialize()).toBe("no-data");
 	});
 
-	it("returns 'no-data' when no explore data in localStorage", () => {
+	it("assigns first question when entries are missing", () => {
+		saveChosenCardIds(sid(), [TEST_CARD_ID]);
 		const vm = new ExploreMeaningViewModel(sid(), TEST_CARD_ID);
-		expect(vm.initialize()).toBe("no-data");
+		expect(vm.initialize()).toBe("ready");
+		expect(vm.entries).toHaveLength(1);
+		expect(vm.entries[0].submitted).toBe(false);
+		expect(vm.entries[0].userAnswer).toBe("");
+
+		const saved = loadExploreData(sid());
+		expect(saved![TEST_CARD_ID].entries).toHaveLength(1);
 	});
 
-	it("returns 'no-data' when entries for card are empty", () => {
+	it("assigns first question when entries are empty", () => {
 		saveChosenCardIds(sid(), [TEST_CARD_ID]);
 		saveExploreData(sid(), { [TEST_CARD_ID]: { entries: [], freeformNote: "", statementSelections: [] } });
 		const vm = new ExploreMeaningViewModel(sid(), TEST_CARD_ID);
-		expect(vm.initialize()).toBe("no-data");
+		expect(vm.initialize()).toBe("ready");
+		expect(vm.entries).toHaveLength(1);
+		expect(vm.entries[0].submitted).toBe(false);
+		expect(vm.entries[0].userAnswer).toBe("");
+
+		const saved = loadExploreData(sid());
+		expect(saved![TEST_CARD_ID].entries).toHaveLength(1);
 	});
 
 	it("returns 'ready' and loads entries on normal load", () => {
@@ -237,13 +250,6 @@ describe("initialize", () => {
 		vm2.initialize();
 		expect(vm2.prefilledQuestionIds.has(nextQId)).toBe(true);
 		expect(vm2.entries[1].userAnswer).toBe("suggested answer");
-	});
-
-	it("returns 'no-data' on corrupt localStorage data", () => {
-		saveChosenCardIds(sid(), [TEST_CARD_ID]);
-		localStorage.setItem(`somecam-${sid()}-explore`, "not-valid-json{{{");
-		const vm = new ExploreMeaningViewModel(sid(), TEST_CARD_ID);
-		expect(vm.initialize()).toBe("no-data");
 	});
 });
 
@@ -1035,5 +1041,27 @@ describe("deterministic question selection", () => {
 		const questionIds2 = await submitAllQuestions();
 
 		expect(questionIds1).toEqual(questionIds2);
+	});
+});
+
+describe("deterministic initial question assignment", () => {
+	it("two VMs with same session and card assign the same initial question", () => {
+		saveChosenCardIds(sid(), [TEST_CARD_ID]);
+		saveExploreData(sid(), { [TEST_CARD_ID]: { entries: [], freeformNote: "", statementSelections: [] } });
+
+		const vm1 = new ExploreMeaningViewModel(sid(), TEST_CARD_ID);
+		vm1.initialize();
+		const data1 = loadExploreData(sid());
+		const questionId1 = data1![TEST_CARD_ID].entries[0].questionId;
+
+		// Reset to empty entries so the second VM re-runs selectNextQuestion
+		saveExploreData(sid(), { [TEST_CARD_ID]: { entries: [], freeformNote: "", statementSelections: [] } });
+
+		const vm2 = new ExploreMeaningViewModel(sid(), TEST_CARD_ID);
+		vm2.initialize();
+		const data2 = loadExploreData(sid());
+		const questionId2 = data2![TEST_CARD_ID].entries[0].questionId;
+
+		expect(questionId1).toBe(questionId2);
 	});
 });

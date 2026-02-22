@@ -135,12 +135,24 @@ export class ExploreMeaningViewModel {
 		}
 
 		try {
-			const data = loadExploreData(this.sessionId);
-			if (data === null) {
-				return "no-data";
-			}
+			const data = loadExploreData(this.sessionId) ?? {};
 			if (!(this.cardId in data) || data[this.cardId].entries.length === 0) {
-				return "no-data";
+				if (!(this.cardId in data)) {
+					data[this.cardId] = { entries: [], freeformNote: "", statementSelections: [] };
+				}
+				const allQuestionIds = EXPLORE_QUESTIONS.map((q) => q.id);
+				const questionId = selectNextQuestion(this.sessionId, this.cardId, allQuestionIds, []);
+				data[this.cardId].entries.push({
+					questionId,
+					userAnswer: "",
+					prefilledAnswer: "",
+					submitted: false,
+					guardrailText: "",
+					submittedAfterGuardrail: false,
+					thoughtBubbleText: "",
+					thoughtBubbleAcknowledged: false,
+				});
+				saveExploreData(this.sessionId, data);
 			}
 			const cardData = data[this.cardId];
 
