@@ -121,7 +121,7 @@ export class ExploreViewModel {
 
 			let exploreData = loadExploreData(this.sessionId);
 			if (exploreData === null) {
-				exploreData = assignQuestions(cardIds);
+				exploreData = assignQuestions(cardIds, this.sessionId);
 				saveExploreData(this.sessionId, exploreData);
 			}
 			const promises: Promise<void>[] = [];

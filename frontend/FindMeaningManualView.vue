@@ -46,7 +46,7 @@ function addCard(cardId: string): void {
 
 	const exploreData = loadExploreData(sessionId);
 	if (exploreData !== null && !(cardId in exploreData)) {
-		const newEntry = assignQuestions([cardId]);
+		const newEntry = assignQuestions([cardId], sessionId);
 		Object.assign(exploreData, newEntry);
 		saveExploreData(sessionId, exploreData);
 	}

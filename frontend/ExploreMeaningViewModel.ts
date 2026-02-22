@@ -1,6 +1,7 @@
 import { ref, type Ref } from "vue";
 
 import { fetchReflectOnAnswer, fetchInferredAnswers } from "./api.ts";
+import { hashStrings } from "./deterministic-hash.ts";
 import type { ReflectOnAnswerResponse } from "./api.ts";
 import { capture } from "./analytics.ts";
 import type { ExploreEntry } from "./store.ts";
@@ -544,8 +545,8 @@ export class ExploreMeaningViewModel {
 		}
 
 		if (nextQuestionId === undefined) {
-			const randomIndex = Math.floor(Math.random() * remaining.length);
-			nextQuestionId = remaining[randomIndex];
+			const index = hashStrings(this.cardId, this.sessionId, String(this._entries.value.length)) % remaining.length;
+			nextQuestionId = remaining[index];
 		}
 
 		this._entries.value.push({

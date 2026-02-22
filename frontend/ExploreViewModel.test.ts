@@ -506,3 +506,24 @@ describe("action methods", () => {
 		}).not.toThrow();
 	});
 });
+
+describe("deterministic question assignment", () => {
+	it("two VMs with same session assign the same initial questions", () => {
+		const cardIds = setupChosenCards(2);
+
+		const vm1 = new ExploreViewModel(sid());
+		vm1.initialize();
+		const data1 = loadExploreData(sid());
+
+		// Clear explore data so the second VM re-runs assignQuestions
+		localStorage.removeItem(`somecam-${sid()}-explore`);
+
+		const vm2 = new ExploreViewModel(sid());
+		vm2.initialize();
+		const data2 = loadExploreData(sid());
+
+		for (const cardId of cardIds) {
+			expect(data1![cardId].entries[0].questionId).toBe(data2![cardId].entries[0].questionId);
+		}
+	});
+});

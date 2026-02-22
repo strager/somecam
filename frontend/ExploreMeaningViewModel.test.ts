@@ -994,32 +994,46 @@ describe("derived properties", () => {
 	});
 });
 
-describe("random question selection", () => {
-	it("uses Math.random to pick next question when no inferences", async () => {
-		const originalRandom = Math.random;
-		Math.random = () => 0.999;
-		try {
-			server.use(
-				http.post("*/api/reflect-on-answer", () => {
-					return HttpResponse.json({ type: "none", message: "" });
-				}),
-				http.post("*/api/infer-answers", () => {
-					return new HttpResponse(null, { status: 500 });
-				}),
-			);
-			const entries = [makeEntry(EXPLORE_QUESTIONS[0].id, "My answer", false)];
-			setupExploreData(TEST_CARD_ID, entries);
+describe("deterministic question selection", () => {
+	async function submitAllQuestions(): Promise<string[]> {
+		server.use(
+			http.post("*/api/reflect-on-answer", () => {
+				return HttpResponse.json({ type: "none", message: "" });
+			}),
+			http.post("*/api/infer-answers", () => {
+				return new HttpResponse(null, { status: 500 });
+			}),
+		);
+		const entries = [makeEntry(EXPLORE_QUESTIONS[0].id, "My answer", false)];
+		setupExploreData(TEST_CARD_ID, entries);
 
-			const vm = new ExploreMeaningViewModel(sid(), TEST_CARD_ID);
-			vm.initialize();
+		const vm = new ExploreMeaningViewModel(sid(), TEST_CARD_ID);
+		vm.initialize();
+
+		for (let i = 0; i < EXPLORE_QUESTIONS.length; i++) {
+			const idx = vm.activeIndex;
+			if (idx >= vm.entries.length) break;
+			vm.entries[idx].userAnswer = `Answer ${String(i)}`;
 			await vm.submitAnswer();
-
-			// Remaining questions are EXPLORE_QUESTIONS[1..4] (4 items).
-			// Math.floor(0.999 * 4) = 3, so index 3 → EXPLORE_QUESTIONS[4].
-			expect(vm.entries).toHaveLength(2);
-			expect(vm.entries[1].questionId).toBe(EXPLORE_QUESTIONS[4].id);
-		} finally {
-			Math.random = originalRandom;
 		}
+
+		return vm.entries.map((e) => e.questionId);
+	}
+
+	it("selects all questions without duplicates", async () => {
+		const questionIds = await submitAllQuestions();
+
+		expect(questionIds).toHaveLength(EXPLORE_QUESTIONS.length);
+		expect(new Set(questionIds).size).toBe(EXPLORE_QUESTIONS.length);
+	});
+
+	it("two runs with same session+card produce the same sequence", async () => {
+		const questionIds1 = await submitAllQuestions();
+
+		server.resetHandlers();
+
+		const questionIds2 = await submitAllQuestions();
+
+		expect(questionIds1).toEqual(questionIds2);
 	});
 });
