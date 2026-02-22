@@ -4,7 +4,7 @@ import { fetchReflectOnAnswer, fetchInferredAnswers } from "./api.ts";
 import type { ReflectOnAnswerResponse } from "./api.ts";
 import { capture } from "./analytics.ts";
 import type { ExploreEntryFull } from "./store.ts";
-import { loadChosenCardIds, loadExploreDataFull, loadFreeformNotes, loadStatementSelections, requestStoragePersistence, saveExploreData, saveFreeformNotes, saveStatementSelections } from "./store.ts";
+import { isExplorePhaseComplete, loadExploreDataFull, loadFreeformNotes, loadStatementSelections, requestStoragePersistence, saveExploreData, saveFreeformNotes, saveStatementSelections } from "./store.ts";
 import { EXPLORE_QUESTIONS } from "../shared/explore-questions.ts";
 import type { MeaningCard } from "../shared/meaning-cards.ts";
 import { MEANING_CARDS } from "../shared/meaning-cards.ts";
@@ -599,18 +599,7 @@ export class ExploreMeaningViewModel {
 			return;
 		}
 
-		const chosenCardIds = loadChosenCardIds(this.sessionId);
-		const data = loadExploreDataFull(this.sessionId);
-		if (chosenCardIds === null || data === null) {
-			return;
-		}
-
-		const allCardsComplete = chosenCardIds.every((chosenId) => {
-			const cardEntries = data[chosenId];
-			return Array.isArray(cardEntries) && cardEntries.length === EXPLORE_QUESTIONS.length && cardEntries.every((entry) => entry.submitted);
-		});
-
-		if (!allCardsComplete) {
+		if (!isExplorePhaseComplete(this.sessionId)) {
 			return;
 		}
 

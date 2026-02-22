@@ -616,6 +616,19 @@ export function hasProgressData(sessionId: string): boolean {
 	return SESSION_DATA_SUFFIXES.some((suffix) => localStorage.getItem(sessionKey(sessionId, suffix)) !== null);
 }
 
+export function isExplorePhaseComplete(sessionId: string): boolean {
+	const chosenCardIds = loadChosenCardIds(sessionId);
+	const data = loadExploreDataFull(sessionId);
+	if (chosenCardIds === null || data === null) {
+		return false;
+	}
+
+	return chosenCardIds.every((chosenId) => {
+		const cardEntries = data[chosenId];
+		return Array.isArray(cardEntries) && cardEntries.length === EXPLORE_QUESTIONS.length && cardEntries.every((entry) => entry.submitted);
+	});
+}
+
 // --- Export / Import ---
 
 const EXPORT_VERSION_V2 = "somecam-v2";
