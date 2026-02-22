@@ -5,7 +5,6 @@
 ## localStorage
 
 - All localStorage access goes through `frontend/store.ts`. Do not use `localStorage` directly in components.
-- `clearAllProgress()` intentionally preserves `somecam-llm-test` (the debug page's data).
 - Debounce text input saves (300ms). Save immediately on discrete actions (button clicks, dropdown changes).
 
 ## Design Tokens

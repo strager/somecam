@@ -177,14 +177,6 @@ export function createSession(name?: string): string {
 	return id;
 }
 
-export function switchSession(id: string): void {
-	const sessions = loadSessionsMeta();
-	if (!sessions.some((s) => s.id === id)) {
-		throw new Error(`Session not found: ${id}`);
-	}
-	localStorage.setItem(ACTIVE_SESSION_KEY, id);
-}
-
 export function renameSession(id: string, newName: string): void {
 	const sessions = loadSessionsMeta();
 	const session = sessions.find((s) => s.id === id);
@@ -574,16 +566,6 @@ export function detectSessionPhase(id: string): ProgressPhase {
 		return "swipe";
 	}
 	return "none";
-}
-
-export function clearAllProgress(sessionId: string): void {
-	for (const suffix of SESSION_DATA_SUFFIXES) {
-		localStorage.removeItem(sessionKey(sessionId, suffix));
-	}
-}
-
-export function hasProgressData(sessionId: string): boolean {
-	return SESSION_DATA_SUFFIXES.some((suffix) => localStorage.getItem(sessionKey(sessionId, suffix)) !== null);
 }
 
 export function isExplorePhaseComplete(sessionId: string): boolean {

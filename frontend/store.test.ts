@@ -3,7 +3,7 @@
 import { Window } from "happy-dom";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { clearAllProgress, createSession, deleteSession, ensureSessionsInitialized, exportProgressData, formatSessionDate, getActiveSessionId, hasProgressData, importProgressData, listSessions, loadChosenCardIds, loadExploreData, loadFreeformNotes, loadLlmTestState, loadPrioritize, loadStatementSelections, loadSummaryCache, loadSwipeProgress, removePrioritize, renameSession, saveChosenCardIds, saveExploreData, saveFreeformNotes, saveLlmTestState, savePrioritize, saveSummaryCache, saveStatementSelections, saveSwipeProgress, switchSession } from "./store.ts";
+import { createSession, deleteSession, ensureSessionsInitialized, exportProgressData, formatSessionDate, getActiveSessionId, importProgressData, listSessions, loadChosenCardIds, loadExploreData, loadFreeformNotes, loadLlmTestState, loadPrioritize, loadStatementSelections, loadSummaryCache, loadSwipeProgress, removePrioritize, renameSession, saveChosenCardIds, saveExploreData, saveFreeformNotes, saveLlmTestState, savePrioritize, saveSummaryCache, saveStatementSelections, saveSwipeProgress } from "./store.ts";
 
 function sid(): string {
 	return getActiveSessionId();
@@ -631,56 +631,6 @@ describe("loadFreeformNotes/saveFreeformNotes", () => {
 	});
 });
 
-describe("clearAllProgress", () => {
-	it("removes all progress keys except llm-test", () => {
-		saveSwipeProgress(sid(), {
-			shuffledCardIds: ["self-knowledge"],
-			swipeHistory: [],
-		});
-		savePrioritize(sid(), {
-			cardIds: ["self-knowledge"],
-			swipeHistory: [],
-		});
-		saveChosenCardIds(sid(), ["self-knowledge"]);
-		saveExploreData(sid(), {
-			"self-knowledge": [
-				{
-					questionId: "interpretation",
-					userAnswer: "",
-					prefilledAnswer: "",
-					submitted: false,
-					guardrailText: "",
-					submittedAfterGuardrail: false,
-					thoughtBubbleText: "",
-					thoughtBubbleAcknowledged: false,
-				},
-			],
-		});
-		saveSummaryCache(sid(), {
-			"self-knowledge:interpretation": {
-				answer: "answer",
-				summary: "summary",
-			},
-		});
-		saveFreeformNotes(sid(), { "self-knowledge": "Some notes" });
-		const llmTestState = {
-			cardId: "self-knowledge",
-			rows: [{ questionId: "interpretation", answer: "answer" }],
-		};
-		saveLlmTestState(llmTestState);
-
-		clearAllProgress(sid());
-
-		expect(loadSwipeProgress(sid())).toBeNull();
-		expect(loadPrioritize(sid())).toBeNull();
-		expect(loadChosenCardIds(sid())).toBeNull();
-		expect(loadExploreData(sid())).toBeNull();
-		expect(loadSummaryCache(sid())).toEqual({});
-		expect(loadFreeformNotes(sid())).toEqual({});
-		expect(loadLlmTestState()).toEqual(llmTestState);
-	});
-});
-
 describe("exportProgressData/importProgressData", () => {
 	it("exportProgressData returns v2 format with empty session data", () => {
 		const result = JSON.parse(exportProgressData());
@@ -769,12 +719,14 @@ describe("exportProgressData/importProgressData", () => {
 		const activeId = getActiveSessionId();
 
 		// Clear active session data
-		clearAllProgress(sid());
+		for (const suffix of ["progress", "narrowdown", "chosen", "explore", "summaries", "freeform", "statements"]) {
+			localStorage.removeItem(`somecam-${activeId}-${suffix}`);
+		}
 		expect(loadChosenCardIds(sid())).toBeNull();
 
 		importProgressData(exported);
 
-		switchSession(activeId);
+		localStorage.setItem("somecam-active-session", activeId);
 		expect(loadChosenCardIds(sid())).toEqual(["self-knowledge", "community"]);
 		expect(loadFreeformNotes(sid())).toEqual({ "self-knowledge": "notes" });
 	});
@@ -900,17 +852,6 @@ describe("loadStatementSelections/saveStatementSelections", () => {
 	});
 });
 
-describe("hasProgressData", () => {
-	it("returns false when empty", () => {
-		expect(hasProgressData(sid())).toBe(false);
-	});
-
-	it("returns true when any somecam key exists", () => {
-		saveChosenCardIds(sid(), ["self-knowledge"]);
-		expect(hasProgressData(sid())).toBe(true);
-	});
-});
-
 describe("session management", () => {
 	it("listSessions hides empty sessions", () => {
 		expect(listSessions()).toHaveLength(0);
@@ -930,7 +871,7 @@ describe("session management", () => {
 		const firstId = getActiveSessionId();
 		const emptyId = createSession("Empty");
 		// Switch back so the empty session is not active
-		switchSession(firstId);
+		localStorage.setItem("somecam-active-session", firstId);
 
 		listSessions();
 
@@ -970,19 +911,6 @@ describe("session management", () => {
 		expect(session?.name).toBe(formatSessionDate(new Date()));
 	});
 
-	it("switchSession changes active session", () => {
-		const firstId = getActiveSessionId();
-		createSession("Second");
-		switchSession(firstId);
-		expect(getActiveSessionId()).toBe(firstId);
-	});
-
-	it("switchSession throws for unknown id", () => {
-		expect(() => {
-			switchSession("nonexistent");
-		}).toThrow(/not found/);
-	});
-
 	it("renameSession updates the session name", () => {
 		const id = getActiveSessionId();
 		saveChosenCardIds(sid(), ["self-knowledge"]);
@@ -1011,7 +939,7 @@ describe("session management", () => {
 	it("deleteSession switches to another session when deleting active", () => {
 		const firstId = getActiveSessionId();
 		const secondId = createSession("Second");
-		switchSession(firstId);
+		localStorage.setItem("somecam-active-session", firstId);
 		deleteSession(firstId);
 		expect(getActiveSessionId()).toBe(secondId);
 	});
@@ -1040,29 +968,6 @@ describe("session data isolation", () => {
 		expect(loadFreeformNotes(sid())).toEqual({});
 	});
 
-	it("switching back to a session restores its data", () => {
-		const firstId = getActiveSessionId();
-		saveChosenCardIds(sid(), ["self-knowledge"]);
-
-		createSession("Second");
-		saveChosenCardIds(sid(), ["community"]);
-
-		switchSession(firstId);
-		expect(loadChosenCardIds(sid())).toEqual(["self-knowledge"]);
-	});
-
-	it("clearAllProgress only affects the active session", () => {
-		saveChosenCardIds(sid(), ["self-knowledge"]);
-		const firstId = getActiveSessionId();
-
-		createSession("Second");
-		saveChosenCardIds(sid(), ["community"]);
-		clearAllProgress(sid());
-
-		expect(loadChosenCardIds(sid())).toBeNull();
-		switchSession(firstId);
-		expect(loadChosenCardIds(sid())).toEqual(["self-knowledge"]);
-	});
 });
 
 describe("formatSessionDate", () => {
