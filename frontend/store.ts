@@ -46,9 +46,15 @@ export interface SwipeProgress {
 	swipeHistory: SwipeRecord[];
 }
 
-export interface PrioritizeProgress {
+export interface RankingComparison {
+	winner: string;
+	loser: string;
+}
+
+export interface RankingProgress {
 	cardIds: string[];
-	swipeHistory: SwipeRecord[];
+	comparisons: RankingComparison[];
+	complete: boolean;
 }
 
 export interface ExploreEntry {
@@ -365,7 +371,7 @@ export function saveSwipeProgress(sessionId: string, data: SwipeProgress): void 
 	touchSession(sessionId);
 }
 
-export function loadPrioritize(sessionId: string): PrioritizeProgress | null {
+export function loadRanking(sessionId: string): RankingProgress | null {
 	const parsed = parseJsonFromStorage(narrowdownKey(sessionId));
 	if (!isObjectRecord(parsed)) {
 		return null;
@@ -373,22 +379,29 @@ export function loadPrioritize(sessionId: string): PrioritizeProgress | null {
 	if (!isStringArray(parsed.cardIds) || parsed.cardIds.length === 0) {
 		return null;
 	}
-	if (!Array.isArray(parsed.swipeHistory) || !parsed.swipeHistory.every((entry) => isSwipeRecord(entry))) {
+	if (!Array.isArray(parsed.comparisons)) {
 		return null;
+	}
+	if (typeof parsed.complete !== "boolean") {
+		return null;
+	}
+	const comparisons: RankingComparison[] = [];
+	for (const entry of parsed.comparisons) {
+		if (!isObjectRecord(entry) || typeof entry.winner !== "string" || typeof entry.loser !== "string") {
+			return null;
+		}
+		comparisons.push({ winner: entry.winner, loser: entry.loser });
 	}
 	return {
 		cardIds: parsed.cardIds,
-		swipeHistory: parsed.swipeHistory,
+		comparisons,
+		complete: parsed.complete,
 	};
 }
 
-export function savePrioritize(sessionId: string, data: PrioritizeProgress): void {
+export function saveRanking(sessionId: string, data: RankingProgress): void {
 	localStorage.setItem(narrowdownKey(sessionId), JSON.stringify(data));
 	touchSession(sessionId);
-}
-
-export function removePrioritize(sessionId: string): void {
-	localStorage.removeItem(narrowdownKey(sessionId));
 }
 
 export function loadChosenCardIds(sessionId: string): string[] | null {
@@ -413,9 +426,9 @@ export function selectCandidateCards(sessionId: string): string[] {
 }
 
 export function needsPrioritization(sessionId: string): boolean {
-	const prioritize = loadPrioritize(sessionId);
-	if (prioritize !== null) {
-		return prioritize.cardIds.length > 5;
+	const ranking = loadRanking(sessionId);
+	if (ranking !== null) {
+		return ranking.cardIds.length > 5;
 	}
 	return selectCandidateCards(sessionId).length > 5;
 }
@@ -584,11 +597,8 @@ export function detectSessionPhase(id: string): ProgressPhase {
 		return "explore";
 	}
 	const narrowRaw = parseJsonFromStorage(`somecam-${id}-narrowdown`);
-	if (isObjectRecord(narrowRaw) && isStringArray(narrowRaw.cardIds) && narrowRaw.cardIds.length > 0 && Array.isArray(narrowRaw.swipeHistory)) {
-		if (narrowRaw.swipeHistory.length >= narrowRaw.cardIds.length) {
-			return "prioritize-complete";
-		}
-		return "prioritize";
+	if (isObjectRecord(narrowRaw) && isStringArray(narrowRaw.cardIds) && narrowRaw.cardIds.length > 0 && Array.isArray(narrowRaw.comparisons) && typeof narrowRaw.complete === "boolean") {
+		return narrowRaw.complete ? "prioritize-complete" : "prioritize";
 	}
 	const progressRaw = parseJsonFromStorage(`somecam-${id}-progress`);
 	if (isObjectRecord(progressRaw) && Array.isArray(progressRaw.swipeHistory) && progressRaw.swipeHistory.length > 0) {

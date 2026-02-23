@@ -1,0 +1,182 @@
+<script setup lang="ts">
+import { onMounted, ref } from "vue";
+import { useRouter } from "vue-router";
+
+import { FindMeaningRankingViewModel } from "./FindMeaningRankingViewModel.ts";
+import { useStringParam } from "./route-utils.ts";
+import AppButton from "./AppButton.vue";
+
+const router = useRouter();
+const sessionId = useStringParam("sessionId");
+const vm = new FindMeaningRankingViewModel(sessionId);
+
+const selectedIndex = ref<0 | 1 | null>(null);
+
+onMounted(() => {
+	const result = vm.initialize();
+	if (result === "no-data") {
+		void router.replace({ name: "findMeaning", params: { sessionId } });
+		return;
+	}
+	if (result === "skip") {
+		void router.replace({ name: "explore", params: { sessionId } });
+		return;
+	}
+});
+
+function handleCardTap(index: 0 | 1): void {
+	if (selectedIndex.value === index) {
+		vm.choose(index);
+		selectedIndex.value = null;
+	} else {
+		selectedIndex.value = index;
+	}
+}
+
+function handleUndo(): void {
+	vm.undo();
+	selectedIndex.value = null;
+}
+
+function handleFinish(): void {
+	vm.finalize();
+	void router.push({ name: "explore", params: { sessionId } });
+}
+</script>
+
+<template>
+	<main>
+		<header>
+			<h1>Find Meaning — Rank</h1>
+			<p class="instruction">Choose which source of meaning resonates with you more.</p>
+			<p class="remaining-text" :class="{ hidden: vm.estimatedRemaining === null }">{{ vm.estimatedRemaining !== null ? `Estimated ${String(Math.ceil(vm.estimatedRemaining.mid))} ${Math.ceil(vm.estimatedRemaining.mid) === 1 ? "comparison" : "comparisons"} remaining.` : "&nbsp;" }}</p>
+		</header>
+
+		<div v-if="!vm.isComplete" class="ranking-area">
+			<div :key="vm.round" class="card-pair">
+				<!-- eslint-disable-next-line vue/no-restricted-html-elements -->
+				<button v-for="(card, index) in vm.currentPair" :key="card.id" class="ranking-card" :class="{ selected: selectedIndex === index }" :aria-pressed="selectedIndex === index" @click="handleCardTap(index as 0 | 1)">
+					<span class="card-source">{{ card.source }}</span>
+					<p class="card-text">{{ card.description }}</p>
+					<span v-if="selectedIndex === index" class="confirm-label">Tap again to confirm</span>
+				</button>
+			</div>
+			<div class="undo-area">
+				<AppButton variant="secondary" emphasis="muted" :disabled="!vm.canUndo" @click="handleUndo">Undo</AppButton>
+			</div>
+		</div>
+
+		<div v-else class="end-state">
+			<h2>You're done!</h2>
+			<p>Your top sources of meaning have been identified.</p>
+			<AppButton variant="primary" @click="handleFinish">Explore Meaning</AppButton>
+		</div>
+	</main>
+</template>
+
+<style scoped>
+main {
+	max-width: 36rem;
+	margin: var(--space-8) auto;
+	padding: 0 var(--space-6);
+	color: var(--color-black);
+}
+
+header {
+	margin-bottom: var(--space-8);
+}
+
+h1 {
+	margin: 0 0 var(--space-1);
+}
+
+.instruction {
+	color: var(--color-gray-400);
+	margin: 0 0 var(--space-2);
+}
+
+.remaining-text {
+	font-size: var(--text-sm);
+	color: var(--color-gray-400);
+	margin: 0;
+}
+
+.remaining-text.hidden {
+	visibility: hidden;
+}
+
+.card-pair {
+	display: flex;
+	gap: var(--space-4);
+	margin-bottom: var(--space-6);
+}
+
+.ranking-card {
+	flex: 1;
+	min-height: 14rem;
+	padding: var(--space-8);
+	background: var(--color-white);
+	border: var(--border-thin);
+	cursor: pointer;
+	text-align: left;
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-2);
+	font-family: inherit;
+}
+
+.ranking-card:hover {
+	border-color: var(--color-gray-400);
+}
+
+.ranking-card.selected {
+	border-color: var(--color-green-600);
+	box-shadow: inset 0 0 0 1px var(--color-green-600);
+}
+
+.card-source {
+	font-family: var(--font-heading);
+	font-weight: 600;
+	font-size: var(--text-sm);
+	color: var(--color-gray-500);
+	text-transform: uppercase;
+	letter-spacing: 0.05em;
+}
+
+.card-text {
+	margin: 0;
+	font-size: var(--text-base, 1rem);
+	line-height: 1.5;
+	color: var(--color-black);
+}
+
+.confirm-label {
+	font-size: var(--text-sm);
+	color: var(--color-green-600);
+	font-weight: 600;
+	margin-top: auto;
+}
+
+.undo-area {
+	text-align: center;
+}
+
+.end-state {
+	text-align: center;
+}
+
+.end-state h2 {
+	margin: 0 0 var(--space-2);
+}
+
+.end-state p {
+	margin: 0 0 var(--space-6);
+	color: var(--color-gray-400);
+}
+
+@media (max-width: 480px) {
+	.card-pair {
+		flex-direction: column;
+	}
+}
+</style>

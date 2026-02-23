@@ -3,7 +3,7 @@
 import { Window } from "happy-dom";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { createSession, deleteSession, ensureSessionsInitialized, exportProgressData, formatSessionDate, getActiveSessionId, importProgressData, listSessions, loadChosenCardIds, loadExploreData, loadLlmTestState, loadPrioritize, loadSwipeProgress, lookupCachedSummary, removePrioritize, renameSession, saveCachedSummary, saveChosenCardIds, saveExploreData, saveLlmTestState, savePrioritize, saveSwipeProgress } from "./store.ts";
+import { createSession, deleteSession, detectSessionPhase, ensureSessionsInitialized, exportProgressData, formatSessionDate, getActiveSessionId, importProgressData, listSessions, loadChosenCardIds, loadExploreData, loadLlmTestState, loadRanking, loadSwipeProgress, lookupCachedSummary, renameSession, saveCachedSummary, saveChosenCardIds, saveExploreData, saveLlmTestState, saveRanking, saveSwipeProgress } from "./store.ts";
 
 function sid(): string {
 	return getActiveSessionId();
@@ -148,65 +148,6 @@ describe("loadSwipeProgress/saveSwipeProgress", () => {
 			shuffledCardIds: ["self-knowledge", "community"],
 			swipeHistory: [{ cardId: "self-knowledge", direction: "agree" }],
 		});
-	});
-});
-
-describe("loadPrioritize/savePrioritize/removePrioritize", () => {
-	it("returns null when key is absent", () => {
-		expect(loadPrioritize(sid())).toBeNull();
-	});
-
-	it("returns null when cardIds is missing", () => {
-		localStorage.setItem(
-			activeKey("narrowdown"),
-			JSON.stringify({
-				swipeHistory: [],
-			}),
-		);
-		expect(loadPrioritize(sid())).toBeNull();
-	});
-
-	it("returns null when cardIds is empty", () => {
-		localStorage.setItem(
-			activeKey("narrowdown"),
-			JSON.stringify({
-				cardIds: [],
-				swipeHistory: [],
-			}),
-		);
-		expect(loadPrioritize(sid())).toBeNull();
-	});
-
-	it("returns null when swipeHistory is missing", () => {
-		localStorage.setItem(
-			activeKey("narrowdown"),
-			JSON.stringify({
-				cardIds: ["self-knowledge"],
-			}),
-		);
-		expect(loadPrioritize(sid())).toBeNull();
-	});
-
-	it("round-trips saved progress", () => {
-		savePrioritize(sid(), {
-			cardIds: ["self-knowledge", "community"],
-			swipeHistory: [{ cardId: "community", direction: "agree" }],
-		});
-
-		expect(loadPrioritize(sid())).toEqual({
-			cardIds: ["self-knowledge", "community"],
-			swipeHistory: [{ cardId: "community", direction: "agree" }],
-		});
-	});
-
-	it("removePrioritize clears the key so loadPrioritize returns null", () => {
-		savePrioritize(sid(), {
-			cardIds: ["self-knowledge"],
-			swipeHistory: [],
-		});
-
-		removePrioritize(sid());
-		expect(loadPrioritize(sid())).toBeNull();
 	});
 });
 
@@ -1041,6 +982,125 @@ describe("session data isolation", () => {
 
 		expect(loadChosenCardIds(sid())).toBeNull();
 		expect(loadExploreData(sid())).toBeNull();
+	});
+});
+
+describe("loadRanking/saveRanking", () => {
+	it("returns null when key is absent", () => {
+		expect(loadRanking(sid())).toBeNull();
+	});
+
+	it("returns null when cardIds is missing", () => {
+		localStorage.setItem(activeKey("narrowdown"), JSON.stringify({ comparisons: [], complete: false }));
+		expect(loadRanking(sid())).toBeNull();
+	});
+
+	it("returns null when cardIds is empty", () => {
+		localStorage.setItem(activeKey("narrowdown"), JSON.stringify({ cardIds: [], comparisons: [], complete: false }));
+		expect(loadRanking(sid())).toBeNull();
+	});
+
+	it("returns null when comparisons is missing", () => {
+		localStorage.setItem(activeKey("narrowdown"), JSON.stringify({ cardIds: ["a"], complete: false }));
+		expect(loadRanking(sid())).toBeNull();
+	});
+
+	it("returns null when complete is missing", () => {
+		localStorage.setItem(activeKey("narrowdown"), JSON.stringify({ cardIds: ["a"], comparisons: [] }));
+		expect(loadRanking(sid())).toBeNull();
+	});
+
+	it("returns null for old PrioritizeProgress format (no comparisons field)", () => {
+		localStorage.setItem(activeKey("narrowdown"), JSON.stringify({ cardIds: ["a", "b"], swipeHistory: [] }));
+		expect(loadRanking(sid())).toBeNull();
+	});
+
+	it("returns null when comparison entry has non-string winner", () => {
+		localStorage.setItem(activeKey("narrowdown"), JSON.stringify({ cardIds: ["a", "b"], comparisons: [{ winner: 1, loser: "b" }], complete: false }));
+		expect(loadRanking(sid())).toBeNull();
+	});
+
+	it("round-trips saved ranking data", () => {
+		saveRanking(sid(), {
+			cardIds: ["a", "b", "c"],
+			comparisons: [{ winner: "a", loser: "b" }],
+			complete: false,
+		});
+		expect(loadRanking(sid())).toEqual({
+			cardIds: ["a", "b", "c"],
+			comparisons: [{ winner: "a", loser: "b" }],
+			complete: false,
+		});
+	});
+
+	it("round-trips complete ranking", () => {
+		saveRanking(sid(), {
+			cardIds: ["a", "b"],
+			comparisons: [{ winner: "a", loser: "b" }],
+			complete: true,
+		});
+		expect(loadRanking(sid())).toEqual({
+			cardIds: ["a", "b"],
+			comparisons: [{ winner: "a", loser: "b" }],
+			complete: true,
+		});
+	});
+});
+
+describe("detectSessionPhase", () => {
+	it("returns 'none' when no data exists", () => {
+		expect(detectSessionPhase(sid())).toBe("none");
+	});
+
+	it("returns 'swipe' when swipe progress exists", () => {
+		saveSwipeProgress(sid(), {
+			shuffledCardIds: ["a", "b"],
+			swipeHistory: [{ cardId: "a", direction: "agree" }],
+		});
+		expect(detectSessionPhase(sid())).toBe("swipe");
+	});
+
+	it("returns 'prioritize' when ranking data exists and not complete", () => {
+		saveRanking(sid(), {
+			cardIds: ["a", "b", "c"],
+			comparisons: [{ winner: "a", loser: "b" }],
+			complete: false,
+		});
+		expect(detectSessionPhase(sid())).toBe("prioritize");
+	});
+
+	it("returns 'prioritize-complete' when ranking is complete", () => {
+		saveRanking(sid(), {
+			cardIds: ["a", "b"],
+			comparisons: [{ winner: "a", loser: "b" }],
+			complete: true,
+		});
+		expect(detectSessionPhase(sid())).toBe("prioritize-complete");
+	});
+
+	it("returns 'explore' when chosen cards exist", () => {
+		saveChosenCardIds(sid(), ["a", "b"]);
+		expect(detectSessionPhase(sid())).toBe("explore");
+	});
+
+	it("explore takes priority over ranking data", () => {
+		saveRanking(sid(), { cardIds: ["a", "b"], comparisons: [], complete: false });
+		saveChosenCardIds(sid(), ["a"]);
+		expect(detectSessionPhase(sid())).toBe("explore");
+	});
+
+	it("ranking takes priority over swipe progress", () => {
+		saveSwipeProgress(sid(), {
+			shuffledCardIds: ["a", "b"],
+			swipeHistory: [{ cardId: "a", direction: "agree" }],
+		});
+		saveRanking(sid(), { cardIds: ["a", "b"], comparisons: [], complete: false });
+		expect(detectSessionPhase(sid())).toBe("prioritize");
+	});
+
+	it("returns 'none' for old PrioritizeProgress format", () => {
+		localStorage.setItem(activeKey("narrowdown"), JSON.stringify({ cardIds: ["a", "b"], swipeHistory: [] }));
+		expect(detectSessionPhase(sid())).toBe("none");
 	});
 });
 

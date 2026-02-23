@@ -7,7 +7,7 @@ import "./global.css";
 import ExploreMeaningView from "./ExploreMeaningView.vue";
 import ExploreView from "./ExploreView.vue";
 import FindMeaningManualView from "./FindMeaningManualView.vue";
-import FindMeaningPrioritizeView from "./FindMeaningPrioritizeView.vue";
+import FindMeaningRankingView from "./FindMeaningRankingView.vue";
 import FindMeaningView from "./FindMeaningView.vue";
 import HomeView from "./HomeView.vue";
 import PrivacyView from "./PrivacyView.vue";
@@ -35,7 +35,7 @@ const router = createRouter({
 		{
 			path: "/:sessionId/find-meaning/prioritize",
 			name: "findMeaningPrioritize",
-			component: FindMeaningPrioritizeView,
+			component: FindMeaningRankingView,
 		},
 		{
 			path: "/:sessionId/explore",

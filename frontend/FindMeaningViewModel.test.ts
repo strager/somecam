@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { MEANING_CARDS } from "../shared/meaning-cards.ts";
 import { FindMeaningViewModel } from "./FindMeaningViewModel.ts";
-import { ensureSessionsInitialized, getActiveSessionId, loadChosenCardIds, loadPrioritize, loadSwipeProgress, saveSwipeProgress } from "./store.ts";
+import { ensureSessionsInitialized, getActiveSessionId, loadChosenCardIds, loadRanking, loadSwipeProgress, saveSwipeProgress } from "./store.ts";
 
 let currentWindow: Window | null = null;
 
@@ -224,7 +224,7 @@ describe("finalize", () => {
 		expect(loadChosenCardIds(sid())).toEqual(cardIds);
 	});
 
-	it("saves prioritize data when more than 5 agreed", () => {
+	it("saves ranking data when more than 5 agreed", () => {
 		const cardIds = MEANING_CARDS.slice(0, 7).map((c) => c.id);
 		const history = cardIds.map((id) => ({ cardId: id, direction: "agree" as const }));
 		saveSwipeProgress(sid(), { shuffledCardIds: cardIds, swipeHistory: history });
@@ -233,9 +233,11 @@ describe("finalize", () => {
 		vm.initialize();
 		vm.finalize();
 		expect(vm.requiresPrioritization).toBe(true);
-		const prioritize = loadPrioritize(sid());
-		expect(prioritize).not.toBeNull();
-		expect(prioritize!.cardIds).toEqual(cardIds);
+		const ranking = loadRanking(sid());
+		expect(ranking).not.toBeNull();
+		expect(ranking!.cardIds).toEqual(cardIds);
+		expect(ranking!.comparisons).toEqual([]);
+		expect(ranking!.complete).toBe(false);
 	});
 
 	it("does not require prioritization when ≤5 agreed among many cards", () => {
