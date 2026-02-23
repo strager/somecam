@@ -27,7 +27,7 @@ import { argsortDescending, checkConfidenceStop, checkStabilityStop, estimateSta
 import type { BayesianRefitRequest, BayesianRefitResponse, SelectPairRequest, SelectPairResponse, WorkerRequest, WorkerResponse } from "./ranking-worker-protocol.ts";
 
 // Re-export all pure math functions so existing imports from ranking.ts keep working.
-export { argsortDescending, bayesianRefit, boxMuller, checkConfidenceStop, checkStabilityStop, choleskyDecompose, choleskyInverse, choleskySolve, computeInformationGain, estimateStabilityStop, makeXorshift, selectPair, sigmoid, topKEntropy } from "./ranking-math.ts";
+export { argsortDescending, bayesianRefit, boxMuller, checkConfidenceStop, checkStabilityStop, choleskyDecompose, choleskyInverse, choleskySolve, computeInformationGain, estimateStabilityStop, makeXorshift, normalCDF, selectPair, sigmoid, topKEntropy } from "./ranking-math.ts";
 export type { RemainingEstimate, WinLoss } from "./ranking-math.ts";
 
 export interface RankingConfig {

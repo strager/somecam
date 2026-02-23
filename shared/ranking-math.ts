@@ -6,6 +6,13 @@
 // This module contains the stateless mathematical functions used by
 // the Ranking class. It is designed to be imported by the worker
 // script without triggering circular dependencies.
+//
+// topKEntropy uses a sum-of-marginals surrogate rather than the
+// true joint top-k set entropy H(S). The original Monte Carlo
+// estimator of H(S) was too slow for interactive use despite being
+// a closer approximation of the optimal objective. The surrogate
+// is deterministic and faster but not guaranteed to preserve pair
+// ordering in all cases.
 // ============================================================
 
 export type WinLoss = readonly [winner: number, loser: number];
@@ -272,52 +279,148 @@ export function argsortDescending(mu: Float64Array): number[] {
 }
 
 /**
+ * Standard normal CDF: P(Z ≤ x) where Z ~ N(0,1).
+ *
+ * Uses the Abramowitz & Stegun rational approximation (formula 26.2.17).
+ * Maximum absolute error ≈ 7.5 × 10⁻⁸.
+ */
+export function normalCDF(x: number): number {
+	if (x < -8) return 0;
+	if (x > 8) return 1;
+	const a = Math.abs(x);
+	const t = 1 / (1 + 0.2316419 * a);
+	const d = 0.3989422804014327; // 1/sqrt(2*pi)
+	const poly = t * (0.31938153 + t * (-0.356563782 + t * (1.781477937 + t * (-1.821255978 + t * 1.330274429))));
+	const tail = d * Math.exp(-0.5 * a * a) * poly;
+	return x >= 0 ? 1 - tail : tail;
+}
+
+// Gauss-Hermite quadrature nodes and weights (Q=7).
+// These integrate ∫ f(t)·exp(-t²) dt exactly for polynomial f of degree ≤ 13.
+// Source: Abramowitz & Stegun, Table 25.10.
+const GH_NODES: readonly number[] = [-2.6519613568352334, -1.6735516287674714, -0.8162878828589647, 0.0, 0.8162878828589647, 1.6735516287674714, 2.6519613568352334];
+const GH_WEIGHTS: readonly number[] = [0.0009717812450995193, 0.054515582819127044, 0.4256072526101283, 0.8102646175568073, 0.4256072526101283, 0.054515582819127044, 0.0009717812450995193];
+
+const SIGMA_EPS = 1e-15;
+const INV_SQRT_PI = 1 / Math.sqrt(Math.PI);
+
+/**
+ * Compute P(at most k-1 of the items j ≠ skipIndex exceed threshold x),
+ * where each item j independently exceeds x with probability qProbs[j].
+ *
+ * Uses dynamic programming over a Poisson binomial distribution.
+ * The dp buffer (length ≥ k) is overwritten and reused across calls.
+ */
+function poissonBinomialAtMostK(qProbs: Float64Array, n: number, k: number, skipIndex: number, dp: Float64Array): number {
+	// dp[m] = P(exactly m successes among items processed so far)
+	dp[0] = 1;
+	for (let m = 1; m < k; m++) dp[m] = 0;
+
+	let count = 0;
+	for (let j = 0; j < n; j++) {
+		if (j === skipIndex) continue;
+		const q = qProbs[j];
+		const limit = Math.min(count, k - 2);
+		for (let m = limit + 1; m >= 1; m--) {
+			dp[m] = dp[m] * (1 - q) + dp[m - 1] * q;
+		}
+		dp[0] *= 1 - q;
+		count++;
+	}
+
+	// Sum dp[0..k-1] = P(at most k-1 successes)
+	let sum = 0;
+	for (let m = 0; m < k; m++) {
+		sum += dp[m];
+	}
+	return sum;
+}
+
+/**
+ * Compute p_i = P(item i ∈ top-k) via Gauss-Hermite quadrature.
+ *
+ * Integrates over item i's score distribution and, at each quadrature
+ * point, uses the Poisson binomial DP to compute the probability that
+ * at most k-1 other items outscore item i.
+ *
+ * The dp (length ≥ k) and qProbs (length ≥ n) buffers are reused.
+ */
+function topKMarginalProb(i: number, mu: Float64Array, sigma: Float64Array, k: number, n: number, dp: Float64Array, qProbs: Float64Array): number {
+	const si = sigma[i];
+
+	// If sigma_i ≈ 0, item i's score is deterministic at mu_i.
+	if (si < SIGMA_EPS) {
+		const x = mu[i];
+		for (let j = 0; j < n; j++) {
+			if (sigma[j] < SIGMA_EPS) {
+				qProbs[j] = mu[j] > x ? 1 : 0;
+			} else {
+				qProbs[j] = 1 - normalCDF((x - mu[j]) / sigma[j]);
+			}
+		}
+		return poissonBinomialAtMostK(qProbs, n, k, i, dp);
+	}
+
+	let weightedSum = 0;
+
+	for (let q = 0; q < GH_NODES.length; q++) {
+		const x = mu[i] + si * Math.SQRT2 * GH_NODES[q];
+
+		// Compute P(item j > x) for each j
+		for (let j = 0; j < n; j++) {
+			if (sigma[j] < SIGMA_EPS) {
+				qProbs[j] = mu[j] > x ? 1 : 0;
+			} else {
+				// P(j > x) = 1 - Φ((x - μ_j) / σ_j)
+				qProbs[j] = 1 - normalCDF((x - mu[j]) / sigma[j]);
+			}
+		}
+
+		weightedSum += GH_WEIGHTS[q] * poissonBinomialAtMostK(qProbs, n, k, i, dp);
+	}
+
+	// Gauss-Hermite computes ∫ f(t)·exp(-t²) dt; normalizing to ∫ φ(x) g(x) dx
+	// requires a factor of 1/√π after the substitution x = μ + σ√2·t.
+	return weightedSum * INV_SQRT_PI;
+}
+
+/**
  * Estimate how uncertain we still are about which K items are the best.
  *
- * We draw many random samples of what the true scores *could* be (given our
- * uncertainty), figure out the top-k for each sample, and measure how much
- * disagreement there is. High entropy means we're still unsure. Low entropy
- * means the same set keeps winning.
+ * Computes a surrogate for the true joint top-k set entropy H(S) using
+ * the sum of per-item marginal membership entropies:
+ *   H_proxy = Σ_i h(p_i), where p_i = P(item i ∈ top-k)
+ * and h(p) = -p log(p) - (1-p) log(1-p) is binary entropy.
  *
- * This is the quantity we're trying to minimize by picking informative pairs.
+ * This is an upper bound on H(S) (by subadditivity of entropy) and is
+ * not guaranteed to preserve the ordering of pairs by information gain.
+ * It is used as a speed-oriented surrogate: the original Monte Carlo
+ * estimator of H(S) was too slow (65,000 samples per pair selection)
+ * despite being a closer approximation of the optimal objective.
+ *
+ * Each p_i is computed via Gauss-Hermite quadrature over item i's
+ * posterior score distribution, combined with a Poisson binomial DP
+ * for the probability that at most k-1 other items outscore item i.
  *
  * @param mu - MAP strength estimates (length N)
  * @param sigma - marginal standard deviations (length N)
  * @param k - number of top items to identify
- * @param monteCarloSamples - number of MC samples (default 500)
- * @param rng - random number generator returning values in (0,1)
+ * @param _monteCarloSamples - unused (kept for API compatibility)
+ * @param _rng - unused (kept for API compatibility)
  */
-export function topKEntropy(mu: Float64Array, sigma: Float64Array, k: number, monteCarloSamples: number, rng: () => number): number {
+export function topKEntropy(mu: Float64Array, sigma: Float64Array, k: number, _monteCarloSamples: number, _rng: () => number): number {
 	const n = mu.length;
-	const setCounts = new Map<string, number>();
-	const sampled = new Float64Array(n);
-	const indices = new Array<number>(n);
+	if (k <= 0 || k >= n) return 0;
 
-	for (let m = 0; m < monteCarloSamples; m++) {
-		// Draw samples from Normal(mu[i], sigma[i])
-		for (let i = 0; i < n; i++) {
-			sampled[i] = mu[i] + sigma[i] * boxMuller(rng);
-		}
+	// Pre-allocate buffers reused across items and quadrature points.
+	const dp = new Float64Array(k);
+	const qProbs = new Float64Array(n);
 
-		// Find top-k indices by sorting
-		for (let i = 0; i < n; i++) {
-			indices[i] = i;
-		}
-		indices.sort((a, b) => sampled[b] - sampled[a]);
-
-		// Canonical key: sorted first k indices, comma-joined
-		const topKIndices = indices.slice(0, k);
-		topKIndices.sort((a, b) => a - b);
-		const key = topKIndices.join(",");
-		setCounts.set(key, (setCounts.get(key) ?? 0) + 1);
-	}
-
-	// Shannon entropy
 	let entropy = 0;
-	for (const count of setCounts.values()) {
-		const p = count / monteCarloSamples;
-		if (p > 0) {
-			entropy -= p * Math.log(p);
+	for (let i = 0; i < n; i++) {
+		const p = topKMarginalProb(i, mu, sigma, k, n, dp, qProbs);
+		if (p > 0 && p < 1) {
+			entropy -= p * Math.log(p) + (1 - p) * Math.log(1 - p);
 		}
 	}
 

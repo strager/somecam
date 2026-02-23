@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { type WinLoss, bayesianRefit, checkConfidenceStop, checkStabilityStop, choleskyDecompose, choleskyInverse, choleskySolve, computeInformationGain, estimateStabilityStop, makeXorshift, Ranking, selectPair, sigmoid, topKEntropy } from "./ranking.ts";
+import { type WinLoss, bayesianRefit, checkConfidenceStop, checkStabilityStop, choleskyDecompose, choleskyInverse, choleskySolve, computeInformationGain, estimateStabilityStop, makeXorshift, normalCDF, Ranking, selectPair, sigmoid, topKEntropy } from "./ranking.ts";
 
 /** Seeded xorshift32 PRNG returning values in (0, 1). */
 function makeRng(seed: number): () => number {
@@ -298,6 +298,34 @@ describe("bayesianRefit", () => {
 	});
 });
 
+describe("normalCDF", () => {
+	it("returns 0.5 at x=0", () => {
+		expect(normalCDF(0)).toBeCloseTo(0.5, 7);
+	});
+
+	it("returns ~0.8413 at x=1", () => {
+		expect(normalCDF(1)).toBeCloseTo(0.8413447460685429, 6);
+	});
+
+	it("returns ~0.975 at x=1.96", () => {
+		expect(normalCDF(1.96)).toBeCloseTo(0.975, 4);
+	});
+
+	it("is symmetric: Φ(x) + Φ(-x) = 1", () => {
+		for (const x of [0.5, 1, 2, 3]) {
+			expect(normalCDF(x) + normalCDF(-x)).toBeCloseTo(1, 10);
+		}
+	});
+
+	it("returns 0 for very negative x", () => {
+		expect(normalCDF(-10)).toBe(0);
+	});
+
+	it("returns 1 for very positive x", () => {
+		expect(normalCDF(10)).toBe(1);
+	});
+});
+
 describe("topKEntropy", () => {
 	it("returns 0 entropy when sigma is zero (certain top-k)", () => {
 		// 5 items with distinct strengths, near-zero uncertainty
@@ -488,30 +516,30 @@ describe("selectPair", () => {
 	});
 
 	it("recencyDiscount discourages items from the last comparison", () => {
-		// Set up a scenario where item 2 is the most informative but was
-		// just shown. With discount, a different pair should be picked.
-		const n = 5;
+		// Set up a scenario where items 1,2 are on the boundary and were
+		// just compared. With discount, a different pair should be picked.
+		const n = 6;
 		const k = 2;
-		// Items 0,1 are clearly top, items 3,4 clearly bottom.
-		// Item 2 is right on the boundary — normally the most informative.
-		const mu = new Float64Array([3, 2, 0.5, -2, -3]);
-		const sigma = new Float64Array(n).fill(0.8);
+		// Item 0 is clearly top, items 3,4,5 clearly bottom.
+		// Items 1,2 are right on the boundary — normally the most informative.
+		const mu = new Float64Array([5, 0.1, -0.1, -5, -6, -7]);
+		const sigma = new Float64Array(n).fill(1.0);
 
-		// Last comparison involved item 2 (winner) and item 3 (loser)
-		const history: WinLoss[] = [[2, 3]];
+		// Last comparison involved item 1 (winner) and item 2 (loser)
+		const history: WinLoss[] = [[1, 2]];
 
-		// Without discount: pair should involve the boundary item 2
+		// Without discount: pair should involve the boundary items 1 or 2
 		const [iNoDiscount, jNoDiscount] = selectPair(mu, sigma, history, k, n, PRIOR_VARIANCE, MC_SAMPLES, makeRng(42), 1.0);
-		const noDiscountInvolves2 = iNoDiscount === 2 || jNoDiscount === 2;
+		const noDiscountInvolves1or2 = iNoDiscount === 1 || jNoDiscount === 1 || iNoDiscount === 2 || jNoDiscount === 2;
 
-		// With aggressive discount: should avoid items 2 and 3
+		// With aggressive discount: should avoid items 1 and 2
 		const [iDiscount, jDiscount] = selectPair(mu, sigma, history, k, n, PRIOR_VARIANCE, MC_SAMPLES, makeRng(42), 0.1);
-		const discountInvolves2or3 = iDiscount === 2 || jDiscount === 2 || iDiscount === 3 || jDiscount === 3;
+		const discountInvolves1or2 = iDiscount === 1 || jDiscount === 1 || iDiscount === 2 || jDiscount === 2;
 
-		// Without discount the boundary item should be picked;
+		// Without discount the boundary items should be picked;
 		// with aggressive discount the recently-shown items should be avoided
-		expect(noDiscountInvolves2).toBe(true);
-		expect(discountInvolves2or3).toBe(false);
+		expect(noDiscountInvolves1or2).toBe(true);
+		expect(discountInvolves1or2).toBe(false);
 	});
 
 	it("recencyDiscount has no effect when history is empty", () => {
