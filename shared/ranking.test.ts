@@ -696,6 +696,7 @@ describe("Ranking class", () => {
 				monteCarloSamples: 100,
 				recencyDiscount: config.recencyDiscount,
 				seed: config.seed,
+				noSpeculation: true,
 			});
 			let repeats = 0;
 			let prevA: number | null = null;

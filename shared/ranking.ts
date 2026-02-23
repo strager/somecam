@@ -52,6 +52,8 @@ export interface RankingConfig {
 	seed: number;
 	/** Disable the worker-side bayesianRefit cache (useful for benchmarks). */
 	noWorkerCache: boolean;
+	/** Disable speculative precomputation of the next pair after selectPair(). */
+	noSpeculation: boolean;
 }
 
 export type StopReason = "confidence" | "stability" | "max-comparisons";
@@ -72,6 +74,7 @@ const DEFAULT_CONFIG: RankingConfig = {
 	recencyDiscount: 0.5,
 	seed: 0,
 	noWorkerCache: false,
+	noSpeculation: false,
 };
 
 /**
@@ -134,21 +137,16 @@ export class Ranking<T> {
 		return idx;
 	}
 
-	async selectPair(): Promise<{ a: T; b: T }> {
-		if (this._stopped) {
-			throw new Error("Ranking has already stopped");
-		}
+	private async _selectPairOnWorker(mu: Float64Array, sigma: Float64Array, history: WinLoss[]): Promise<[number, number]> {
 		await ensureWorker();
 		const id = nextRequestId++;
-		// Derive a unique seed per call using a simple integer hash (MurmurHash3-style mix)
-		// so successive calls don't get correlated seeds.
-		const callSeed = hashMix(this._config.seed, this._history.length);
+		const callSeed = hashMix(this._config.seed, history.length);
 		const response = await postToWorker({
 			type: "selectPair",
 			id,
-			mu: this._mu,
-			sigma: this._sigma,
-			history: this._history,
+			mu,
+			sigma,
+			history,
 			k: this._config.k,
 			n: this._n,
 			priorVariance: this._config.priorVariance,
@@ -157,7 +155,92 @@ export class Ranking<T> {
 			seed: callSeed,
 			noCache: this._config.noWorkerCache,
 		});
-		const [i, j] = response.pair;
+		return response.pair;
+	}
+
+	private async _recordComparisonPure(
+		mu: Float64Array,
+		sigma: Float64Array,
+		history: WinLoss[],
+		wi: number,
+		li: number,
+		round: number,
+		previousTopK: number[] | null,
+		stableCount: number,
+		flipHistory: boolean[],
+	): Promise<{
+		mu: Float64Array;
+		sigma: Float64Array;
+		history: WinLoss[];
+		round: number;
+		previousTopK: number[] | null;
+		stableCount: number;
+		flipHistory: boolean[];
+		stopped: boolean;
+		stopReason: StopReason | null;
+	}> {
+		const newHistory: WinLoss[] = [...history, [wi, li]];
+		const newRound = round + 1;
+		const newFlipHistory = [...flipHistory];
+
+		await ensureWorker();
+		const id = nextRequestId++;
+		const response = await postToWorker({
+			type: "bayesianRefit",
+			id,
+			history: newHistory,
+			n: this._n,
+			priorVariance: this._config.priorVariance,
+			noCache: this._config.noWorkerCache,
+		});
+
+		const newMu = response.mu instanceof Float64Array ? response.mu : new Float64Array(response.mu);
+		const newSigma = response.sigma instanceof Float64Array ? response.sigma : new Float64Array(response.sigma);
+
+		// Confidence-based stop
+		if (checkConfidenceStop(newMu, newSigma, this._config.k, this._config.z, this._config.confidenceThreshold)) {
+			return { mu: newMu, sigma: newSigma, history: newHistory, round: newRound, previousTopK, stableCount, flipHistory: newFlipHistory, stopped: true, stopReason: "confidence" };
+		}
+
+		// Stability stop
+		const stability = checkStabilityStop(newMu, this._config.k, previousTopK, stableCount, this._config.stabilityWindow);
+		if (previousTopK !== null) {
+			newFlipHistory.push(stability.stableCount === 0);
+		}
+		const newPreviousTopK = stability.topK;
+		const newStableCount = stability.stableCount;
+		if (stability.stopped) {
+			return { mu: newMu, sigma: newSigma, history: newHistory, round: newRound, previousTopK: newPreviousTopK, stableCount: newStableCount, flipHistory: newFlipHistory, stopped: true, stopReason: "stability" };
+		}
+
+		// Hard cap
+		if (newRound >= this._config.maxComparisons) {
+			return { mu: newMu, sigma: newSigma, history: newHistory, round: newRound, previousTopK: newPreviousTopK, stableCount: newStableCount, flipHistory: newFlipHistory, stopped: true, stopReason: "max-comparisons" };
+		}
+
+		return { mu: newMu, sigma: newSigma, history: newHistory, round: newRound, previousTopK: newPreviousTopK, stableCount: newStableCount, flipHistory: newFlipHistory, stopped: false, stopReason: null };
+	}
+
+	private _speculateAfterPairSelection(i: number, j: number): void {
+		if (this._config.noSpeculation) return;
+		const speculate = async (wi: number, li: number): Promise<void> => {
+			const result = await this._recordComparisonPure(this._mu, this._sigma, this._history, wi, li, this._round, this._previousTopK, this._stableCount, this._flipHistory);
+			if (!result.stopped) {
+				await this._selectPairOnWorker(result.mu, result.sigma, result.history);
+			}
+		};
+		// eslint-disable-next-line @typescript-eslint/no-empty-function -- fire-and-forget; errors are intentionally swallowed
+		speculate(i, j).catch(() => {});
+		// eslint-disable-next-line @typescript-eslint/no-empty-function -- fire-and-forget; errors are intentionally swallowed
+		speculate(j, i).catch(() => {});
+	}
+
+	async selectPair(): Promise<{ a: T; b: T }> {
+		if (this._stopped) {
+			throw new Error("Ranking has already stopped");
+		}
+		const [i, j] = await this._selectPairOnWorker(this._mu, this._sigma, this._history);
+		this._speculateAfterPairSelection(i, j);
 		return { a: this._items[i], b: this._items[j] };
 	}
 
@@ -169,55 +252,20 @@ export class Ranking<T> {
 		const wi = this._indexOf(winner);
 		const li = this._indexOf(loser);
 
-		this._history.push([wi, li]);
+		const result = await this._recordComparisonPure(this._mu, this._sigma, this._history, wi, li, this._round, this._previousTopK, this._stableCount, this._flipHistory);
+
+		this._mu = result.mu;
+		this._sigma = result.sigma;
+		this._history = result.history;
 		this._comparisonRecords.push({ winner, loser });
-		this._round++;
+		this._round = result.round;
+		this._previousTopK = result.previousTopK;
+		this._stableCount = result.stableCount;
+		this._flipHistory = result.flipHistory;
+		this._stopped = result.stopped;
+		this._stopReason = result.stopReason;
 
-		// Refit model on worker
-		await ensureWorker();
-		const id = nextRequestId++;
-		const response = await postToWorker({
-			type: "bayesianRefit",
-			id,
-			history: this._history,
-			n: this._n,
-			priorVariance: this._config.priorVariance,
-			noCache: this._config.noWorkerCache,
-		});
-
-		this._mu = response.mu instanceof Float64Array ? response.mu : new Float64Array(response.mu);
-		this._sigma = response.sigma instanceof Float64Array ? response.sigma : new Float64Array(response.sigma);
-
-		// Check stopping conditions (cheap, stays on main thread)
-
-		// Confidence-based stop
-		if (checkConfidenceStop(this._mu, this._sigma, this._config.k, this._config.z, this._config.confidenceThreshold)) {
-			this._stopped = true;
-			this._stopReason = "confidence";
-			return { stopped: true, stopReason: "confidence" };
-		}
-
-		// Stability stop
-		const stability = checkStabilityStop(this._mu, this._config.k, this._previousTopK, this._stableCount, this._config.stabilityWindow);
-		if (this._previousTopK !== null) {
-			this._flipHistory.push(stability.stableCount === 0);
-		}
-		this._previousTopK = stability.topK;
-		this._stableCount = stability.stableCount;
-		if (stability.stopped) {
-			this._stopped = true;
-			this._stopReason = "stability";
-			return { stopped: true, stopReason: "stability" };
-		}
-
-		// Hard cap
-		if (this._round >= this._config.maxComparisons) {
-			this._stopped = true;
-			this._stopReason = "max-comparisons";
-			return { stopped: true, stopReason: "max-comparisons" };
-		}
-
-		return { stopped: false, stopReason: null };
+		return { stopped: result.stopped, stopReason: result.stopReason };
 	}
 
 	async undoLastComparison(): Promise<ComparisonRecord<T>> {

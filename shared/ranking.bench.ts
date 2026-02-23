@@ -31,6 +31,7 @@ const ranking = new Ranking(items, {
 	k: 5,
 	seed: 42,
 	noWorkerCache: true,
+	noSpeculation: true,
 });
 
 await advanceRanking(ranking, 5, oracleRng);
