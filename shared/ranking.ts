@@ -23,7 +23,7 @@
 // ============================================================
 
 import type { RemainingEstimate, WinLoss } from "./ranking-math.ts";
-import { checkConfidenceStop, checkStabilityStop, estimateStabilityStop } from "./ranking-math.ts";
+import { argsortDescending, checkConfidenceStop, checkStabilityStop, estimateStabilityStop } from "./ranking-math.ts";
 import type { BayesianRefitRequest, BayesianRefitResponse, SelectPairRequest, SelectPairResponse, WorkerRequest, WorkerResponse } from "./ranking-worker-protocol.ts";
 
 // Re-export all pure math functions so existing imports from ranking.ts keep working.
@@ -61,6 +61,14 @@ export type StopReason = "confidence" | "stability" | "max-comparisons";
 export interface ComparisonRecord<T> {
 	winner: T;
 	loser: T;
+}
+
+interface HistoryEntry {
+	readonly winnerIndex: number;
+	readonly loserIndex: number;
+	readonly topK: readonly number[];
+	readonly stableCount: number;
+	readonly flip: boolean | null;
 }
 
 const DEFAULT_CONFIG: RankingConfig = {
@@ -104,14 +112,11 @@ export class Ranking<T> {
 	private readonly _n: number;
 	private _mu: Float64Array;
 	private _sigma: Float64Array;
-	private _history: WinLoss[];
+	private _history: HistoryEntry[];
 	private _comparisonRecords: ComparisonRecord<T>[];
-	private _flipHistory: boolean[];
 	private _round: number;
 	private _stopped: boolean;
 	private _stopReason: StopReason | null;
-	private _previousTopK: number[] | null;
-	private _stableCount: number;
 
 	constructor(items: readonly T[], config?: Partial<RankingConfig>) {
 		this._items = items;
@@ -121,12 +126,9 @@ export class Ranking<T> {
 		this._sigma = new Float64Array(this._n).fill(Math.sqrt(this._config.priorVariance));
 		this._history = [];
 		this._comparisonRecords = [];
-		this._flipHistory = [];
 		this._round = 0;
 		this._stopped = false;
 		this._stopReason = null;
-		this._previousTopK = null;
-		this._stableCount = 0;
 	}
 
 	private _indexOf(item: T): number {
@@ -135,6 +137,31 @@ export class Ranking<T> {
 			throw new Error("Item not found in ranking");
 		}
 		return idx;
+	}
+
+	private _historyAsWinLoss(history: readonly HistoryEntry[]): WinLoss[] {
+		return history.map((entry) => [entry.winnerIndex, entry.loserIndex]);
+	}
+
+	private _topKFromMu(mu: Float64Array): number[] {
+		return argsortDescending(mu)
+			.slice(0, this._config.k)
+			.sort((a, b) => a - b);
+	}
+
+	private _stableCountFromHistory(): number {
+		const current = this._history.at(-1);
+		return current === undefined ? 0 : current.stableCount;
+	}
+
+	private _flipHistoryFromHistory(): boolean[] {
+		const flips: boolean[] = [];
+		for (const entry of this._history) {
+			if (entry.flip !== null) {
+				flips.push(entry.flip);
+			}
+		}
+		return flips;
 	}
 
 	private async _selectPairOnWorker(mu: Float64Array, sigma: Float64Array, history: WinLoss[]): Promise<[number, number]> {
@@ -165,23 +192,21 @@ export class Ranking<T> {
 		wi: number,
 		li: number,
 		round: number,
-		previousTopK: number[] | null,
+		previousTopK: readonly number[] | null,
 		stableCount: number,
-		flipHistory: boolean[],
 	): Promise<{
 		mu: Float64Array;
 		sigma: Float64Array;
 		history: WinLoss[];
 		round: number;
-		previousTopK: number[] | null;
+		topK: readonly number[];
 		stableCount: number;
-		flipHistory: boolean[];
+		flip: boolean | null;
 		stopped: boolean;
 		stopReason: StopReason | null;
 	}> {
 		const newHistory: WinLoss[] = [...history, [wi, li]];
 		const newRound = round + 1;
-		const newFlipHistory = [...flipHistory];
 
 		await ensureWorker();
 		const id = nextRequestId++;
@@ -199,32 +224,34 @@ export class Ranking<T> {
 
 		// Confidence-based stop
 		if (checkConfidenceStop(newMu, newSigma, this._config.k, this._config.z, this._config.confidenceThreshold)) {
-			return { mu: newMu, sigma: newSigma, history: newHistory, round: newRound, previousTopK, stableCount, flipHistory: newFlipHistory, stopped: true, stopReason: "confidence" };
+			return { mu: newMu, sigma: newSigma, history: newHistory, round: newRound, topK: this._topKFromMu(newMu), stableCount, flip: null, stopped: true, stopReason: "confidence" };
 		}
 
 		// Stability stop
 		const stability = checkStabilityStop(newMu, this._config.k, previousTopK, stableCount, this._config.stabilityWindow);
-		if (previousTopK !== null) {
-			newFlipHistory.push(stability.stableCount === 0);
-		}
-		const newPreviousTopK = stability.topK;
+		const flip = previousTopK !== null ? stability.stableCount === 0 : null;
+		const newTopK = stability.topK;
 		const newStableCount = stability.stableCount;
 		if (stability.stopped) {
-			return { mu: newMu, sigma: newSigma, history: newHistory, round: newRound, previousTopK: newPreviousTopK, stableCount: newStableCount, flipHistory: newFlipHistory, stopped: true, stopReason: "stability" };
+			return { mu: newMu, sigma: newSigma, history: newHistory, round: newRound, topK: newTopK, stableCount: newStableCount, flip, stopped: true, stopReason: "stability" };
 		}
 
 		// Hard cap
 		if (newRound >= this._config.maxComparisons) {
-			return { mu: newMu, sigma: newSigma, history: newHistory, round: newRound, previousTopK: newPreviousTopK, stableCount: newStableCount, flipHistory: newFlipHistory, stopped: true, stopReason: "max-comparisons" };
+			return { mu: newMu, sigma: newSigma, history: newHistory, round: newRound, topK: newTopK, stableCount: newStableCount, flip, stopped: true, stopReason: "max-comparisons" };
 		}
 
-		return { mu: newMu, sigma: newSigma, history: newHistory, round: newRound, previousTopK: newPreviousTopK, stableCount: newStableCount, flipHistory: newFlipHistory, stopped: false, stopReason: null };
+		return { mu: newMu, sigma: newSigma, history: newHistory, round: newRound, topK: newTopK, stableCount: newStableCount, flip, stopped: false, stopReason: null };
 	}
 
 	private _speculateAfterPairSelection(i: number, j: number): void {
 		if (this._config.noSpeculation) return;
+		const history = this._historyAsWinLoss(this._history);
+		const current = this._history.at(-1);
+		const previousTopK = current === undefined ? null : current.topK;
+		const stableCount = current === undefined ? 0 : current.stableCount;
 		const speculate = async (wi: number, li: number): Promise<void> => {
-			const result = await this._recordComparisonPure(this._mu, this._sigma, this._history, wi, li, this._round, this._previousTopK, this._stableCount, this._flipHistory);
+			const result = await this._recordComparisonPure(this._mu, this._sigma, history, wi, li, this._round, previousTopK, stableCount);
 			if (!result.stopped) {
 				await this._selectPairOnWorker(result.mu, result.sigma, result.history);
 			}
@@ -239,7 +266,7 @@ export class Ranking<T> {
 		if (this._stopped) {
 			throw new Error("Ranking has already stopped");
 		}
-		const [i, j] = await this._selectPairOnWorker(this._mu, this._sigma, this._history);
+		const [i, j] = await this._selectPairOnWorker(this._mu, this._sigma, this._historyAsWinLoss(this._history));
 		this._speculateAfterPairSelection(i, j);
 		return { a: this._items[i], b: this._items[j] };
 	}
@@ -251,17 +278,23 @@ export class Ranking<T> {
 
 		const wi = this._indexOf(winner);
 		const li = this._indexOf(loser);
+		const current = this._history.at(-1);
+		const previousTopK = current === undefined ? null : current.topK;
+		const stableCount = current === undefined ? 0 : current.stableCount;
 
-		const result = await this._recordComparisonPure(this._mu, this._sigma, this._history, wi, li, this._round, this._previousTopK, this._stableCount, this._flipHistory);
+		const result = await this._recordComparisonPure(this._mu, this._sigma, this._historyAsWinLoss(this._history), wi, li, this._round, previousTopK, stableCount);
 
 		this._mu = result.mu;
 		this._sigma = result.sigma;
-		this._history = result.history;
+		this._history.push({
+			winnerIndex: wi,
+			loserIndex: li,
+			topK: result.topK,
+			stableCount: result.stableCount,
+			flip: result.flip,
+		});
 		this._comparisonRecords.push({ winner, loser });
 		this._round = result.round;
-		this._previousTopK = result.previousTopK;
-		this._stableCount = result.stableCount;
-		this._flipHistory = result.flipHistory;
 		this._stopped = result.stopped;
 		this._stopReason = result.stopReason;
 
@@ -277,7 +310,6 @@ export class Ranking<T> {
 		this._stopReason = null;
 
 		this._history.pop();
-		this._flipHistory.pop();
 		const record = this._comparisonRecords.pop();
 		if (record === undefined) {
 			throw new Error("No comparison to undo");
@@ -290,7 +322,7 @@ export class Ranking<T> {
 		const response = await postToWorker({
 			type: "bayesianRefit",
 			id,
-			history: this._history,
+			history: this._historyAsWinLoss(this._history),
 			n: this._n,
 			priorVariance: this._config.priorVariance,
 			noCache: this._config.noWorkerCache,
@@ -298,9 +330,6 @@ export class Ranking<T> {
 
 		this._mu = response.mu instanceof Float64Array ? response.mu : new Float64Array(response.mu);
 		this._sigma = response.sigma instanceof Float64Array ? response.sigma : new Float64Array(response.sigma);
-
-		this._previousTopK = null;
-		this._stableCount = 0;
 
 		return record;
 	}
@@ -344,18 +373,15 @@ export class Ranking<T> {
 		copy._sigma = this._sigma.slice();
 		copy._history = [...this._history];
 		copy._comparisonRecords = [...this._comparisonRecords];
-		copy._flipHistory = [...this._flipHistory];
 		copy._round = this._round;
 		copy._stopped = this._stopped;
 		copy._stopReason = this._stopReason;
-		copy._previousTopK = this._previousTopK !== null ? [...this._previousTopK] : null;
-		copy._stableCount = this._stableCount;
 		return copy;
 	}
 
 	estimateRemaining(): RemainingEstimate {
 		const maxRemaining = Math.max(0, this._config.maxComparisons - this._round);
-		return estimateStabilityStop(this._flipHistory, this._stableCount, this._config.stabilityWindow, maxRemaining);
+		return estimateStabilityStop(this._flipHistoryFromHistory(), this._stableCountFromHistory(), this._config.stabilityWindow, maxRemaining);
 	}
 }
 

@@ -826,6 +826,30 @@ describe("Ranking class", () => {
 		expect(undone.winner).toBe(a);
 		expect(undone.loser).toBe(b);
 	});
+
+	it("undoLastComparison preserves stability state when replaying the same comparison", async () => {
+		const ranking = new Ranking(["a", "b", "c"], {
+			k: 1,
+			stabilityWindow: 1,
+			maxComparisons: 10,
+			confidenceThreshold: Number.POSITIVE_INFINITY,
+			monteCarloSamples: 50,
+			seed: 1,
+		});
+
+		const first = await ranking.recordComparison("a", "b");
+		expect(first.stopped).toBe(false);
+
+		const second = await ranking.recordComparison("a", "b");
+		expect(second).toEqual({ stopped: true, stopReason: "stability" });
+
+		await ranking.undoLastComparison();
+		expect(ranking.round).toBe(1);
+		expect(ranking.stopped).toBe(false);
+
+		const replay = await ranking.recordComparison("a", "b");
+		expect(replay).toEqual({ stopped: true, stopReason: "stability" });
+	});
 });
 
 describe("estimateStabilityStop", () => {
