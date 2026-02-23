@@ -12,7 +12,7 @@
 		"analyze-client-bundle": "npm run build",
 		"typecheck": "tsc -p tsconfig.backend.json && vue-tsc --noEmit -p tsconfig.frontend.json",
 		"test": "vitest run",
-		"bench": "vitest bench",
+		"bench": "vitest bench --run",
 		"lint": "eslint .",
 		"fix": "eslint --fix .",
 		"format": "prettier --write ."

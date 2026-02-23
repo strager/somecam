@@ -34,30 +34,12 @@ const ranking = new Ranking(items, {
 	noSpeculation: true,
 });
 
-await advanceRanking(ranking, 5, oracleRng);
-const early = ranking.clone();
-
-await advanceRanking(ranking, 15, oracleRng);
+await advanceRanking(ranking, 20, oracleRng);
 const mid = ranking.clone();
 
-await advanceRanking(ranking, 30, oracleRng);
-const late = ranking.clone();
-
 describe("Ranking single step (26 items, k=5)", () => {
-	bench(`early game (round ${early.round.toString()})`, async () => {
-		const r = early.clone();
-		const { a, b } = await r.selectPair();
-		await r.recordComparison(a > b ? a : b, a > b ? b : a);
-	});
-
 	bench(`mid game (round ${mid.round.toString()})`, async () => {
 		const r = mid.clone();
-		const { a, b } = await r.selectPair();
-		await r.recordComparison(a > b ? a : b, a > b ? b : a);
-	});
-
-	bench(`late game (round ${late.round.toString()})`, async () => {
-		const r = late.clone();
 		const { a, b } = await r.selectPair();
 		await r.recordComparison(a > b ? a : b, a > b ? b : a);
 	});
