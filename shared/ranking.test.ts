@@ -1,11 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { type WinLoss, bayesianRefit, checkConfidenceStop, checkStabilityStop, choleskyDecompose, choleskyInverse, choleskySolve, computeInformationGain, estimateStabilityStop, makeXorshift, normalCDF, Ranking, selectPair, sigmoid, topKEntropy } from "./ranking.ts";
-
-/** Seeded xorshift32 PRNG returning values in (0, 1). */
-function makeRng(seed: number): () => number {
-	return makeXorshift(seed);
-}
+import { type WinLoss, bayesianRefit, checkConfidenceStop, checkStabilityStop, choleskyDecompose, choleskyInverse, choleskySolve, computeInformationGain, estimateStabilityStop, normalCDF, Ranking, selectPair, sigmoid, topKEntropy } from "./ranking.ts";
 
 describe("sigmoid", () => {
 	it("returns 0.5 at x=0", () => {
@@ -330,9 +325,8 @@ describe("topKEntropy", () => {
 	it("returns 0 entropy when sigma is zero (certain top-k)", () => {
 		// 5 items with distinct strengths, near-zero uncertainty
 		const mu = new Float64Array([5, 4, 3, 2, 1]);
-		const rng = makeRng(42);
 		const tinySigma = new Float64Array([1e-15, 1e-15, 1e-15, 1e-15, 1e-15]);
-		const entropy = topKEntropy(mu, tinySigma, 2, 500, rng);
+		const entropy = topKEntropy(mu, tinySigma, 2);
 		expect(entropy).toBeCloseTo(0, 2);
 	});
 
@@ -340,42 +334,38 @@ describe("topKEntropy", () => {
 		const n = 6;
 		const mu = new Float64Array(n); // all zeros
 		const sigma = new Float64Array(n).fill(10);
-		const rng = makeRng(123);
-		const entropy = topKEntropy(mu, sigma, 2, 500, rng);
+		const entropy = topKEntropy(mu, sigma, 2);
 		// With equal means and large noise, many different top-k sets are possible
 		expect(entropy).toBeGreaterThan(1);
 	});
 
 	it("entropy is lower with more separated means", () => {
 		const n = 6;
-		const rng1 = makeRng(99);
-		const rng2 = makeRng(99);
 		const sigma = new Float64Array(n).fill(1);
 
 		// Close means
 		const muClose = new Float64Array([0.1, 0.0, -0.1, -0.2, -0.3, -0.4]);
-		const entropyClose = topKEntropy(muClose, sigma, 2, 500, rng1);
+		const entropyClose = topKEntropy(muClose, sigma, 2);
 
 		// Well-separated means
 		const muSep = new Float64Array([10, 8, -5, -6, -7, -8]);
-		const entropySep = topKEntropy(muSep, sigma, 2, 500, rng2);
+		const entropySep = topKEntropy(muSep, sigma, 2);
 
 		expect(entropySep).toBeLessThan(entropyClose);
 	});
 
-	it("is deterministic with the same seeded RNG", () => {
+	it("is deterministic", () => {
 		const mu = new Float64Array([2, 1, 0, -1, -2]);
 		const sigma = new Float64Array([0.5, 0.5, 0.5, 0.5, 0.5]);
 
-		const e1 = topKEntropy(mu, sigma, 2, 500, makeRng(42));
-		const e2 = topKEntropy(mu, sigma, 2, 500, makeRng(42));
+		const e1 = topKEntropy(mu, sigma, 2);
+		const e2 = topKEntropy(mu, sigma, 2);
 		expect(e1).toBe(e2);
 	});
 });
 
 describe("computeInformationGain", () => {
 	const PRIOR_VARIANCE = 1.0;
-	const MC_SAMPLES = 200; // fewer samples for speed in tests
 
 	it("boundary pair is more informative than clearly-separated pair", () => {
 		// 6 items: indices 0-5, k=2
@@ -388,10 +378,10 @@ describe("computeInformationGain", () => {
 		const history: WinLoss[] = [];
 
 		// Boundary pair: 2 vs 3 (both near the k/rest boundary)
-		const gainBoundary = computeInformationGain(2, 3, mu, sigma, history, k, n, PRIOR_VARIANCE, MC_SAMPLES, makeRng(42));
+		const gainBoundary = computeInformationGain(2, 3, mu, sigma, history, k, n, PRIOR_VARIANCE);
 
 		// Clearly-separated pair: 0 vs 5 (one clearly in, one clearly out)
-		const gainClear = computeInformationGain(0, 5, mu, sigma, history, k, n, PRIOR_VARIANCE, MC_SAMPLES, makeRng(42));
+		const gainClear = computeInformationGain(0, 5, mu, sigma, history, k, n, PRIOR_VARIANCE);
 
 		// Boundary comparison should be more informative (higher gain = less negative)
 		expect(gainBoundary).toBeGreaterThan(gainClear);
@@ -403,18 +393,18 @@ describe("computeInformationGain", () => {
 		const mu = new Float64Array([1, 0.5, -0.5, -1]);
 		const sigma = new Float64Array(n).fill(1);
 
-		const gain = computeInformationGain(0, 1, mu, sigma, [], k, n, PRIOR_VARIANCE, MC_SAMPLES, makeRng(77));
+		const gain = computeInformationGain(0, 1, mu, sigma, [], k, n, PRIOR_VARIANCE);
 		expect(Number.isFinite(gain)).toBe(true);
 	});
 
-	it("is deterministic with seeded RNG", () => {
+	it("is deterministic", () => {
 		const n = 4;
 		const k = 2;
 		const mu = new Float64Array([1, 0, -0.5, -1]);
 		const sigma = new Float64Array(n).fill(0.8);
 
-		const g1 = computeInformationGain(1, 2, mu, sigma, [], k, n, PRIOR_VARIANCE, MC_SAMPLES, makeRng(55));
-		const g2 = computeInformationGain(1, 2, mu, sigma, [], k, n, PRIOR_VARIANCE, MC_SAMPLES, makeRng(55));
+		const g1 = computeInformationGain(1, 2, mu, sigma, [], k, n, PRIOR_VARIANCE);
+		const g2 = computeInformationGain(1, 2, mu, sigma, [], k, n, PRIOR_VARIANCE);
 		expect(g1).toBe(g2);
 	});
 });
@@ -481,25 +471,24 @@ describe("checkStabilityStop", () => {
 
 describe("selectPair", () => {
 	const PRIOR_VARIANCE = 1.0;
-	const MC_SAMPLES = 100;
 
 	it("returns valid indices (i < j, both in range)", () => {
 		const n = 5;
 		const mu = new Float64Array(n);
 		const sigma = new Float64Array(n).fill(1);
-		const [i, j] = selectPair(mu, sigma, [], 2, n, PRIOR_VARIANCE, MC_SAMPLES, makeRng(42));
+		const [i, j] = selectPair(mu, sigma, [], 2, n, PRIOR_VARIANCE);
 		expect(i).toBeGreaterThanOrEqual(0);
 		expect(i).toBeLessThan(n);
 		expect(j).toBeGreaterThan(i);
 		expect(j).toBeLessThan(n);
 	});
 
-	it("is deterministic with seeded RNG", () => {
+	it("is deterministic", () => {
 		const n = 5;
 		const mu = new Float64Array([2, 1, 0, -1, -2]);
 		const sigma = new Float64Array(n).fill(1);
-		const [i1, j1] = selectPair(mu, sigma, [], 2, n, PRIOR_VARIANCE, MC_SAMPLES, makeRng(42));
-		const [i2, j2] = selectPair(mu, sigma, [], 2, n, PRIOR_VARIANCE, MC_SAMPLES, makeRng(42));
+		const [i1, j1] = selectPair(mu, sigma, [], 2, n, PRIOR_VARIANCE);
+		const [i2, j2] = selectPair(mu, sigma, [], 2, n, PRIOR_VARIANCE);
 		expect(i1).toBe(i2);
 		expect(j1).toBe(j2);
 	});
@@ -509,8 +498,8 @@ describe("selectPair", () => {
 		const mu = new Float64Array([2, 1, 0, -1, -2]);
 		const sigma = new Float64Array(n).fill(1);
 		const history: WinLoss[] = [[0, 1]];
-		const [i1, j1] = selectPair(mu, sigma, history, 2, n, PRIOR_VARIANCE, MC_SAMPLES, makeRng(42));
-		const [i2, j2] = selectPair(mu, sigma, history, 2, n, PRIOR_VARIANCE, MC_SAMPLES, makeRng(42), 1.0);
+		const [i1, j1] = selectPair(mu, sigma, history, 2, n, PRIOR_VARIANCE);
+		const [i2, j2] = selectPair(mu, sigma, history, 2, n, PRIOR_VARIANCE, 1.0);
 		expect(i1).toBe(i2);
 		expect(j1).toBe(j2);
 	});
@@ -529,11 +518,11 @@ describe("selectPair", () => {
 		const history: WinLoss[] = [[1, 2]];
 
 		// Without discount: pair should involve the boundary items 1 or 2
-		const [iNoDiscount, jNoDiscount] = selectPair(mu, sigma, history, k, n, PRIOR_VARIANCE, MC_SAMPLES, makeRng(42), 1.0);
+		const [iNoDiscount, jNoDiscount] = selectPair(mu, sigma, history, k, n, PRIOR_VARIANCE, 1.0);
 		const noDiscountInvolves1or2 = iNoDiscount === 1 || jNoDiscount === 1 || iNoDiscount === 2 || jNoDiscount === 2;
 
 		// With aggressive discount: should avoid items 1 and 2
-		const [iDiscount, jDiscount] = selectPair(mu, sigma, history, k, n, PRIOR_VARIANCE, MC_SAMPLES, makeRng(42), 0.1);
+		const [iDiscount, jDiscount] = selectPair(mu, sigma, history, k, n, PRIOR_VARIANCE, 0.1);
 		const discountInvolves1or2 = iDiscount === 1 || jDiscount === 1 || iDiscount === 2 || jDiscount === 2;
 
 		// Without discount the boundary items should be picked;
@@ -546,8 +535,8 @@ describe("selectPair", () => {
 		const n = 4;
 		const mu = new Float64Array([1, 0, -0.5, -1]);
 		const sigma = new Float64Array(n).fill(1);
-		const [i1, j1] = selectPair(mu, sigma, [], 2, n, PRIOR_VARIANCE, MC_SAMPLES, makeRng(42), 1.0);
-		const [i2, j2] = selectPair(mu, sigma, [], 2, n, PRIOR_VARIANCE, MC_SAMPLES, makeRng(42), 0.5);
+		const [i1, j1] = selectPair(mu, sigma, [], 2, n, PRIOR_VARIANCE, 1.0);
+		const [i2, j2] = selectPair(mu, sigma, [], 2, n, PRIOR_VARIANCE, 0.5);
 		expect(i1).toBe(i2);
 		expect(j1).toBe(j2);
 	});
@@ -556,7 +545,7 @@ describe("selectPair", () => {
 describe("Ranking class", () => {
 	it("selectPair returns distinct items from the candidate set", async () => {
 		const items = ["a", "b", "c", "d"] as const;
-		const ranking = new Ranking(items, { k: 2, monteCarloSamples: 60, seed: 7 });
+		const ranking = new Ranking(items, { k: 2 });
 		const pair = await ranking.selectPair();
 
 		expect(items).toContain(pair.a);
@@ -573,8 +562,6 @@ describe("Ranking class", () => {
 		const ranking = new Ranking(items, {
 			k: 5,
 			maxComparisons: 80,
-			monteCarloSamples: 200,
-			seed: 100,
 		});
 
 		while (!ranking.stopped) {
@@ -596,8 +583,6 @@ describe("Ranking class", () => {
 		const ranking = new Ranking(items, {
 			k: 2,
 			maxComparisons: 5,
-			monteCarloSamples: 50,
-			seed: 99,
 		});
 
 		while (!ranking.stopped) {
@@ -615,8 +600,6 @@ describe("Ranking class", () => {
 		const ranking = new Ranking(items, {
 			k: 1,
 			maxComparisons: 2,
-			monteCarloSamples: 50,
-			seed: 7,
 		});
 
 		const { a, b } = await ranking.selectPair();
@@ -632,8 +615,6 @@ describe("Ranking class", () => {
 		const ranking = new Ranking(items, {
 			k: 1,
 			maxComparisons: 1,
-			monteCarloSamples: 50,
-			seed: 1,
 		});
 		const { a, b } = await ranking.selectPair();
 		await ranking.recordComparison(a, b);
@@ -646,23 +627,19 @@ describe("Ranking class", () => {
 		const ranking = new Ranking(items, {
 			k: 1,
 			maxComparisons: 1,
-			monteCarloSamples: 50,
-			seed: 1,
 		});
 		const { a, b } = await ranking.selectPair();
 		await ranking.recordComparison(a, b);
 		await expect(ranking.selectPair()).rejects.toThrow("already stopped");
 	});
 
-	it("is deterministic with seeded RNG", async () => {
+	it("is deterministic", async () => {
 		const items = ["a", "b", "c", "d", "e"];
 
-		async function runRanking(rngSeed: number): Promise<{ pairs: string[]; topK: readonly string[] }> {
+		async function runRanking(): Promise<{ pairs: string[]; topK: readonly string[] }> {
 			const ranking = new Ranking(items, {
 				k: 2,
 				maxComparisons: 5,
-				monteCarloSamples: 100,
-				seed: rngSeed,
 			});
 			const pairs: string[] = [];
 			while (!ranking.stopped) {
@@ -673,8 +650,8 @@ describe("Ranking class", () => {
 			return { pairs, topK: ranking.topK };
 		}
 
-		const run1 = await runRanking(42);
-		const run2 = await runRanking(42);
+		const run1 = await runRanking();
+		const run2 = await runRanking();
 		expect(run1.pairs).toEqual(run2.pairs);
 		expect(run1.topK).toEqual(run2.topK);
 	});
@@ -684,8 +661,6 @@ describe("Ranking class", () => {
 		const ranking = new Ranking(items, {
 			k: 5,
 			maxComparisons: 80,
-			monteCarloSamples: 100,
-			seed: 42,
 		});
 
 		// Advance a few rounds
@@ -717,13 +692,11 @@ describe("Ranking class", () => {
 		const items = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
 		const trueStrength = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
 
-		async function countConsecutiveRepeats(config: { recencyDiscount: number; seed: number }): Promise<number> {
+		async function countConsecutiveRepeats(recencyDiscount: number): Promise<number> {
 			const ranking = new Ranking(items, {
 				k: 5,
 				maxComparisons: 40,
-				monteCarloSamples: 100,
-				recencyDiscount: config.recencyDiscount,
-				seed: config.seed,
+				recencyDiscount,
 				noSpeculation: true,
 			});
 			let repeats = 0;
@@ -743,22 +716,15 @@ describe("Ranking class", () => {
 			return repeats;
 		}
 
-		// Run with no discount and with discount across several seeds
-		let totalRepeatsNoDiscount = 0;
-		let totalRepeatsWithDiscount = 0;
-		for (const seed of [42, 99, 123, 777, 2024]) {
-			totalRepeatsNoDiscount += await countConsecutiveRepeats({ recencyDiscount: 1.0, seed });
-			totalRepeatsWithDiscount += await countConsecutiveRepeats({ recencyDiscount: 0.5, seed });
-		}
+		const repeatsNoDiscount = await countConsecutiveRepeats(1.0);
+		const repeatsWithDiscount = await countConsecutiveRepeats(0.5);
 
-		expect(totalRepeatsWithDiscount).toBeLessThan(totalRepeatsNoDiscount);
+		expect(repeatsWithDiscount).toBeLessThan(repeatsNoDiscount);
 	});
 
 	it("undoLastComparison throws when no comparisons to undo", async () => {
 		const ranking = new Ranking(["a", "b", "c"], {
 			k: 1,
-			monteCarloSamples: 50,
-			seed: 1,
 		});
 		await expect(ranking.undoLastComparison()).rejects.toThrow("No comparison to undo");
 	});
@@ -768,8 +734,6 @@ describe("Ranking class", () => {
 		const ranking = new Ranking(items, {
 			k: 1,
 			maxComparisons: 10,
-			monteCarloSamples: 50,
-			seed: 1,
 		});
 
 		const initialMu = ranking.mu.slice();
@@ -792,8 +756,6 @@ describe("Ranking class", () => {
 		const ranking = new Ranking(items, {
 			k: 2,
 			maxComparisons: 10,
-			monteCarloSamples: 50,
-			seed: 42,
 		});
 
 		for (let i = 0; i < 3; i++) {
@@ -819,8 +781,6 @@ describe("Ranking class", () => {
 		const ranking = new Ranking(items, {
 			k: 1,
 			maxComparisons: 1,
-			monteCarloSamples: 50,
-			seed: 1,
 		});
 
 		const { a, b } = await ranking.selectPair();
@@ -843,8 +803,6 @@ describe("Ranking class", () => {
 		const ranking = new Ranking(items, {
 			k: 1,
 			maxComparisons: 10,
-			monteCarloSamples: 50,
-			seed: 7,
 		});
 
 		const { a, b } = await ranking.selectPair();
@@ -861,8 +819,6 @@ describe("Ranking class", () => {
 			stabilityWindow: 1,
 			maxComparisons: 10,
 			confidenceThreshold: Number.POSITIVE_INFINITY,
-			monteCarloSamples: 50,
-			seed: 1,
 		});
 
 		const first = await ranking.recordComparison("a", "b");
@@ -1052,8 +1008,6 @@ describe("estimateRemaining integration", () => {
 		const ranking = new Ranking(items, {
 			k: 5,
 			maxComparisons: 80,
-			monteCarloSamples: 120,
-			seed: 19,
 		});
 
 		for (let round = 1; round <= 10; round++) {
@@ -1077,8 +1031,6 @@ describe("estimateRemaining integration", () => {
 		const ranking = new Ranking(items, {
 			k: 5,
 			maxComparisons: 80,
-			monteCarloSamples: 200,
-			seed: 42,
 		});
 
 		let firstNonNullRound = 0;
@@ -1120,8 +1072,6 @@ describe("estimateRemaining integration", () => {
 			k: 5,
 			maxComparisons: 12,
 			confidenceThreshold: Number.POSITIVE_INFINITY,
-			monteCarloSamples: 120,
-			seed: 7,
 		});
 
 		while (!ranking.stopped) {

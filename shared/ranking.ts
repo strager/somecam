@@ -43,13 +43,9 @@ export interface RankingConfig {
 	priorVariance: number;
 	/** Gap the confidence intervals must exceed to trigger early stop. */
 	confidenceThreshold: number;
-	/** Number of Monte Carlo samples for top-k entropy estimation. */
-	monteCarloSamples: number;
 	/** Penalize pairs that include items from the last comparison.
 	 * Value in (0, 1]: 1.0 = no penalty, lower = stronger penalty. */
 	recencyDiscount: number;
-	/** Seed for the internal xorshift PRNG. */
-	seed: number;
 	/** Disable the worker-side bayesianRefit cache (useful for benchmarks). */
 	noWorkerCache: boolean;
 	/** Disable speculative precomputation of the next pair after selectPair(). */
@@ -78,9 +74,7 @@ const DEFAULT_CONFIG: RankingConfig = {
 	maxComparisons: 80,
 	priorVariance: 1.0,
 	confidenceThreshold: 0.0,
-	monteCarloSamples: 100,
 	recencyDiscount: 0.5,
-	seed: 0,
 	noWorkerCache: false,
 	noSpeculation: false,
 };
@@ -167,7 +161,6 @@ export class Ranking<T> {
 	private async _selectPairOnWorker(mu: Float64Array, sigma: Float64Array, history: WinLoss[]): Promise<[number, number]> {
 		await ensureWorker();
 		const id = nextRequestId++;
-		const callSeed = hashMix(this._config.seed, history.length);
 		const response = await postToWorker({
 			type: "selectPair",
 			id,
@@ -177,9 +170,7 @@ export class Ranking<T> {
 			k: this._config.k,
 			n: this._n,
 			priorVariance: this._config.priorVariance,
-			monteCarloSamples: this._config.monteCarloSamples,
 			recencyDiscount: this._config.recencyDiscount,
-			seed: callSeed,
 			noCache: this._config.noWorkerCache,
 		});
 		return response.pair;
@@ -437,15 +428,6 @@ async function initWorker(): Promise<void> {
 	workerPostMessage = (msg) => {
 		w.postMessage(msg);
 	};
-}
-
-/** Mix two integers into a well-distributed 32-bit seed (MurmurHash3-style finalizer). */
-function hashMix(a: number, b: number): number {
-	let h = (a ^ b) | 0;
-	h = Math.imul(h ^ (h >>> 16), 0x85ebca6b);
-	h = Math.imul(h ^ (h >>> 13), 0xc2b2ae35);
-	h = h ^ (h >>> 16);
-	return h >>> 0;
 }
 
 let nextRequestId = 0;

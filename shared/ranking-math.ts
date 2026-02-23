@@ -44,7 +44,7 @@ export function makeXorshift(seed: number): () => number {
  *   recently-shown items. Default 1.0.
  * @returns [i, j] — the most informative pair of indices
  */
-export function selectPair(mu: Float64Array, sigma: Float64Array, history: readonly WinLoss[], k: number, n: number, priorVariance: number, monteCarloSamples: number, rng: () => number, recencyDiscount = 1.0): [number, number] {
+export function selectPair(mu: Float64Array, sigma: Float64Array, history: readonly WinLoss[], k: number, n: number, priorVariance: number, recencyDiscount = 1.0): [number, number] {
 	let bestPair: [number, number] = [0, 1];
 	let bestGain = -Infinity;
 
@@ -53,7 +53,7 @@ export function selectPair(mu: Float64Array, sigma: Float64Array, history: reado
 
 	for (let i = 0; i < n; i++) {
 		for (let j = i + 1; j < n; j++) {
-			let gain = computeInformationGain(i, j, mu, sigma, history, k, n, priorVariance, monteCarloSamples, rng);
+			let gain = computeInformationGain(i, j, mu, sigma, history, k, n, priorVariance);
 
 			// Penalize pairs that include items from the last comparison.
 			// Gain is negative (higher = better), so dividing by a value < 1
@@ -92,19 +92,19 @@ export function selectPair(mu: Float64Array, sigma: Float64Array, history: reado
  * Pfeiffer, T., Gao, X. A., Chen, Y., Mao, A., & Rand, D. G. (2012).
  *   "Adaptive Polling for Information Aggregation." AAAI, 26(1).
  */
-export function computeInformationGain(i: number, j: number, mu: Float64Array, sigma: Float64Array, history: readonly WinLoss[], k: number, n: number, priorVariance: number, monteCarloSamples: number, rng: () => number): number {
+export function computeInformationGain(i: number, j: number, mu: Float64Array, sigma: Float64Array, history: readonly WinLoss[], k: number, n: number, priorVariance: number): number {
 	const pIWins = sigmoid(mu[i] - mu[j]);
 	const pJWins = 1 - pIWins;
 
 	// Simulate outcome: i beats j
 	const historyI: WinLoss[] = [...history, [i, j]];
 	const refitI = bayesianRefit(historyI, n, priorVariance);
-	const entropyIfIWins = topKEntropy(refitI.mu, refitI.sigma, k, monteCarloSamples, rng);
+	const entropyIfIWins = topKEntropy(refitI.mu, refitI.sigma, k);
 
 	// Simulate outcome: j beats i
 	const historyJ: WinLoss[] = [...history, [j, i]];
 	const refitJ = bayesianRefit(historyJ, n, priorVariance);
-	const entropyIfJWins = topKEntropy(refitJ.mu, refitJ.sigma, k, monteCarloSamples, rng);
+	const entropyIfJWins = topKEntropy(refitJ.mu, refitJ.sigma, k);
 
 	const expectedPosteriorEntropy = pIWins * entropyIfIWins + pJWins * entropyIfJWins;
 
@@ -405,10 +405,8 @@ function topKMarginalProb(i: number, mu: Float64Array, sigma: Float64Array, k: n
  * @param mu - MAP strength estimates (length N)
  * @param sigma - marginal standard deviations (length N)
  * @param k - number of top items to identify
- * @param _monteCarloSamples - unused (kept for API compatibility)
- * @param _rng - unused (kept for API compatibility)
  */
-export function topKEntropy(mu: Float64Array, sigma: Float64Array, k: number, _monteCarloSamples: number, _rng: () => number): number {
+export function topKEntropy(mu: Float64Array, sigma: Float64Array, k: number): number {
 	const n = mu.length;
 	if (k <= 0 || k >= n) return 0;
 

@@ -29,7 +29,6 @@ const items = Array.from({ length: 26 }, (_, i) => i);
 const oracleRng = makeXorshift(99);
 const ranking = new Ranking(items, {
 	k: 5,
-	seed: 42,
 	noWorkerCache: true,
 	noSpeculation: true,
 });

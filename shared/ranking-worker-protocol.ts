@@ -9,9 +9,7 @@ export interface SelectPairRequest {
 	k: number;
 	n: number;
 	priorVariance: number;
-	monteCarloSamples: number;
 	recencyDiscount: number;
-	seed: number;
 	noCache?: boolean;
 }
 

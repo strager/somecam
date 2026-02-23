@@ -46,7 +46,7 @@ export class FindMeaningRankingViewModel {
 		return this.ranking?.estimateRemaining() ?? null;
 	}
 
-	async initialize(seed?: number): Promise<"ready" | "no-data" | "skip"> {
+	async initialize(): Promise<"ready" | "no-data" | "skip"> {
 		this._phaseStartedAtMs = performance.now();
 		const saved = loadRanking(this.sessionId);
 		let resolvedCardIds: string[];
@@ -73,7 +73,7 @@ export class FindMeaningRankingViewModel {
 		}
 
 		const resumedFromRound = saved?.comparisons.length ?? 0;
-		this.ranking = new Ranking(resolvedCardIds, { k: 5, ...(seed !== undefined ? { seed } : {}) });
+		this.ranking = new Ranking(resolvedCardIds, { k: 5 });
 
 		if (saved !== null) {
 			for (const comp of saved.comparisons) {

@@ -1,4 +1,4 @@
-import { bayesianRefit, makeXorshift, selectPair } from "./ranking-math.ts";
+import { bayesianRefit, selectPair } from "./ranking-math.ts";
 import type { WorkerRequest, WorkerResponse } from "./ranking-worker-protocol.ts";
 
 const refitCache = new Map<string, { mu: Float64Array; sigma: Float64Array }>();
@@ -8,29 +8,27 @@ function makeHistoryKey(n: number, priorVariance: number, history: readonly (rea
 	return `${n.toString()}|${priorVariance.toString()}|${history.map(([w, l]) => `${w.toString()},${l.toString()}`).join("|")}`;
 }
 
-function makeSelectPairCacheKey(k: number, n: number, priorVariance: number, monteCarloSamples: number, recencyDiscount: number, seed: number, history: readonly (readonly [number, number])[]): string {
-	return `${k.toString()}|${monteCarloSamples.toString()}|${recencyDiscount.toString()}|${seed.toString()}|${makeHistoryKey(n, priorVariance, history)}`;
+function makeSelectPairCacheKey(k: number, n: number, priorVariance: number, recencyDiscount: number, history: readonly (readonly [number, number])[]): string {
+	return `${k.toString()}|${recencyDiscount.toString()}|${makeHistoryKey(n, priorVariance, history)}`;
 }
 
 function handleMessage(data: WorkerRequest): WorkerResponse {
 	switch (data.type) {
 		case "selectPair": {
 			if (data.noCache) {
-				const rng = makeXorshift(data.seed);
 				const mu = data.mu instanceof Float64Array ? data.mu : new Float64Array(data.mu);
 				const sigma = data.sigma instanceof Float64Array ? data.sigma : new Float64Array(data.sigma);
-				const pair = selectPair(mu, sigma, data.history, data.k, data.n, data.priorVariance, data.monteCarloSamples, rng, data.recencyDiscount);
+				const pair = selectPair(mu, sigma, data.history, data.k, data.n, data.priorVariance, data.recencyDiscount);
 				return { type: "selectPair", id: data.id, pair };
 			}
-			const key = makeSelectPairCacheKey(data.k, data.n, data.priorVariance, data.monteCarloSamples, data.recencyDiscount, data.seed, data.history);
+			const key = makeSelectPairCacheKey(data.k, data.n, data.priorVariance, data.recencyDiscount, data.history);
 			const cached = selectPairCache.get(key);
 			if (cached !== undefined) {
 				return { type: "selectPair", id: data.id, pair: cached };
 			}
-			const rng = makeXorshift(data.seed);
 			const mu = data.mu instanceof Float64Array ? data.mu : new Float64Array(data.mu);
 			const sigma = data.sigma instanceof Float64Array ? data.sigma : new Float64Array(data.sigma);
-			const pair = selectPair(mu, sigma, data.history, data.k, data.n, data.priorVariance, data.monteCarloSamples, rng, data.recencyDiscount);
+			const pair = selectPair(mu, sigma, data.history, data.k, data.n, data.priorVariance, data.recencyDiscount);
 			selectPairCache.set(key, pair);
 			return { type: "selectPair", id: data.id, pair };
 		}
