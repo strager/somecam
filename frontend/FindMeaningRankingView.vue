@@ -67,12 +67,18 @@ function handleFinish(): void {
 
 		<div v-if="!vm.isComplete" class="ranking-area">
 			<div :key="vm.round" class="card-pair">
-				<!-- eslint-disable-next-line vue/no-restricted-html-elements -->
-				<button v-for="(card, index) in vm.currentPair" :key="card.id" class="ranking-card" :class="{ selected: selectedIndex === index }" :disabled="loading" :aria-pressed="selectedIndex === index" @click="handleCardTap(index as 0 | 1)">
-					<span class="card-source">{{ card.source }}</span>
-					<p class="card-text">{{ card.description }}</p>
-					<span v-if="selectedIndex === index" class="confirm-label">Tap again to confirm</span>
-				</button>
+				<template v-if="vm.currentPair !== null">
+					<!-- eslint-disable-next-line vue/no-restricted-html-elements -->
+					<button v-for="(card, index) in vm.currentPair" :key="card.id" class="ranking-card" :class="{ selected: selectedIndex === index }" :disabled="loading" :aria-pressed="selectedIndex === index" @click="handleCardTap(index as 0 | 1)">
+						<span class="card-source">{{ card.source }}</span>
+						<p class="card-text">{{ card.description }}</p>
+						<span v-if="selectedIndex === index" class="confirm-label">Tap again to confirm</span>
+					</button>
+				</template>
+				<template v-else>
+					<div class="ranking-card blank" aria-hidden="true" />
+					<div class="ranking-card blank" aria-hidden="true" />
+				</template>
 			</div>
 			<div class="undo-area">
 				<AppButton variant="secondary" emphasis="muted" :disabled="!vm.canUndo || loading" @click="handleUndo">Undo</AppButton>
@@ -138,6 +144,10 @@ h1 {
 	font-family: inherit;
 }
 
+.ranking-card.blank {
+	cursor: default;
+}
+
 .ranking-card:hover {
 	border-color: var(--color-gray-400);
 }
@@ -161,6 +171,10 @@ h1 {
 	font-size: var(--text-base, 1rem);
 	line-height: 1.5;
 	color: var(--color-black);
+}
+
+.ranking-card:disabled .card-text {
+	color: var(--color-gray-400);
 }
 
 .confirm-label {
