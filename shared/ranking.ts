@@ -70,7 +70,7 @@ const DEFAULT_CONFIG: RankingConfig = {
 	maxComparisons: 80,
 	priorVariance: 1.0,
 	confidenceThreshold: 0.0,
-	monteCarloSamples: 500,
+	monteCarloSamples: 100,
 	recencyDiscount: 0.5,
 	seed: 0,
 	noWorkerCache: false,
