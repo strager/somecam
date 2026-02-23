@@ -1,16 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { type WinLoss, bayesianRefit, checkConfidenceStop, checkStabilityStop, choleskyDecompose, choleskyInverse, choleskySolve, computeInformationGain, estimateStabilityStop, Ranking, selectPair, sigmoid, topKEntropy } from "./ranking.ts";
+import { type WinLoss, bayesianRefit, checkConfidenceStop, checkStabilityStop, choleskyDecompose, choleskyInverse, choleskySolve, computeInformationGain, estimateStabilityStop, makeXorshift, Ranking, selectPair, sigmoid, topKEntropy } from "./ranking.ts";
 
 /** Seeded xorshift32 PRNG returning values in (0, 1). */
 function makeRng(seed: number): () => number {
-	let state = seed;
-	return () => {
-		state ^= state << 13;
-		state ^= state >> 17;
-		state ^= state << 5;
-		return (state >>> 0) / 0x100000000;
-	};
+	return makeXorshift(seed);
 }
 
 describe("sigmoid", () => {
@@ -532,17 +526,17 @@ describe("selectPair", () => {
 });
 
 describe("Ranking class", () => {
-	it("selectPair returns distinct items from the candidate set", () => {
+	it("selectPair returns distinct items from the candidate set", async () => {
 		const items = ["a", "b", "c", "d"] as const;
-		const ranking = new Ranking(items, { k: 2, monteCarloSamples: 60, rng: makeRng(7) });
-		const pair = ranking.selectPair();
+		const ranking = new Ranking(items, { k: 2, monteCarloSamples: 60, seed: 7 });
+		const pair = await ranking.selectPair();
 
 		expect(items).toContain(pair.a);
 		expect(items).toContain(pair.b);
 		expect(pair.a).not.toBe(pair.b);
 	});
 
-	it("converges on correct top-k with a perfect oracle", () => {
+	it("converges on correct top-k with a perfect oracle", async () => {
 		// 10 items with known true strengths 0..9 (item 9 is strongest)
 		const items = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
 		const trueStrength = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
@@ -552,15 +546,15 @@ describe("Ranking class", () => {
 			k: 5,
 			maxComparisons: 80,
 			monteCarloSamples: 200,
-			rng: makeRng(42),
+			seed: 100,
 		});
 
 		while (!ranking.stopped) {
-			const { a, b } = ranking.selectPair();
+			const { a, b } = await ranking.selectPair();
 			// Perfect oracle: item with higher true strength wins
 			const winner = trueStrength[a] > trueStrength[b] ? a : b;
 			const loser = winner === a ? b : a;
-			ranking.recordComparison(winner, loser);
+			await ranking.recordComparison(winner, loser);
 		}
 
 		const topK = new Set(ranking.topK);
@@ -569,109 +563,109 @@ describe("Ranking class", () => {
 		expect(ranking.stopReason).not.toBeNull();
 	});
 
-	it("stops at max comparisons if needed", () => {
+	it("stops at max comparisons if needed", async () => {
 		const items = ["a", "b", "c", "d", "e", "f"];
 		const ranking = new Ranking(items, {
 			k: 2,
 			maxComparisons: 5,
 			monteCarloSamples: 50,
-			rng: makeRng(99),
+			seed: 99,
 		});
 
 		while (!ranking.stopped) {
-			const { a, b } = ranking.selectPair();
+			const { a, b } = await ranking.selectPair();
 			// Random oracle — always pick a
-			ranking.recordComparison(a, b);
+			await ranking.recordComparison(a, b);
 		}
 
 		expect(ranking.round).toBe(5);
 		expect(ranking.stopReason).toBe("max-comparisons");
 	});
 
-	it("tracks history correctly", () => {
+	it("tracks history correctly", async () => {
 		const items = ["x", "y", "z"];
 		const ranking = new Ranking(items, {
 			k: 1,
 			maxComparisons: 2,
 			monteCarloSamples: 50,
-			rng: makeRng(7),
+			seed: 7,
 		});
 
-		const { a, b } = ranking.selectPair();
-		ranking.recordComparison(a, b);
+		const { a, b } = await ranking.selectPair();
+		await ranking.recordComparison(a, b);
 		expect(ranking.history).toHaveLength(1);
 		expect(ranking.history[0].winner).toBe(a);
 		expect(ranking.history[0].loser).toBe(b);
 		expect(ranking.round).toBe(1);
 	});
 
-	it("throws when recording after stopped", () => {
+	it("throws when recording after stopped", async () => {
 		const items = ["a", "b"];
 		const ranking = new Ranking(items, {
 			k: 1,
 			maxComparisons: 1,
 			monteCarloSamples: 50,
-			rng: makeRng(1),
+			seed: 1,
 		});
-		const { a, b } = ranking.selectPair();
-		ranking.recordComparison(a, b);
+		const { a, b } = await ranking.selectPair();
+		await ranking.recordComparison(a, b);
 		expect(ranking.stopped).toBe(true);
-		expect(() => ranking.recordComparison(a, b)).toThrow("already stopped");
+		await expect(ranking.recordComparison(a, b)).rejects.toThrow("already stopped");
 	});
 
-	it("throws when selecting pair after stopped", () => {
+	it("throws when selecting pair after stopped", async () => {
 		const items = ["a", "b"];
 		const ranking = new Ranking(items, {
 			k: 1,
 			maxComparisons: 1,
 			monteCarloSamples: 50,
-			rng: makeRng(1),
+			seed: 1,
 		});
-		const { a, b } = ranking.selectPair();
-		ranking.recordComparison(a, b);
-		expect(() => ranking.selectPair()).toThrow("already stopped");
+		const { a, b } = await ranking.selectPair();
+		await ranking.recordComparison(a, b);
+		await expect(ranking.selectPair()).rejects.toThrow("already stopped");
 	});
 
-	it("is deterministic with seeded RNG", () => {
+	it("is deterministic with seeded RNG", async () => {
 		const items = ["a", "b", "c", "d", "e"];
 
-		function runRanking(seed: number): { pairs: string[]; topK: readonly string[] } {
+		async function runRanking(rngSeed: number): Promise<{ pairs: string[]; topK: readonly string[] }> {
 			const ranking = new Ranking(items, {
 				k: 2,
 				maxComparisons: 5,
 				monteCarloSamples: 100,
-				rng: makeRng(seed),
+				seed: rngSeed,
 			});
 			const pairs: string[] = [];
 			while (!ranking.stopped) {
-				const { a, b } = ranking.selectPair();
+				const { a, b } = await ranking.selectPair();
 				pairs.push(`${a}-${b}`);
-				ranking.recordComparison(a, b);
+				await ranking.recordComparison(a, b);
 			}
 			return { pairs, topK: ranking.topK };
 		}
 
-		const run1 = runRanking(42);
-		const run2 = runRanking(42);
+		const run1 = await runRanking(42);
+		const run2 = await runRanking(42);
 		expect(run1.pairs).toEqual(run2.pairs);
 		expect(run1.topK).toEqual(run2.topK);
 	});
 
-	it("clone produces an independent copy with identical state", () => {
+	it("clone produces an independent copy with identical state", async () => {
 		const items = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
 		const ranking = new Ranking(items, {
 			k: 5,
 			maxComparisons: 80,
 			monteCarloSamples: 100,
-			rng: makeRng(42),
+			seed: 42,
 		});
 
 		// Advance a few rounds
 		for (let i = 0; i < 5; i++) {
-			const { a, b } = ranking.selectPair();
+			const { a, b } = await ranking.selectPair();
 			const winner = a > b ? a : b;
 			const loser = a > b ? b : a;
-			ranking.recordComparison(winner, loser);
+			await ranking.recordComparison(winner, loser);
 		}
 
 		const clone = ranking.clone();
@@ -685,29 +679,29 @@ describe("Ranking class", () => {
 		expect(clone.topK).toEqual(ranking.topK);
 
 		// Mutating the clone does not affect the original
-		const { a, b } = clone.selectPair();
-		clone.recordComparison(a > b ? a : b, a > b ? b : a);
+		const { a, b } = await clone.selectPair();
+		await clone.recordComparison(a > b ? a : b, a > b ? b : a);
 		expect(clone.round).toBe(ranking.round + 1);
 		expect(ranking.round).toBe(5);
 	});
 
-	it("recencyDiscount reduces consecutive appearances of the same item", () => {
+	it("recencyDiscount reduces consecutive appearances of the same item", async () => {
 		const items = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
 		const trueStrength = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
 
-		function countConsecutiveRepeats(config: { recencyDiscount: number; seed: number }): number {
+		async function countConsecutiveRepeats(config: { recencyDiscount: number; seed: number }): Promise<number> {
 			const ranking = new Ranking(items, {
 				k: 5,
 				maxComparisons: 40,
 				monteCarloSamples: 100,
 				recencyDiscount: config.recencyDiscount,
-				rng: makeRng(config.seed),
+				seed: config.seed,
 			});
 			let repeats = 0;
 			let prevA: number | null = null;
 			let prevB: number | null = null;
 			while (!ranking.stopped) {
-				const { a, b } = ranking.selectPair();
+				const { a, b } = await ranking.selectPair();
 				if (prevA !== null && (a === prevA || a === prevB || b === prevA || b === prevB)) {
 					repeats++;
 				}
@@ -715,7 +709,7 @@ describe("Ranking class", () => {
 				prevB = b;
 				const winner = trueStrength[a] > trueStrength[b] ? a : b;
 				const loser = winner === a ? b : a;
-				ranking.recordComparison(winner, loser);
+				await ranking.recordComparison(winner, loser);
 			}
 			return repeats;
 		}
@@ -724,110 +718,110 @@ describe("Ranking class", () => {
 		let totalRepeatsNoDiscount = 0;
 		let totalRepeatsWithDiscount = 0;
 		for (const seed of [42, 99, 123, 777, 2024]) {
-			totalRepeatsNoDiscount += countConsecutiveRepeats({ recencyDiscount: 1.0, seed });
-			totalRepeatsWithDiscount += countConsecutiveRepeats({ recencyDiscount: 0.5, seed });
+			totalRepeatsNoDiscount += await countConsecutiveRepeats({ recencyDiscount: 1.0, seed });
+			totalRepeatsWithDiscount += await countConsecutiveRepeats({ recencyDiscount: 0.5, seed });
 		}
 
 		expect(totalRepeatsWithDiscount).toBeLessThan(totalRepeatsNoDiscount);
 	});
 
-	it("undoLastComparison throws when no comparisons to undo", () => {
+	it("undoLastComparison throws when no comparisons to undo", async () => {
 		const ranking = new Ranking(["a", "b", "c"], {
 			k: 1,
 			monteCarloSamples: 50,
-			rng: makeRng(1),
+			seed: 1,
 		});
-		expect(() => ranking.undoLastComparison()).toThrow("No comparison to undo");
+		await expect(ranking.undoLastComparison()).rejects.toThrow("No comparison to undo");
 	});
 
-	it("undoLastComparison undoes a single comparison", () => {
+	it("undoLastComparison undoes a single comparison", async () => {
 		const items = ["a", "b", "c"];
 		const ranking = new Ranking(items, {
 			k: 1,
 			maxComparisons: 10,
 			monteCarloSamples: 50,
-			rng: makeRng(1),
+			seed: 1,
 		});
 
 		const initialMu = ranking.mu.slice();
 		const initialSigma = ranking.sigma.slice();
 
-		const { a, b } = ranking.selectPair();
-		ranking.recordComparison(a, b);
+		const { a, b } = await ranking.selectPair();
+		await ranking.recordComparison(a, b);
 		expect(ranking.round).toBe(1);
 		expect(ranking.history).toHaveLength(1);
 
-		ranking.undoLastComparison();
+		await ranking.undoLastComparison();
 		expect(ranking.round).toBe(0);
 		expect(ranking.history).toHaveLength(0);
 		expect(ranking.mu).toEqual(initialMu);
 		expect(ranking.sigma).toEqual(initialSigma);
 	});
 
-	it("undoLastComparison can be called multiple times in succession", () => {
+	it("undoLastComparison can be called multiple times in succession", async () => {
 		const items = ["a", "b", "c", "d"];
 		const ranking = new Ranking(items, {
 			k: 2,
 			maxComparisons: 10,
 			monteCarloSamples: 50,
-			rng: makeRng(42),
+			seed: 42,
 		});
 
 		for (let i = 0; i < 3; i++) {
-			const { a, b } = ranking.selectPair();
-			ranking.recordComparison(a, b);
+			const { a, b } = await ranking.selectPair();
+			await ranking.recordComparison(a, b);
 		}
 		expect(ranking.round).toBe(3);
 		expect(ranking.history).toHaveLength(3);
 
-		ranking.undoLastComparison();
+		await ranking.undoLastComparison();
 		expect(ranking.round).toBe(2);
-		ranking.undoLastComparison();
+		await ranking.undoLastComparison();
 		expect(ranking.round).toBe(1);
-		ranking.undoLastComparison();
+		await ranking.undoLastComparison();
 		expect(ranking.round).toBe(0);
 		expect(ranking.history).toHaveLength(0);
 
-		expect(() => ranking.undoLastComparison()).toThrow("No comparison to undo");
+		await expect(ranking.undoLastComparison()).rejects.toThrow("No comparison to undo");
 	});
 
-	it("undoLastComparison after stop re-opens ranking", () => {
+	it("undoLastComparison after stop re-opens ranking", async () => {
 		const items = ["a", "b"];
 		const ranking = new Ranking(items, {
 			k: 1,
 			maxComparisons: 1,
 			monteCarloSamples: 50,
-			rng: makeRng(1),
+			seed: 1,
 		});
 
-		const { a, b } = ranking.selectPair();
-		ranking.recordComparison(a, b);
+		const { a, b } = await ranking.selectPair();
+		await ranking.recordComparison(a, b);
 		expect(ranking.stopped).toBe(true);
 		expect(ranking.stopReason).toBe("max-comparisons");
 
-		ranking.undoLastComparison();
+		await ranking.undoLastComparison();
 		expect(ranking.stopped).toBe(false);
 		expect(ranking.stopReason).toBeNull();
 
 		// Can continue using the ranking after undo
-		const pair = ranking.selectPair();
+		const pair = await ranking.selectPair();
 		expect(pair.a).not.toBe(pair.b);
-		ranking.recordComparison(pair.a, pair.b);
+		await ranking.recordComparison(pair.a, pair.b);
 	});
 
-	it("undoLastComparison returns the undone comparison record", () => {
+	it("undoLastComparison returns the undone comparison record", async () => {
 		const items = ["x", "y", "z"];
 		const ranking = new Ranking(items, {
 			k: 1,
 			maxComparisons: 10,
 			monteCarloSamples: 50,
-			rng: makeRng(7),
+			seed: 7,
 		});
 
-		const { a, b } = ranking.selectPair();
-		ranking.recordComparison(a, b);
+		const { a, b } = await ranking.selectPair();
+		await ranking.recordComparison(a, b);
 
-		const undone = ranking.undoLastComparison();
+		const undone = await ranking.undoLastComparison();
 		expect(undone.winner).toBe(a);
 		expect(undone.loser).toBe(b);
 	});
@@ -924,7 +918,7 @@ describe("estimateStabilityStop", () => {
 });
 
 describe("transcript replay", () => {
-	it("produces estimates from round 10 onward that decrease as stability builds", () => {
+	it("produces estimates from round 10 onward that decrease as stability builds", async () => {
 		// The first 8 meaning sources, matching MEANING_CARDS.slice(0, 8)
 		const cards = ["Social commitment", "Religiosity", "Unity with nature", "Self-knowledge", "Health", "Generativity", "Spirituality", "Challenge"];
 
@@ -970,7 +964,7 @@ describe("transcript replay", () => {
 		for (let i = 0; i < comparisons.length; i++) {
 			const [winner, loser] = comparisons[i];
 			const round = i + 1;
-			const { stopReason } = ranking.recordComparison(winner, loser);
+			const { stopReason } = await ranking.recordComparison(winner, loser);
 
 			const estimate = ranking.estimateRemaining();
 
@@ -1000,26 +994,26 @@ describe("transcript replay", () => {
 });
 
 describe("estimateRemaining integration", () => {
-	it("remains null through round 10 because flip history starts after first transition", () => {
+	it("remains null through round 10 because flip history starts after first transition", async () => {
 		const items = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
 		const ranking = new Ranking(items, {
 			k: 5,
 			maxComparisons: 80,
 			monteCarloSamples: 120,
-			rng: makeRng(19),
+			seed: 19,
 		});
 
 		for (let round = 1; round <= 10; round++) {
-			const { a, b } = ranking.selectPair();
+			const { a, b } = await ranking.selectPair();
 			const winner = a > b ? a : b;
 			const loser = winner === a ? b : a;
-			ranking.recordComparison(winner, loser);
+			await ranking.recordComparison(winner, loser);
 			expect(ranking.round).toBe(round);
 			expect(ranking.estimateRemaining()).toBeNull();
 		}
 	});
 
-	it("returns non-null after stabilityWindow rounds and mid decreases as stability builds", () => {
+	it("returns non-null after stabilityWindow rounds and mid decreases as stability builds", async () => {
 		const items = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
 		const trueStrength = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
 
@@ -1031,17 +1025,17 @@ describe("estimateRemaining integration", () => {
 			k: 5,
 			maxComparisons: 80,
 			monteCarloSamples: 200,
-			rng: makeRng(42),
+			seed: 42,
 		});
 
 		let firstNonNullRound = 0;
 		const estimates: { round: number; mid: number }[] = [];
 
 		while (!ranking.stopped) {
-			const { a, b } = ranking.selectPair();
+			const { a, b } = await ranking.selectPair();
 			const winner = oracle(a, b);
 			const loser = winner === a ? b : a;
-			ranking.recordComparison(winner, loser);
+			await ranking.recordComparison(winner, loser);
 			const est = ranking.estimateRemaining();
 			if (est !== null) {
 				if (firstNonNullRound === 0) firstNonNullRound = ranking.round;
@@ -1061,7 +1055,7 @@ describe("estimateRemaining integration", () => {
 		expect(lastEstimate.mid).toBeLessThan(15);
 	});
 
-	it("never exceeds max-comparisons budget in low-budget runs", () => {
+	it("never exceeds max-comparisons budget in low-budget runs", async () => {
 		const items = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
 		const trueStrength = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
 
@@ -1074,14 +1068,14 @@ describe("estimateRemaining integration", () => {
 			maxComparisons: 12,
 			confidenceThreshold: Number.POSITIVE_INFINITY,
 			monteCarloSamples: 120,
-			rng: makeRng(7),
+			seed: 7,
 		});
 
 		while (!ranking.stopped) {
-			const { a, b } = ranking.selectPair();
+			const { a, b } = await ranking.selectPair();
 			const winner = oracle(a, b);
 			const loser = winner === a ? b : a;
-			ranking.recordComparison(winner, loser);
+			await ranking.recordComparison(winner, loser);
 
 			const est = ranking.estimateRemaining();
 			if (est !== null) {

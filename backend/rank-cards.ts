@@ -15,7 +15,7 @@ async function main(): Promise<void> {
 	const ranking = new Ranking<MeaningCard>(cards);
 
 	while (!ranking.stopped) {
-		const { a, b } = ranking.selectPair();
+		const { a, b } = await ranking.selectPair();
 
 		// Randomize display order to control for position bias
 		const showAFirst = Math.random() < 0.5;
@@ -41,7 +41,7 @@ async function main(): Promise<void> {
 
 		const winner = choice;
 		const loser = winner === left ? right : left;
-		const { stopReason } = ranking.recordComparison(winner, loser);
+		const { stopReason } = await ranking.recordComparison(winner, loser);
 
 		// Show progress
 		console.log(`  Comparisons so far: ${String(ranking.round)}`);

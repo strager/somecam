@@ -28,15 +28,6 @@ function sid(): string {
 	return getActiveSessionId();
 }
 
-// Seeded RNG for deterministic tests (simple LCG)
-function seededRng(seed: number): () => number {
-	let s = seed;
-	return () => {
-		s = (s * 1664525 + 1013904223) & 0x7fffffff;
-		return s / 0x7fffffff;
-	};
-}
-
 function setupSwipeProgressAllSwiped(cardIds: string[]): void {
 	saveSwipeProgress(sid(), {
 		shuffledCardIds: cardIds,
@@ -56,41 +47,41 @@ afterEach(() => {
 });
 
 describe("initialize", () => {
-	it("returns 'no-data' when sorting isn't complete", () => {
+	it("returns 'no-data' when sorting isn't complete", async () => {
 		const vm = new FindMeaningRankingViewModel(sid());
-		expect(vm.initialize(seededRng(1))).toBe("no-data");
+		expect(await vm.initialize(1)).toBe("no-data");
 	});
 
-	it("returns 'no-data' when swipe progress exists but not all cards swiped", () => {
+	it("returns 'no-data' when swipe progress exists but not all cards swiped", async () => {
 		const cardIds = MEANING_CARDS.slice(0, 7).map((c) => c.id);
 		saveSwipeProgress(sid(), {
 			shuffledCardIds: cardIds,
 			swipeHistory: [{ cardId: cardIds[0], direction: "agree" }],
 		});
 		const vm = new FindMeaningRankingViewModel(sid());
-		expect(vm.initialize(seededRng(1))).toBe("no-data");
+		expect(await vm.initialize(1)).toBe("no-data");
 	});
 
-	it("returns 'skip' when <=5 candidate cards", () => {
+	it("returns 'skip' when <=5 candidate cards", async () => {
 		const cardIds = MEANING_CARDS.slice(0, 4).map((c) => c.id);
 		setupSwipeProgressAllSwiped(cardIds);
 		const vm = new FindMeaningRankingViewModel(sid());
-		expect(vm.initialize(seededRng(1))).toBe("skip");
+		expect(await vm.initialize(1)).toBe("skip");
 		expect(loadChosenCardIds(sid())).toEqual(cardIds);
 	});
 
-	it("returns 'ready' when >5 cards, populates currentPair", () => {
+	it("returns 'ready' when >5 cards, populates currentPair", async () => {
 		const cardIds = MEANING_CARDS.slice(0, 7).map((c) => c.id);
 		setupSwipeProgressAllSwiped(cardIds);
 		const vm = new FindMeaningRankingViewModel(sid());
-		expect(vm.initialize(seededRng(1))).toBe("ready");
+		expect(await vm.initialize(1)).toBe("ready");
 		expect(vm.currentPair).not.toBeNull();
 		expect(vm.currentPair!.length).toBe(2);
 		expect(vm.round).toBe(0);
 		expect(vm.isComplete).toBe(false);
 	});
 
-	it("resumes from saved comparison history", () => {
+	it("resumes from saved comparison history", async () => {
 		const cardIds = MEANING_CARDS.slice(0, 7).map((c) => c.id);
 		saveRanking(sid(), {
 			cardIds,
@@ -98,31 +89,31 @@ describe("initialize", () => {
 			complete: false,
 		});
 		const vm = new FindMeaningRankingViewModel(sid());
-		expect(vm.initialize(seededRng(1))).toBe("ready");
+		expect(await vm.initialize(1)).toBe("ready");
 		expect(vm.round).toBe(1);
 		expect(vm.canUndo).toBe(true);
 	});
 });
 
 describe("choose", () => {
-	function setupVm(): FindMeaningRankingViewModel {
+	async function setupVm(): Promise<FindMeaningRankingViewModel> {
 		const cardIds = MEANING_CARDS.slice(0, 7).map((c) => c.id);
 		setupSwipeProgressAllSwiped(cardIds);
 		const vm = new FindMeaningRankingViewModel(sid());
-		vm.initialize(seededRng(42));
+		await vm.initialize(42);
 		return vm;
 	}
 
-	it("advances round and persists to localStorage", () => {
-		const vm = setupVm();
-		vm.choose(0);
+	it("advances round and persists to localStorage", async () => {
+		const vm = await setupVm();
+		await vm.choose(0);
 		expect(vm.round).toBe(1);
 		const saved = loadRanking(sid());
 		expect(saved).not.toBeNull();
 		expect(saved!.comparisons).toHaveLength(1);
 	});
 
-	it("throws when isComplete", () => {
+	it("throws when isComplete", async () => {
 		const cardIds = MEANING_CARDS.slice(0, 7).map((c) => c.id);
 		// Build many comparisons to trigger max-comparisons stop
 		const comparisons = [];
@@ -131,44 +122,40 @@ describe("choose", () => {
 		}
 		saveRanking(sid(), { cardIds, comparisons, complete: false });
 		const vm = new FindMeaningRankingViewModel(sid());
-		vm.initialize(seededRng(42));
+		await vm.initialize(42);
 		// After replaying 80 comparisons, it should be stopped
 		expect(vm.isComplete).toBe(true);
-		expect(() => {
-			vm.choose(0);
-		}).toThrow();
+		await expect(vm.choose(0)).rejects.toThrow();
 	});
 });
 
 describe("undo", () => {
-	function setupVm(): FindMeaningRankingViewModel {
+	async function setupVm(): Promise<FindMeaningRankingViewModel> {
 		const cardIds = MEANING_CARDS.slice(0, 7).map((c) => c.id);
 		setupSwipeProgressAllSwiped(cardIds);
 		const vm = new FindMeaningRankingViewModel(sid());
-		vm.initialize(seededRng(42));
+		await vm.initialize(42);
 		return vm;
 	}
 
-	it("throws when no comparisons", () => {
-		const vm = setupVm();
-		expect(() => {
-			vm.undo();
-		}).toThrow();
+	it("throws when no comparisons", async () => {
+		const vm = await setupVm();
+		await expect(vm.undo()).rejects.toThrow();
 	});
 
-	it("decrements round", () => {
-		const vm = setupVm();
-		vm.choose(0);
+	it("decrements round", async () => {
+		const vm = await setupVm();
+		await vm.choose(0);
 		expect(vm.round).toBe(1);
-		vm.undo();
+		await vm.undo();
 		expect(vm.round).toBe(0);
 		expect(vm.canUndo).toBe(false);
 	});
 
-	it("persists to localStorage", () => {
-		const vm = setupVm();
-		vm.choose(0);
-		vm.undo();
+	it("persists to localStorage", async () => {
+		const vm = await setupVm();
+		await vm.choose(0);
+		await vm.undo();
 		const saved = loadRanking(sid());
 		expect(saved).not.toBeNull();
 		expect(saved!.comparisons).toHaveLength(0);
@@ -176,15 +163,15 @@ describe("undo", () => {
 });
 
 describe("finalize", () => {
-	it("saves chosen cards via loadChosenCardIds", () => {
+	it("saves chosen cards via loadChosenCardIds", async () => {
 		const cardIds = MEANING_CARDS.slice(0, 7).map((c) => c.id);
 		setupSwipeProgressAllSwiped(cardIds);
 		const vm = new FindMeaningRankingViewModel(sid());
-		vm.initialize(seededRng(42));
+		await vm.initialize(42);
 
 		// Make comparisons until complete
 		while (!vm.isComplete) {
-			vm.choose(0);
+			await vm.choose(0);
 		}
 		vm.finalize();
 		const chosen = loadChosenCardIds(sid());
@@ -194,17 +181,17 @@ describe("finalize", () => {
 });
 
 describe("full ranking run", () => {
-	it("completes ranking with 7 cards, picking lexicographically lowest card", () => {
+	it("completes ranking with 7 cards, picking lexicographically lowest card", async () => {
 		const cardIds = MEANING_CARDS.slice(0, 7).map((c) => c.id);
 		setupSwipeProgressAllSwiped(cardIds);
 		const vm = new FindMeaningRankingViewModel(sid());
-		vm.initialize(seededRng(99));
+		await vm.initialize(99);
 
 		while (!vm.isComplete) {
 			const pair = vm.currentPair!;
 			// Pick the card with lexicographically lower ID
 			const index = pair[0].id <= pair[1].id ? 0 : 1;
-			vm.choose(index);
+			await vm.choose(index);
 		}
 
 		expect(vm.topK.length).toBe(5);
