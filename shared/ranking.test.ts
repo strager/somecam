@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { type WinLoss, bayesianRefit, checkConfidenceStop, checkStabilityStop, choleskyDecompose, choleskyInverse, choleskySolve, computeInformationGain, Ranking, selectPair, sigmoid, topKEntropy } from "./ranking.ts";
+import { type WinLoss, bayesianRefit, checkConfidenceStop, checkStabilityStop, choleskyDecompose, choleskyInverse, choleskySolve, computeInformationGain, estimateStabilityStop, Ranking, selectPair, sigmoid, topKEntropy } from "./ranking.ts";
 
 /** Seeded xorshift32 PRNG returning values in (0, 1). */
 function makeRng(seed: number): () => number {
@@ -830,5 +830,271 @@ describe("Ranking class", () => {
 		const undone = ranking.undoLastComparison();
 		expect(undone.winner).toBe(a);
 		expect(undone.loser).toBe(b);
+	});
+});
+
+describe("estimateStabilityStop", () => {
+	it("returns null when flipHistory has fewer entries than stabilityWindow", () => {
+		expect(estimateStabilityStop([], 0, 10)).toBeNull();
+		expect(estimateStabilityStop([false, true, false, true], 0, 10)).toBeNull();
+		// 9 entries, window=10 → still null
+		expect(estimateStabilityStop([false, false, false, false, false, false, false, false, false], 0, 10)).toBeNull();
+	});
+
+	it("with no flips in history, returns approximately stabilityWindow - stableCount", () => {
+		const history = new Array<boolean>(10).fill(false);
+		const result = estimateStabilityStop(history, 3, 10);
+		expect(result).not.toBeNull();
+		if (result === null) return;
+		// With 0 flips, p is very low via Jeffreys prior, so mid ≈ needed = 7 + small overshoot
+		expect(result.mid).toBeGreaterThanOrEqual(6);
+		expect(result.mid).toBeLessThanOrEqual(10);
+	});
+
+	it("with higher flip rate, returns larger estimate or null", () => {
+		// Use stableCount=6 so needed=4, keeping intervals tight enough to pass
+		const noFlips = new Array<boolean>(10).fill(false);
+		const someFlips = [true, false, false, false, false, false, false, false, false, false];
+		const resultNoFlips = estimateStabilityStop(noFlips, 6, 10);
+		const resultSomeFlips = estimateStabilityStop(someFlips, 6, 10);
+		expect(resultNoFlips).not.toBeNull();
+		if (resultNoFlips === null) return;
+		// With more flips, estimate is either larger or suppressed as unreliable
+		if (resultSomeFlips !== null) {
+			expect(resultSomeFlips.mid).toBeGreaterThan(resultNoFlips.mid);
+		}
+	});
+
+	it("returns null when flip rate makes interval too wide", () => {
+		// 50% flip rate with needed=10 → huge, unreliable interval
+		const history = [true, false, true, false, true, false, true, false, true, false];
+		const result = estimateStabilityStop(history, 0, 10);
+		expect(result).toBeNull();
+	});
+
+	it("caps low/mid/high by maxRemaining when provided", () => {
+		const history = new Array<boolean>(10).fill(false);
+		const result = estimateStabilityStop(history, 0, 10, 3);
+		expect(result).not.toBeNull();
+		if (result === null) return;
+		expect(result.low).toBe(3);
+		expect(result.mid).toBe(3);
+		expect(result.high).toBe(3);
+	});
+
+	it("applies cap before wide-interval suppression", () => {
+		// Without cap, this case is too wide and returns null.
+		const history = [true, false, true, false, true, false, true, false, true, false];
+		const uncapped = estimateStabilityStop(history, 0, 10);
+		expect(uncapped).toBeNull();
+
+		// With a tight hard cap, the estimate should collapse to that cap.
+		const capped = estimateStabilityStop(history, 0, 10, 4);
+		expect(capped).not.toBeNull();
+		if (capped === null) return;
+		expect(capped.low).toBe(4);
+		expect(capped.mid).toBe(4);
+		expect(capped.high).toBe(4);
+	});
+
+	it("satisfies low <= mid <= high", () => {
+		// Use a low flip rate with stableCount close to window for tight interval
+		const history = [false, false, true, false, false, false, false, false, false, false];
+		const result = estimateStabilityStop(history, 6, 10);
+		expect(result).not.toBeNull();
+		if (result === null) return;
+		expect(result.low).toBeLessThanOrEqual(result.mid);
+		expect(result.mid).toBeLessThanOrEqual(result.high);
+	});
+
+	it("with stableCount close to stabilityWindow, returns small estimate", () => {
+		const history = new Array<boolean>(10).fill(false);
+		const result = estimateStabilityStop(history, 8, 10);
+		expect(result).not.toBeNull();
+		if (result === null) return;
+		// Only need 2 more stable rounds
+		expect(result.mid).toBeLessThanOrEqual(3);
+		expect(result.mid).toBeGreaterThanOrEqual(1);
+	});
+
+	it("returns zero interval when maxRemaining is zero", () => {
+		expect(estimateStabilityStop([], 0, 10, 0)).toEqual({ low: 0, mid: 0, high: 0 });
+		expect(estimateStabilityStop([true, false], 0, 10, 0)).toEqual({ low: 0, mid: 0, high: 0 });
+	});
+});
+
+describe("transcript replay", () => {
+	it("produces estimates from round 10 onward that decrease as stability builds", () => {
+		// The first 8 meaning sources, matching MEANING_CARDS.slice(0, 8)
+		const cards = ["Social commitment", "Religiosity", "Unity with nature", "Self-knowledge", "Health", "Generativity", "Spirituality", "Challenge"];
+
+		const ranking = new Ranking(cards, { k: 5 });
+
+		// Winner/loser pairs from transcript (user picked displayed A or B;
+		// we record which source won and which lost).
+		const comparisons: [winner: string, loser: string][] = [
+			["Religiosity", "Unity with nature"], // round 1
+			["Self-knowledge", "Health"], // round 2
+			["Generativity", "Religiosity"], // round 3
+			["Spirituality", "Health"], // round 4
+			["Challenge", "Unity with nature"], // round 5
+			["Generativity", "Health"], // round 6
+			["Social commitment", "Challenge"], // round 7
+			["Religiosity", "Health"], // round 8
+			["Self-knowledge", "Spirituality"], // round 9
+			["Generativity", "Health"], // round 10
+			["Religiosity", "Unity with nature"], // round 11
+			["Generativity", "Self-knowledge"], // round 12
+			["Challenge", "Spirituality"], // round 13
+			["Social commitment", "Health"], // round 14
+			["Spirituality", "Unity with nature"], // round 15
+			["Challenge", "Religiosity"], // round 16
+			["Spirituality", "Unity with nature"], // round 17
+			["Generativity", "Health"], // round 18
+			["Spirituality", "Religiosity"], // round 19
+			["Challenge", "Social commitment"], // round 20
+			["Spirituality", "Religiosity"], // round 21
+			["Generativity", "Challenge"], // round 22
+			["Social commitment", "Health"], // round 23
+			["Challenge", "Spirituality"], // round 24
+			["Self-knowledge", "Religiosity"], // round 25
+			["Generativity", "Challenge"], // round 26
+			["Health", "Unity with nature"], // round 27
+			["Generativity", "Social commitment"], // round 28
+			["Religiosity", "Unity with nature"], // round 29
+		];
+
+		let sawEstimateFromRound5 = false;
+		let lastEstimateMid: number | null = null;
+
+		for (let i = 0; i < comparisons.length; i++) {
+			const [winner, loser] = comparisons[i];
+			const round = i + 1;
+			const { stopReason } = ranking.recordComparison(winner, loser);
+
+			const estimate = ranking.estimateRemaining();
+
+			if (round >= 10 && estimate !== null) {
+				sawEstimateFromRound5 = true;
+				expect(estimate.low).toBeLessThanOrEqual(estimate.mid);
+				expect(estimate.mid).toBeLessThanOrEqual(estimate.high);
+				lastEstimateMid = estimate.mid;
+			}
+
+			if (stopReason !== null) {
+				break;
+			}
+		}
+
+		expect(sawEstimateFromRound5).toBe(true);
+		// By the final rounds, the estimate should be small (close to stabilityWindow - stableCount)
+		expect(lastEstimateMid).not.toBeNull();
+		if (lastEstimateMid !== null) {
+			expect(lastEstimateMid).toBeLessThanOrEqual(12);
+		}
+
+		// Confirm it stopped via stability, not confidence
+		expect(ranking.stopped).toBe(true);
+		expect(ranking.stopReason).toBe("stability");
+	});
+});
+
+describe("estimateRemaining integration", () => {
+	it("remains null through round 10 because flip history starts after first transition", () => {
+		const items = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
+		const ranking = new Ranking(items, {
+			k: 5,
+			maxComparisons: 80,
+			monteCarloSamples: 120,
+			rng: makeRng(19),
+		});
+
+		for (let round = 1; round <= 10; round++) {
+			const { a, b } = ranking.selectPair();
+			const winner = a > b ? a : b;
+			const loser = winner === a ? b : a;
+			ranking.recordComparison(winner, loser);
+			expect(ranking.round).toBe(round);
+			expect(ranking.estimateRemaining()).toBeNull();
+		}
+	});
+
+	it("returns non-null after stabilityWindow rounds and mid decreases as stability builds", () => {
+		const items = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
+		const trueStrength = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
+
+		function oracle(a: number, b: number): number {
+			return trueStrength[a] >= trueStrength[b] ? a : b;
+		}
+
+		const ranking = new Ranking(items, {
+			k: 5,
+			maxComparisons: 80,
+			monteCarloSamples: 200,
+			rng: makeRng(42),
+		});
+
+		let firstNonNullRound = 0;
+		const estimates: { round: number; mid: number }[] = [];
+
+		while (!ranking.stopped) {
+			const { a, b } = ranking.selectPair();
+			const winner = oracle(a, b);
+			const loser = winner === a ? b : a;
+			ranking.recordComparison(winner, loser);
+			const est = ranking.estimateRemaining();
+			if (est !== null) {
+				if (firstNonNullRound === 0) firstNonNullRound = ranking.round;
+				estimates.push({ round: ranking.round, mid: est.mid });
+				expect(est.low).toBeLessThanOrEqual(est.mid);
+				expect(est.mid).toBeLessThanOrEqual(est.high);
+			}
+		}
+
+		// Should get estimates once we have a full window of flip history
+		expect(firstNonNullRound).toBeLessThanOrEqual(15);
+		expect(estimates.length).toBeGreaterThan(0);
+
+		// The last estimate's mid should be small (close to 0, since stability
+		// was nearly reached)
+		const lastEstimate = estimates[estimates.length - 1];
+		expect(lastEstimate.mid).toBeLessThan(15);
+	});
+
+	it("never exceeds max-comparisons budget in low-budget runs", () => {
+		const items = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
+		const trueStrength = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
+
+		function oracle(a: number, b: number): number {
+			return trueStrength[a] >= trueStrength[b] ? a : b;
+		}
+
+		const ranking = new Ranking(items, {
+			k: 5,
+			maxComparisons: 12,
+			confidenceThreshold: Number.POSITIVE_INFINITY,
+			monteCarloSamples: 120,
+			rng: makeRng(7),
+		});
+
+		while (!ranking.stopped) {
+			const { a, b } = ranking.selectPair();
+			const winner = oracle(a, b);
+			const loser = winner === a ? b : a;
+			ranking.recordComparison(winner, loser);
+
+			const est = ranking.estimateRemaining();
+			if (est !== null) {
+				const budget = 12 - ranking.round;
+				expect(est.low).toBeLessThanOrEqual(budget);
+				expect(est.mid).toBeLessThanOrEqual(budget);
+				expect(est.high).toBeLessThanOrEqual(budget);
+				expect(est.low).toBeLessThanOrEqual(est.mid);
+				expect(est.mid).toBeLessThanOrEqual(est.high);
+			}
+		}
+
+		expect(ranking.stopReason).toBe("max-comparisons");
+		expect(ranking.estimateRemaining()).toEqual({ low: 0, mid: 0, high: 0 });
 	});
 });

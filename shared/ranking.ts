@@ -48,6 +48,8 @@ export type StopReason = "confidence" | "stability" | "max-comparisons";
 
 export type WinLoss = readonly [winner: number, loser: number];
 
+export type RemainingEstimate = { low: number; mid: number; high: number } | null;
+
 export interface ComparisonRecord<T> {
 	winner: T;
 	loser: T;
@@ -90,6 +92,7 @@ export class Ranking<T> {
 	private _sigma: Float64Array;
 	private _history: WinLoss[];
 	private _comparisonRecords: ComparisonRecord<T>[];
+	private _flipHistory: boolean[];
 	private _round: number;
 	private _stopped: boolean;
 	private _stopReason: StopReason | null;
@@ -104,6 +107,7 @@ export class Ranking<T> {
 		this._sigma = new Float64Array(this._n).fill(Math.sqrt(this._config.priorVariance));
 		this._history = [];
 		this._comparisonRecords = [];
+		this._flipHistory = [];
 		this._round = 0;
 		this._stopped = false;
 		this._stopReason = null;
@@ -155,6 +159,9 @@ export class Ranking<T> {
 
 		// Stability stop
 		const stability = checkStabilityStop(this._mu, this._config.k, this._previousTopK, this._stableCount, this._config.stabilityWindow);
+		if (this._previousTopK !== null) {
+			this._flipHistory.push(stability.stableCount === 0);
+		}
 		this._previousTopK = stability.topK;
 		this._stableCount = stability.stableCount;
 		if (stability.stopped) {
@@ -182,6 +189,7 @@ export class Ranking<T> {
 		this._stopReason = null;
 
 		this._history.pop();
+		this._flipHistory.pop();
 		const record = this._comparisonRecords.pop();
 		if (record === undefined) {
 			throw new Error("No comparison to undo");
@@ -237,12 +245,18 @@ export class Ranking<T> {
 		copy._sigma = this._sigma.slice();
 		copy._history = [...this._history];
 		copy._comparisonRecords = [...this._comparisonRecords];
+		copy._flipHistory = [...this._flipHistory];
 		copy._round = this._round;
 		copy._stopped = this._stopped;
 		copy._stopReason = this._stopReason;
 		copy._previousTopK = this._previousTopK !== null ? [...this._previousTopK] : null;
 		copy._stableCount = this._stableCount;
 		return copy;
+	}
+
+	estimateRemaining(): RemainingEstimate {
+		const maxRemaining = Math.max(0, this._config.maxComparisons - this._round);
+		return estimateStabilityStop(this._flipHistory, this._stableCount, this._config.stabilityWindow, maxRemaining);
 	}
 }
 
@@ -344,31 +358,45 @@ export function computeInformationGain(i: number, j: number, mu: Float64Array, s
  * @param confidenceThreshold - gap must exceed this value (default 0)
  */
 export function checkConfidenceStop(mu: Float64Array, sigma: Float64Array, k: number, z: number, confidenceThreshold: number): boolean {
+	const constraint = findBindingConstraint(mu, sigma, k, z);
+	if (constraint === null) return true; // k >= n, all items in top-k
+	return constraint.weakestLcb - constraint.strongestUcb > confidenceThreshold;
+}
+
+/**
+ * Find the binding constraint for confidence-based stopping: the weakest
+ * top-k item (lowest LCB) and the strongest non-top-k item (highest UCB).
+ *
+ * Returns null when k >= n (all items are in the top-k).
+ */
+function findBindingConstraint(mu: Float64Array, sigma: Float64Array, k: number, z: number): { weakestIdx: number; weakestLcb: number; strongestIdx: number; strongestUcb: number } | null {
 	const sorted = argsortDescending(mu);
 	const topK = sorted.slice(0, k);
 	const rest = sorted.slice(k);
 
-	if (rest.length === 0) {
-		return true;
-	}
+	if (rest.length === 0) return null;
 
-	let weakestInLcb = Infinity;
+	let weakestIdx = topK[0];
+	let weakestLcb = mu[topK[0]] - z * sigma[topK[0]];
 	for (const i of topK) {
 		const lcb = mu[i] - z * sigma[i];
-		if (lcb < weakestInLcb) {
-			weakestInLcb = lcb;
+		if (lcb < weakestLcb) {
+			weakestLcb = lcb;
+			weakestIdx = i;
 		}
 	}
 
-	let strongestOutUcb = -Infinity;
+	let strongestIdx = rest[0];
+	let strongestUcb = mu[rest[0]] + z * sigma[rest[0]];
 	for (const j of rest) {
 		const ucb = mu[j] + z * sigma[j];
-		if (ucb > strongestOutUcb) {
-			strongestOutUcb = ucb;
+		if (ucb > strongestUcb) {
+			strongestUcb = ucb;
+			strongestIdx = j;
 		}
 	}
 
-	return weakestInLcb - strongestOutUcb > confidenceThreshold;
+	return { weakestIdx, weakestLcb, strongestIdx, strongestUcb };
 }
 
 /**
@@ -407,9 +435,71 @@ export function checkStabilityStop(mu: Float64Array, k: number, previousTopK: re
 }
 
 /**
+ * Estimate how many rounds remain until the stability stop triggers.
+ *
+ * Uses the empirical flip rate from a sliding window of recent rounds to
+ * model the expected number of consecutive non-flip rounds needed. Produces
+ * a confidence interval via a Beta posterior on the flip probability.
+ *
+ * @param flipHistory - boolean array: true = top-k set changed on that round
+ * @param stableCount - current consecutive stable round count
+ * @param stabilityWindow - number of consecutive stable rounds to trigger stop
+ * @param maxRemaining - optional hard cap on remaining rounds
+ */
+export function estimateStabilityStop(flipHistory: readonly boolean[], stableCount: number, stabilityWindow: number, maxRemaining?: number): RemainingEstimate {
+	const cappedMaxRemaining = maxRemaining !== undefined ? Math.max(0, maxRemaining) : undefined;
+	if (cappedMaxRemaining !== undefined && cappedMaxRemaining === 0) {
+		return { low: 0, mid: 0, high: 0 };
+	}
+
+	if (flipHistory.length < stabilityWindow) return null;
+
+	const needed = stabilityWindow - stableCount;
+
+	// Empirical flip rate from sliding window with Jeffreys prior
+	const window = Math.min(15, flipHistory.length);
+	let flips = 0;
+	for (let i = flipHistory.length - window; i < flipHistory.length; i++) {
+		if (flipHistory[i]) flips++;
+	}
+	const p = (flips + 0.5) / (window + 1);
+
+	// Expected remaining rounds via Markov chain:
+	// Need `needed` consecutive non-flip rounds.
+	// E[rounds] = (1/q) * ((1/q)^needed - 1) / (1/q - 1) when p >= 0.01
+	function expectedRounds(flipProb: number, need: number): number {
+		if (need <= 0) return 0;
+		const qq = 1 - flipProb;
+		if (flipProb < 0.01) return need;
+		const invQ = 1 / qq;
+		return (invQ * (Math.pow(invQ, need) - 1)) / (invQ - 1);
+	}
+
+	const rawMid = expectedRounds(p, needed);
+
+	// Confidence interval via normal approximation to Beta posterior
+	const se = 0.675 * Math.sqrt((p * (1 - p)) / (window + 1));
+	const pLow = Math.max(0, p - se);
+	const pHigh = Math.min(0.99, p + se);
+
+	// Higher flip prob → more remaining rounds
+	const rawLow = expectedRounds(pLow, needed);
+	const rawHigh = expectedRounds(pHigh, needed);
+
+	const low = cappedMaxRemaining === undefined ? rawLow : Math.min(rawLow, cappedMaxRemaining);
+	const mid = cappedMaxRemaining === undefined ? rawMid : Math.min(rawMid, cappedMaxRemaining);
+	const high = cappedMaxRemaining === undefined ? rawHigh : Math.min(rawHigh, cappedMaxRemaining);
+
+	// Hide unreliable estimates where the confidence interval is too wide
+	if (high > 3 * low && high - low > stabilityWindow) return null;
+
+	return { low, mid, high };
+}
+
+/**
  * Helper: return indices sorted by descending mu value.
  */
-function argsortDescending(mu: Float64Array): number[] {
+export function argsortDescending(mu: Float64Array): number[] {
 	const indices: number[] = [];
 	for (let i = 0; i < mu.length; i++) {
 		indices.push(i);

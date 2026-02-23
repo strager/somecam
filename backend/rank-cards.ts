@@ -47,6 +47,14 @@ async function main(): Promise<void> {
 		console.log(`  Comparisons so far: ${String(ranking.round)}`);
 		console.log(`  Current top 5: ${ranking.topK.map((c: MeaningCard) => c.source).join(", ")}`);
 
+		const remaining = ranking.estimateRemaining();
+		if (remaining !== null) {
+			const lo = Math.ceil(remaining.low);
+			const mid = Math.ceil(remaining.mid);
+			const hi = Math.ceil(remaining.high);
+			console.log(`  Estimated remaining: ~${String(mid)} (${String(lo)}-${String(hi)})`);
+		}
+
 		if (stopReason !== null) {
 			console.log(`\n  Stopping: ${stopReason}`);
 		}
